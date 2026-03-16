@@ -1,0 +1,5 @@
+DROP INDEX IF EXISTS idx_shares_folder;
+ALTER TABLE shares DROP CONSTRAINT IF EXISTS shares_target_check;
+ALTER TABLE shares DROP COLUMN IF EXISTS share_type;
+ALTER TABLE shares DROP COLUMN IF EXISTS folder_id;
+ALTER TABLE shares ALTER COLUMN file_id SET NOT NULL;

@@ -1,0 +1,139 @@
+package file
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// Request types
+
+type RenameFileRequest struct {
+	Name string `json:"name" validate:"required,min=1,max=255"`
+}
+
+type MoveFileRequest struct {
+	FolderID *uuid.UUID `json:"folder_id"` // nil = move to root
+}
+
+type CopyFileRequest struct {
+	FolderID *uuid.UUID `json:"folder_id"` // nil = copy to root
+}
+
+// Domain model
+
+type File struct {
+	ID                uuid.UUID
+	UserID            uuid.UUID
+	FolderID          *uuid.UUID
+	Name              string
+	StorageKey        string
+	ThumbnailKey      string
+	Size              int64
+	MimeType          string
+	ContentHash       string
+	ScanStatus        string
+	CurrentVersion    int
+	IsVideo           bool
+	StreamVideoID      string
+	StreamStatus      string // "", "processing", "ready", "failed"
+	HLSURL            string
+	VideoThumbnailURL string
+	TrashedAt         *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type FileVersion struct {
+	ID            uuid.UUID
+	FileID        uuid.UUID
+	VersionNumber int
+	StorageKey    string
+	Size          int64
+	ContentHash   string
+	CreatedBy     uuid.UUID
+	CreatedAt     time.Time
+}
+
+// Response types
+
+type FileResponse struct {
+	ID                uuid.UUID  `json:"id"`
+	FolderID          *uuid.UUID `json:"folder_id"`
+	Name              string     `json:"name"`
+	Size              int64      `json:"size"`
+	MimeType          string     `json:"mime_type"`
+	ThumbnailKey      string     `json:"thumbnail_key,omitempty"`
+	ScanStatus        string     `json:"scan_status"`
+	CurrentVersion    int        `json:"current_version"`
+	IsVideo           bool       `json:"is_video"`
+	StreamStatus      string     `json:"stream_status,omitempty"`
+	HLSURL            string     `json:"hls_url,omitempty"`
+	VideoThumbnailURL string     `json:"video_thumbnail_url,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type FileVersionResponse struct {
+	ID            uuid.UUID `json:"id"`
+	FileID        uuid.UUID `json:"file_id"`
+	VersionNumber int       `json:"version_number"`
+	Size          int64     `json:"size"`
+	ContentHash   string    `json:"content_hash"`
+	CreatedBy     uuid.UUID `json:"created_by"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+func (f *File) ToResponse() FileResponse {
+	return FileResponse{
+		ID:                f.ID,
+		FolderID:          f.FolderID,
+		Name:              f.Name,
+		Size:              f.Size,
+		MimeType:          f.MimeType,
+		ThumbnailKey:      f.ThumbnailKey,
+		ScanStatus:        f.ScanStatus,
+		CurrentVersion:    f.CurrentVersion,
+		IsVideo:           f.IsVideo,
+		StreamStatus:      f.StreamStatus,
+		HLSURL:            f.HLSURL,
+		VideoThumbnailURL: f.VideoThumbnailURL,
+		CreatedAt:         f.CreatedAt,
+		UpdatedAt:         f.UpdatedAt,
+	}
+}
+
+func (v *FileVersion) ToResponse() FileVersionResponse {
+	return FileVersionResponse{
+		ID:            v.ID,
+		FileID:        v.FileID,
+		VersionNumber: v.VersionNumber,
+		Size:          v.Size,
+		ContentHash:   v.ContentHash,
+		CreatedBy:     v.CreatedBy,
+		CreatedAt:     v.CreatedAt,
+	}
+}
+
+type DownloadResponse struct {
+	URL               string `json:"url"`
+	ExpiresIn         int64  `json:"expires_in"` // seconds
+	IsVideo           bool   `json:"is_video"`
+	HLSURL            string `json:"hls_url,omitempty"`
+	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
+}
+
+// Combined listing response for folder contents
+type FolderContentsItem struct {
+	Type   string      `json:"type"` // "folder" or "file"
+	Folder *FolderItem `json:"folder,omitempty"`
+	File   *FileResponse `json:"file,omitempty"`
+}
+
+type FolderItem struct {
+	ID        uuid.UUID  `json:"id"`
+	ParentID  *uuid.UUID `json:"parent_id"`
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	CreatedAt time.Time  `json:"created_at"`
+}

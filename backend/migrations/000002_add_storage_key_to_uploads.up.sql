@@ -1,0 +1,1 @@
+ALTER TABLE upload_sessions ADD COLUMN storage_key VARCHAR(500) NOT NULL DEFAULT '';

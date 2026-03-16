@@ -1,0 +1,109 @@
+version: "3.8"
+
+# Scaled deployment overlay: docker compose -f docker-compose.yml -f docker-compose.scaled.yml up -d
+# Adds: multiple API instances, PgBouncer, PostgreSQL read replica
+
+services:
+  # PgBouncer connection pooler (sits between API and PostgreSQL)
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: bytebox-pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://${DB_USER:-bytebox}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-bytebox}"
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      POOL_MODE: transaction
+    volumes:
+      - ./pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # PostgreSQL read replica (streaming replication)
+  postgres-replica:
+    image: postgres:16-alpine
+    container_name: bytebox-postgres-replica
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-bytebox}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-bytebox}
+    volumes:
+      - pgdata_replica:/var/lib/postgresql/data
+    command: >
+      bash -c "
+        until pg_isready -h postgres -U ${DB_USER:-bytebox}; do sleep 1; done;
+        pg_basebackup -h postgres -U ${DB_USER:-bytebox} -D /var/lib/postgresql/data -Fp -Xs -P -R 2>/dev/null || true;
+        postgres
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bytebox}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # Scale API to multiple instances
+  api-1:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: bytebox-api-1
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      SERVER_PORT: 8080
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  api-2:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: bytebox-api-2
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      SERVER_PORT: 8080
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # Override single api service — disable it in favor of api-1/api-2
+  api:
+    profiles:
+      - disabled
+
+  # Use the scaled nginx config
+  nginx:
+    volumes:
+      - ./nginx/nginx-scaled.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api-1
+      - api-2
+      - admin
+
+  # Scale workers
+  worker:
+    deploy:
+      replicas: 2
+
+volumes:
+  pgdata_replica:

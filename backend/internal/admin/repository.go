@@ -1,0 +1,350 @@
+package admin
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type Repository struct {
+	db *pgxpool.Pool
+}
+
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db}
+}
+
+func (r *Repository) GetDashboardStats(ctx context.Context) (*DashboardStats, error) {
+	stats := &DashboardStats{}
+
+	queries := []struct {
+		query string
+		dest  *int64
+	}{
+		{`SELECT COUNT(*) FROM users`, &stats.TotalUsers},
+		{`SELECT COUNT(*) FROM users WHERE is_active = true`, &stats.ActiveUsers},
+		{`SELECT COUNT(*) FROM files WHERE trashed_at IS NULL`, &stats.TotalFiles},
+		{`SELECT COALESCE(SUM(storage_used), 0) FROM users`, &stats.TotalStorage},
+		{`SELECT COUNT(*) FROM files WHERE created_at >= CURRENT_DATE`, &stats.UploadsToday},
+		{`SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE`, &stats.NewUsersToday},
+		{`SELECT COUNT(*) FROM files WHERE trashed_at IS NOT NULL`, &stats.TrashedFiles},
+		{`SELECT COUNT(*) FROM upload_sessions WHERE status = 'active'`, &stats.ActiveUploads},
+	}
+
+	for _, q := range queries {
+		if err := r.db.QueryRow(ctx, q.query).Scan(q.dest); err != nil {
+			return nil, fmt.Errorf("dashboard stats: %w", err)
+		}
+	}
+
+	return stats, nil
+}
+
+func (r *Repository) ListUsers(ctx context.Context, limit, offset int, search string) ([]AdminUserResponse, int64, error) {
+	var total int64
+	var countQuery string
+	var countArgs []any
+
+	if search != "" {
+		countQuery = `SELECT COUNT(*) FROM users WHERE email ILIKE $1 OR display_name ILIKE $1`
+		countArgs = []any{"%" + search + "%"}
+	} else {
+		countQuery = `SELECT COUNT(*) FROM users`
+	}
+
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count users: %w", err)
+	}
+
+	var query string
+	var args []any
+
+	if search != "" {
+		query = `
+			SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
+			       u.plan, u.is_active, u.is_admin, u.email_verified, u.last_login_at, u.created_at,
+			       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+			FROM users u
+			WHERE u.email ILIKE $1 OR u.display_name ILIKE $1
+			ORDER BY u.created_at DESC
+			LIMIT $2 OFFSET $3`
+		args = []any{"%" + search + "%", limit, offset}
+	} else {
+		query = `
+			SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
+			       u.plan, u.is_active, u.is_admin, u.email_verified, u.last_login_at, u.created_at,
+			       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+			FROM users u
+			ORDER BY u.created_at DESC
+			LIMIT $1 OFFSET $2`
+		args = []any{limit, offset}
+	}
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []AdminUserResponse
+	for rows.Next() {
+		var u AdminUserResponse
+		if err := rows.Scan(
+			&u.ID, &u.Email, &u.DisplayName, &u.StorageUsed, &u.StorageLimit,
+			&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.LastLoginAt, &u.CreatedAt,
+			&u.FileCount,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+
+	return users, total, nil
+}
+
+func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (*AdminUserResponse, error) {
+	query := `
+		SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
+		       u.plan, u.is_active, u.is_admin, u.email_verified, u.last_login_at, u.created_at,
+		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+		FROM users u
+		WHERE u.id = $1`
+
+	u := &AdminUserResponse{}
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&u.ID, &u.Email, &u.DisplayName, &u.StorageUsed, &u.StorageLimit,
+		&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.LastLoginAt, &u.CreatedAt,
+		&u.FileCount,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get user: %w", err)
+	}
+	return u, nil
+}
+
+func (r *Repository) UpdateUser(ctx context.Context, id uuid.UUID, req UpdateUserRequest) error {
+	if req.Plan != nil {
+		if _, err := r.db.Exec(ctx, `UPDATE users SET plan = $1 WHERE id = $2`, *req.Plan, id); err != nil {
+			return fmt.Errorf("update plan: %w", err)
+		}
+	}
+	if req.StorageLimit != nil {
+		if _, err := r.db.Exec(ctx, `UPDATE users SET storage_limit = $1 WHERE id = $2`, *req.StorageLimit, id); err != nil {
+			return fmt.Errorf("update storage limit: %w", err)
+		}
+	}
+	if req.IsActive != nil {
+		if _, err := r.db.Exec(ctx, `UPDATE users SET is_active = $1 WHERE id = $2`, *req.IsActive, id); err != nil {
+			return fmt.Errorf("update is_active: %w", err)
+		}
+	}
+	if req.IsAdmin != nil {
+		if _, err := r.db.Exec(ctx, `UPDATE users SET is_admin = $1 WHERE id = $2`, *req.IsAdmin, id); err != nil {
+			return fmt.Errorf("update is_admin: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *Repository) BanUser(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET is_active = false WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("ban user: %w", err)
+	}
+	// Delete all sessions
+	_, err = r.db.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete sessions: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetStorageStats(ctx context.Context) (*StorageStats, error) {
+	stats := &StorageStats{}
+
+	// Totals
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(SUM(storage_used), 0), COALESCE(SUM(storage_limit), 0), COUNT(*)
+		FROM users`).Scan(&stats.TotalUsed, &stats.TotalAllocated, &stats.UserCount)
+	if err != nil {
+		return nil, fmt.Errorf("storage totals: %w", err)
+	}
+
+	if stats.UserCount > 0 {
+		stats.AvgPerUser = stats.TotalUsed / stats.UserCount
+	}
+
+	// Top 10 users by storage
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id, u.email, u.storage_used,
+		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+		FROM users u
+		ORDER BY u.storage_used DESC
+		LIMIT 10`)
+	if err != nil {
+		return nil, fmt.Errorf("top users: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var t TopUserStorage
+		if err := rows.Scan(&t.ID, &t.Email, &t.StorageUsed, &t.FileCount); err != nil {
+			return nil, fmt.Errorf("scan top user: %w", err)
+		}
+		stats.TopUsers = append(stats.TopUsers, t)
+	}
+
+	// By plan
+	planRows, err := r.db.Query(ctx, `
+		SELECT plan, COUNT(*), COALESCE(SUM(storage_used), 0)
+		FROM users GROUP BY plan ORDER BY plan`)
+	if err != nil {
+		return nil, fmt.Errorf("plan stats: %w", err)
+	}
+	defer planRows.Close()
+
+	for planRows.Next() {
+		var p PlanStats
+		if err := planRows.Scan(&p.Plan, &p.UserCount, &p.TotalUsed); err != nil {
+			return nil, fmt.Errorf("scan plan: %w", err)
+		}
+		stats.ByPlan = append(stats.ByPlan, p)
+	}
+
+	return stats, nil
+}
+
+func (r *Repository) ListAuditLogs(ctx context.Context, limit, offset int, action, userID string) ([]AuditLogEntry, int64, error) {
+	var total int64
+	var countArgs []any
+	countQuery := `SELECT COUNT(*) FROM audit_logs WHERE 1=1`
+	argIdx := 1
+
+	if action != "" {
+		countQuery += fmt.Sprintf(` AND action = $%d`, argIdx)
+		countArgs = append(countArgs, action)
+		argIdx++
+	}
+	if userID != "" {
+		countQuery += fmt.Sprintf(` AND user_id = $%d`, argIdx)
+		countArgs = append(countArgs, userID)
+		argIdx++
+	}
+
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count audit logs: %w", err)
+	}
+
+	query := `
+		SELECT a.id, a.user_id, u.email, a.action, a.resource_type, a.resource_id,
+		       a.metadata, a.ip_address, a.created_at
+		FROM audit_logs a
+		LEFT JOIN users u ON u.id = a.user_id
+		WHERE 1=1`
+	args := make([]any, 0, len(countArgs)+2)
+	argIdx = 1
+
+	if action != "" {
+		query += fmt.Sprintf(` AND a.action = $%d`, argIdx)
+		args = append(args, action)
+		argIdx++
+	}
+	if userID != "" {
+		query += fmt.Sprintf(` AND a.user_id = $%d`, argIdx)
+		args = append(args, userID)
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` ORDER BY a.created_at DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list audit logs: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []AuditLogEntry
+	for rows.Next() {
+		var entry AuditLogEntry
+		var metaJSON []byte
+		if err := rows.Scan(
+			&entry.ID, &entry.UserID, &entry.UserEmail, &entry.Action,
+			&entry.ResourceType, &entry.ResourceID,
+			&metaJSON, &entry.IPAddress, &entry.CreatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan audit log: %w", err)
+		}
+		if metaJSON != nil {
+			json.Unmarshal(metaJSON, &entry.Metadata)
+		}
+		logs = append(logs, entry)
+	}
+
+	return logs, total, nil
+}
+
+func (r *Repository) GetMimeTypeStats(ctx context.Context) ([]MimeTypeStats, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			CASE
+				WHEN mime_type LIKE 'image/%' THEN 'Images'
+				WHEN mime_type LIKE 'video/%' THEN 'Videos'
+				WHEN mime_type LIKE 'audio/%' THEN 'Audio'
+				WHEN mime_type LIKE 'application/pdf' THEN 'PDFs'
+				WHEN mime_type LIKE 'text/%' THEN 'Text'
+				ELSE 'Other'
+			END as category,
+			COUNT(*) as file_count,
+			COALESCE(SUM(size), 0) as total_size
+		FROM files WHERE trashed_at IS NULL
+		GROUP BY category
+		ORDER BY total_size DESC`)
+	if err != nil {
+		return nil, fmt.Errorf("mime stats: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []MimeTypeStats
+	for rows.Next() {
+		var s MimeTypeStats
+		if err := rows.Scan(&s.MimeType, &s.FileCount, &s.TotalSize); err != nil {
+			return nil, fmt.Errorf("scan mime stat: %w", err)
+		}
+		stats = append(stats, s)
+	}
+	return stats, nil
+}
+
+func (r *Repository) GetDailyUploadStats(ctx context.Context, days int) ([]DailyUploadStats, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT date_trunc('day', created_at)::date::text as day,
+		       COUNT(*) as file_count,
+		       COALESCE(SUM(size), 0) as total_bytes
+		FROM files
+		WHERE created_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+		GROUP BY day
+		ORDER BY day`, days)
+	if err != nil {
+		return nil, fmt.Errorf("daily uploads: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []DailyUploadStats
+	for rows.Next() {
+		var s DailyUploadStats
+		if err := rows.Scan(&s.Date, &s.FileCount, &s.TotalBytes); err != nil {
+			return nil, fmt.Errorf("scan daily stat: %w", err)
+		}
+		stats = append(stats, s)
+	}
+	return stats, nil
+}

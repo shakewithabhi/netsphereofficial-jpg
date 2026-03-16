@@ -1,0 +1,373 @@
+package billing
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/google/uuid"
+	stripe "github.com/stripe/stripe-go/v81"
+	checkoutsession "github.com/stripe/stripe-go/v81/checkout/session"
+	portalsession "github.com/stripe/stripe-go/v81/billingportal/session"
+	stripesub "github.com/stripe/stripe-go/v81/subscription"
+	"github.com/stripe/stripe-go/v81/webhook"
+
+	"github.com/bytebox/backend/internal/common"
+)
+
+type Service struct {
+	repo           *Repository
+	stripeKey      string
+	webhookSecret  string
+	appBaseURL     string
+}
+
+func NewService(repo *Repository, stripeKey, webhookSecret, appBaseURL string) *Service {
+	stripe.Key = stripeKey
+	return &Service{
+		repo:          repo,
+		stripeKey:     stripeKey,
+		webhookSecret: webhookSecret,
+		appBaseURL:    appBaseURL,
+	}
+}
+
+func (s *Service) GetSubscription(ctx context.Context, userID uuid.UUID) (*SubscriptionResponse, error) {
+	sub, err := s.repo.GetSubscriptionByUserID(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get subscription", "error", err)
+		return nil, common.ErrInternal("failed to get subscription")
+	}
+	if sub == nil {
+		// User has no subscription record — they're on the free plan
+		return &SubscriptionResponse{
+			Plan:   "free",
+			Status: "active",
+		}, nil
+	}
+	resp := sub.ToResponse()
+	return &resp, nil
+}
+
+func (s *Service) CreateCheckoutSession(ctx context.Context, userID uuid.UUID, email string, req CreateCheckoutRequest) (*CheckoutResponse, error) {
+	plan := GetPlan(req.Plan)
+	if plan == nil {
+		return nil, common.ErrBadRequest("invalid plan")
+	}
+	if plan.StripePriceID == "" {
+		return nil, common.ErrBadRequest("plan not available for purchase")
+	}
+
+	// Check if user already has an active subscription
+	existing, err := s.repo.GetSubscriptionByUserID(ctx, userID)
+	if err != nil {
+		slog.Error("failed to check existing subscription", "error", err)
+		return nil, common.ErrInternal("failed to create checkout")
+	}
+	if existing != nil && existing.Status == "active" && existing.Plan != "free" {
+		return nil, common.ErrConflict("already have an active subscription — use the billing portal to change plans")
+	}
+
+	params := &stripe.CheckoutSessionParams{
+		Mode: stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+				Price:    stripe.String(plan.StripePriceID),
+				Quantity: stripe.Int64(1),
+			},
+		},
+		CustomerEmail: stripe.String(email),
+		SuccessURL:    stripe.String(fmt.Sprintf("%s/billing/success?session_id={CHECKOUT_SESSION_ID}", s.appBaseURL)),
+		CancelURL:     stripe.String(fmt.Sprintf("%s/billing/cancel", s.appBaseURL)),
+		Metadata: map[string]string{
+			"user_id": userID.String(),
+			"plan":    req.Plan,
+		},
+	}
+
+	session, err := checkoutsession.New(params)
+	if err != nil {
+		slog.Error("failed to create checkout session", "error", err)
+		return nil, common.ErrInternal("failed to create checkout session")
+	}
+
+	return &CheckoutResponse{CheckoutURL: session.URL}, nil
+}
+
+func (s *Service) CreateBillingPortal(ctx context.Context, userID uuid.UUID) (*BillingPortalResponse, error) {
+	sub, err := s.repo.GetSubscriptionByUserID(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get subscription", "error", err)
+		return nil, common.ErrInternal("failed to create billing portal")
+	}
+	if sub == nil || sub.StripeCustomerID == "" {
+		return nil, common.ErrBadRequest("no active subscription — subscribe to a plan first")
+	}
+
+	params := &stripe.BillingPortalSessionParams{
+		Customer:  stripe.String(sub.StripeCustomerID),
+		ReturnURL: stripe.String(fmt.Sprintf("%s/billing", s.appBaseURL)),
+	}
+
+	session, err := portalsession.New(params)
+	if err != nil {
+		slog.Error("failed to create billing portal session", "error", err)
+		return nil, common.ErrInternal("failed to create billing portal")
+	}
+
+	return &BillingPortalResponse{PortalURL: session.URL}, nil
+}
+
+func (s *Service) CancelSubscription(ctx context.Context, userID uuid.UUID) error {
+	sub, err := s.repo.GetSubscriptionByUserID(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get subscription", "error", err)
+		return common.ErrInternal("failed to cancel subscription")
+	}
+	if sub == nil || sub.StripeSubscriptionID == "" {
+		return common.ErrBadRequest("no active subscription to cancel")
+	}
+	if sub.Status != "active" {
+		return common.ErrBadRequest("subscription is not active")
+	}
+
+	params := &stripe.SubscriptionCancelParams{}
+	_, err = stripesub.Cancel(sub.StripeSubscriptionID, params)
+	if err != nil {
+		slog.Error("failed to cancel stripe subscription", "error", err)
+		return common.ErrInternal("failed to cancel subscription")
+	}
+
+	// Mark as cancelled locally (webhook will also handle this)
+	if err := s.repo.UpdateSubscriptionPlan(ctx, sub.ID, sub.Plan, "cancelled"); err != nil {
+		slog.Error("failed to update subscription status", "error", err)
+	}
+
+	return nil
+}
+
+func (s *Service) HandleWebhook(r *http.Request) error {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return common.ErrBadRequest("failed to read request body")
+	}
+
+	event, err := webhook.ConstructEvent(body, r.Header.Get("Stripe-Signature"), s.webhookSecret)
+	if err != nil {
+		slog.Error("webhook signature verification failed", "error", err)
+		return common.ErrUnauthorized("invalid webhook signature")
+	}
+
+	ctx := r.Context()
+
+	switch event.Type {
+	case "checkout.session.completed":
+		return s.handleCheckoutCompleted(ctx, &event)
+	case "customer.subscription.updated":
+		return s.handleSubscriptionUpdated(ctx, &event)
+	case "customer.subscription.deleted":
+		return s.handleSubscriptionDeleted(ctx, &event)
+	case "invoice.payment_failed":
+		return s.handlePaymentFailed(ctx, &event)
+	default:
+		slog.Debug("unhandled webhook event", "type", event.Type)
+	}
+
+	return nil
+}
+
+func (s *Service) handleCheckoutCompleted(ctx context.Context, event *stripe.Event) error {
+	session, ok := event.Data.Object["id"].(string)
+	if !ok {
+		return common.ErrBadRequest("invalid checkout session data")
+	}
+
+	// Retrieve the full session to get metadata
+	params := &stripe.CheckoutSessionParams{}
+	params.AddExpand("subscription")
+	cs, err := checkoutsession.Get(session, params)
+	if err != nil {
+		slog.Error("failed to retrieve checkout session", "error", err)
+		return common.ErrInternal("failed to process checkout")
+	}
+
+	userIDStr, ok := cs.Metadata["user_id"]
+	if !ok {
+		slog.Error("checkout session missing user_id metadata")
+		return common.ErrBadRequest("missing user_id in metadata")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return common.ErrBadRequest("invalid user_id in metadata")
+	}
+
+	planKey, ok := cs.Metadata["plan"]
+	if !ok {
+		return common.ErrBadRequest("missing plan in metadata")
+	}
+
+	plan := GetPlan(planKey)
+	if plan == nil {
+		return common.ErrBadRequest("invalid plan in metadata")
+	}
+
+	var periodStart, periodEnd *time.Time
+	if cs.Subscription != nil {
+		start := time.Unix(cs.Subscription.CurrentPeriodStart, 0)
+		end := time.Unix(cs.Subscription.CurrentPeriodEnd, 0)
+		periodStart = &start
+		periodEnd = &end
+	}
+
+	// Upsert subscription: delete existing if any, then create
+	existing, _ := s.repo.GetSubscriptionByUserID(ctx, userID)
+	if existing != nil {
+		// Update existing subscription
+		existing.Plan = planKey
+		existing.StripeCustomerID = cs.Customer.ID
+		existing.StripeSubscriptionID = cs.Subscription.ID
+		existing.Status = "active"
+		existing.CurrentPeriodStart = periodStart
+		existing.CurrentPeriodEnd = periodEnd
+		if err := s.repo.UpdateSubscription(ctx, existing.ID, "active", periodStart, periodEnd); err != nil {
+			slog.Error("failed to update subscription", "error", err)
+			return common.ErrInternal("failed to update subscription")
+		}
+		if err := s.repo.UpdateSubscriptionPlan(ctx, existing.ID, planKey, "active"); err != nil {
+			slog.Error("failed to update subscription plan", "error", err)
+		}
+	} else {
+		sub := &Subscription{
+			UserID:               userID,
+			Plan:                 planKey,
+			StripeCustomerID:     cs.Customer.ID,
+			StripeSubscriptionID: cs.Subscription.ID,
+			Status:               "active",
+			CurrentPeriodStart:   periodStart,
+			CurrentPeriodEnd:     periodEnd,
+		}
+		if err := s.repo.CreateSubscription(ctx, sub); err != nil {
+			slog.Error("failed to create subscription", "error", err)
+			return common.ErrInternal("failed to create subscription")
+		}
+	}
+
+	// Update user plan and storage limit
+	if err := s.repo.UpdateUserPlan(ctx, userID, planKey, plan.SoftStorageLimit); err != nil {
+		slog.Error("failed to update user plan", "error", err)
+		return common.ErrInternal("failed to update user plan")
+	}
+
+	slog.Info("checkout completed", "user_id", userID, "plan", planKey)
+	return nil
+}
+
+func (s *Service) handleSubscriptionUpdated(ctx context.Context, event *stripe.Event) error {
+	stripeSubID, _ := event.Data.Object["id"].(string)
+	if stripeSubID == "" {
+		return common.ErrBadRequest("missing subscription id")
+	}
+
+	sub, err := s.repo.GetSubscriptionByStripeID(ctx, stripeSubID)
+	if err != nil {
+		slog.Error("failed to get subscription by stripe id", "error", err)
+		return common.ErrInternal("failed to process subscription update")
+	}
+	if sub == nil {
+		slog.Warn("received update for unknown subscription", "stripe_subscription_id", stripeSubID)
+		return nil
+	}
+
+	status, _ := event.Data.Object["status"].(string)
+	var periodStart, periodEnd *time.Time
+	if startUnix, ok := event.Data.Object["current_period_start"].(float64); ok {
+		t := time.Unix(int64(startUnix), 0)
+		periodStart = &t
+	}
+	if endUnix, ok := event.Data.Object["current_period_end"].(float64); ok {
+		t := time.Unix(int64(endUnix), 0)
+		periodEnd = &t
+	}
+
+	mappedStatus := mapStripeStatus(status)
+	if err := s.repo.UpdateSubscription(ctx, sub.ID, mappedStatus, periodStart, periodEnd); err != nil {
+		slog.Error("failed to update subscription", "error", err)
+		return common.ErrInternal("failed to update subscription")
+	}
+
+	slog.Info("subscription updated", "subscription_id", sub.ID, "status", mappedStatus)
+	return nil
+}
+
+func (s *Service) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event) error {
+	stripeSubID, _ := event.Data.Object["id"].(string)
+	if stripeSubID == "" {
+		return common.ErrBadRequest("missing subscription id")
+	}
+
+	sub, err := s.repo.GetSubscriptionByStripeID(ctx, stripeSubID)
+	if err != nil {
+		slog.Error("failed to get subscription by stripe id", "error", err)
+		return common.ErrInternal("failed to process subscription deletion")
+	}
+	if sub == nil {
+		slog.Warn("received delete for unknown subscription", "stripe_subscription_id", stripeSubID)
+		return nil
+	}
+
+	// Downgrade to free
+	freePlan := GetPlan("free")
+	if err := s.repo.UpdateSubscriptionPlan(ctx, sub.ID, "free", "cancelled"); err != nil {
+		slog.Error("failed to update subscription to free", "error", err)
+	}
+	if err := s.repo.UpdateUserPlan(ctx, sub.UserID, "free", freePlan.SoftStorageLimit); err != nil {
+		slog.Error("failed to downgrade user plan", "error", err)
+		return common.ErrInternal("failed to downgrade user plan")
+	}
+
+	slog.Info("subscription deleted, downgraded to free", "user_id", sub.UserID)
+	return nil
+}
+
+func (s *Service) handlePaymentFailed(ctx context.Context, event *stripe.Event) error {
+	subObj, ok := event.Data.Object["subscription"].(string)
+	if !ok || subObj == "" {
+		slog.Warn("payment failed event without subscription id")
+		return nil
+	}
+
+	sub, err := s.repo.GetSubscriptionByStripeID(ctx, subObj)
+	if err != nil {
+		slog.Error("failed to get subscription by stripe id", "error", err)
+		return common.ErrInternal("failed to process payment failure")
+	}
+	if sub == nil {
+		slog.Warn("payment failed for unknown subscription", "stripe_subscription_id", subObj)
+		return nil
+	}
+
+	if err := s.repo.UpdateSubscription(ctx, sub.ID, "past_due", sub.CurrentPeriodStart, sub.CurrentPeriodEnd); err != nil {
+		slog.Error("failed to mark subscription as past_due", "error", err)
+		return common.ErrInternal("failed to update subscription status")
+	}
+
+	slog.Info("subscription marked past_due due to payment failure", "subscription_id", sub.ID)
+	return nil
+}
+
+func mapStripeStatus(status string) string {
+	switch status {
+	case "active", "trialing":
+		return "active"
+	case "canceled", "unpaid":
+		return "cancelled"
+	case "past_due":
+		return "past_due"
+	default:
+		return status
+	}
+}

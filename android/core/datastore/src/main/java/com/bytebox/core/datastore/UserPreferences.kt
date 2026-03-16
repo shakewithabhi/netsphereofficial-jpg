@@ -1,0 +1,78 @@
+package com.bytebox.core.datastore
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.preferencesDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_preferences")
+
+@Singleton
+class UserPreferences @Inject constructor(
+    @ApplicationContext context: Context
+) {
+    private val dataStore = context.dataStore
+
+    val viewMode: Flow<ViewMode>
+        get() = dataStore.data.map { prefs ->
+            when (prefs[VIEW_MODE_KEY]) {
+                "grid" -> ViewMode.GRID
+                else -> ViewMode.LIST
+            }
+        }
+
+    val sortBy: Flow<SortBy>
+        get() = dataStore.data.map { prefs ->
+            when (prefs[SORT_BY_KEY]) {
+                "size" -> SortBy.SIZE
+                "date" -> SortBy.DATE
+                "type" -> SortBy.TYPE
+                else -> SortBy.NAME
+            }
+        }
+
+    val sortOrder: Flow<SortOrder>
+        get() = dataStore.data.map { prefs ->
+            when (prefs[SORT_ORDER_KEY]) {
+                "desc" -> SortOrder.DESC
+                else -> SortOrder.ASC
+            }
+        }
+
+    val uploadOnWifiOnly: Flow<Boolean>
+        get() = dataStore.data.map { prefs ->
+            prefs[WIFI_ONLY_KEY] ?: true
+        }
+
+    suspend fun setViewMode(mode: ViewMode) {
+        dataStore.edit { it[VIEW_MODE_KEY] = mode.name.lowercase() }
+    }
+
+    suspend fun setSortBy(sort: SortBy) {
+        dataStore.edit { it[SORT_BY_KEY] = sort.name.lowercase() }
+    }
+
+    suspend fun setSortOrder(order: SortOrder) {
+        dataStore.edit { it[SORT_ORDER_KEY] = order.name.lowercase() }
+    }
+
+    suspend fun setUploadOnWifiOnly(wifiOnly: Boolean) {
+        dataStore.edit { it[WIFI_ONLY_KEY] = wifiOnly }
+    }
+
+    companion object {
+        private val VIEW_MODE_KEY = stringPreferencesKey("view_mode")
+        private val SORT_BY_KEY = stringPreferencesKey("sort_by")
+        private val SORT_ORDER_KEY = stringPreferencesKey("sort_order")
+        private val WIFI_ONLY_KEY = booleanPreferencesKey("wifi_only_upload")
+    }
+}
+
+enum class ViewMode { LIST, GRID }
+enum class SortBy { NAME, SIZE, DATE, TYPE }
+enum class SortOrder { ASC, DESC }
