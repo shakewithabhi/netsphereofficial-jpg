@@ -2,52 +2,70 @@ package com.bytebox.core.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
-    primary = Blue40,
-    onPrimary = Gray99,
-    primaryContainer = Blue90,
-    onPrimaryContainer = Blue10,
-    secondary = Teal40,
-    onSecondary = Gray99,
-    secondaryContainer = Teal90,
-    onSecondaryContainer = Teal10,
-    error = Red40,
-    onError = Gray99,
-    errorContainer = Red90,
-    onErrorContainer = Red10,
-    background = Gray99,
-    onBackground = Gray10,
-    surface = Gray99,
-    onSurface = Gray10,
-    surfaceVariant = Gray95,
-    onSurfaceVariant = Gray30,
-    outline = Gray40
+    primary = Indigo600,
+    onPrimary = Zinc50,
+    primaryContainer = Indigo100,
+    onPrimaryContainer = Indigo900,
+    secondary = Slate600,
+    onSecondary = Zinc50,
+    secondaryContainer = Slate100,
+    onSecondaryContainer = Slate900,
+    tertiary = Indigo500,
+    onTertiary = Zinc50,
+    error = Red600,
+    onError = Zinc50,
+    errorContainer = Red50,
+    onErrorContainer = Red900,
+    background = Zinc50,
+    onBackground = Zinc900,
+    surface = Zinc50,
+    onSurface = Zinc900,
+    surfaceVariant = Zinc100,
+    onSurfaceVariant = Zinc600,
+    outline = Zinc300,
+    outlineVariant = Zinc200,
+    inverseSurface = Zinc900,
+    inverseOnSurface = Zinc100,
+    surfaceTint = Indigo600,
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Blue80,
-    onPrimary = Blue20,
-    primaryContainer = Blue30,
-    onPrimaryContainer = Blue90,
-    secondary = Teal80,
-    onSecondary = Teal20,
-    secondaryContainer = Teal30,
-    onSecondaryContainer = Teal90,
-    error = Red80,
-    onError = Red20,
-    errorContainer = Red30,
-    onErrorContainer = Red90,
-    background = Gray10,
-    onBackground = Gray90,
-    surface = Gray10,
-    onSurface = Gray90,
-    surfaceVariant = Gray20,
-    onSurfaceVariant = Gray80,
-    outline = Gray40
+    primary = Indigo400,
+    onPrimary = Indigo950,
+    primaryContainer = Indigo900,
+    onPrimaryContainer = Indigo100,
+    secondary = Slate400,
+    onSecondary = Slate900,
+    secondaryContainer = Slate800,
+    onSecondaryContainer = Slate100,
+    tertiary = Indigo300,
+    onTertiary = Indigo950,
+    error = Red400,
+    onError = Red950,
+    errorContainer = Red950,
+    onErrorContainer = Red100,
+    background = Zinc950,
+    onBackground = Zinc100,
+    surface = Zinc900,
+    onSurface = Zinc100,
+    surfaceVariant = Zinc800,
+    onSurfaceVariant = Zinc400,
+    outline = Zinc700,
+    outlineVariant = Zinc800,
+    inverseSurface = Zinc100,
+    inverseOnSurface = Zinc900,
+    surfaceTint = Indigo400,
 )
 
 @Composable
@@ -65,9 +83,32 @@ fun ByteBoxTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = ByteBoxTypography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalByteBoxSpacing provides ByteBoxSpacing(),
+        LocalByteBoxRadius provides ByteBoxRadius(),
+        LocalByteBoxElevation provides ByteBoxElevation(),
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = ByteBoxTypography,
+            content = content
+        )
+    }
+}
+
+object ByteBoxTheme {
+    val spacing: ByteBoxSpacing
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalByteBoxSpacing.current
+
+    val radius: ByteBoxRadius
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalByteBoxRadius.current
+
+    val elevation: ByteBoxElevation
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalByteBoxElevation.current
 }

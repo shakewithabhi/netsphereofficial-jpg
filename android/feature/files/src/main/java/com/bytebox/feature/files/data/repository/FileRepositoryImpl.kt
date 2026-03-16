@@ -110,6 +110,12 @@ class FileRepositoryImpl @Inject constructor(
         return safeApiCall { fileApi.getDownloadUrl(fileId) }.map { it.url }
     }
 
+    override suspend fun copyFile(fileId: String, folderId: String?): Result<Unit> {
+        return safeApiCall {
+            fileApi.copyFile(fileId, com.bytebox.core.network.dto.CopyFileRequest(folderId))
+        }.map { }
+    }
+
     override suspend fun searchFiles(query: String, cursor: String?): Result<FolderContents> {
         return safeApiCall { fileApi.searchFiles(query, cursor) }.map { response ->
             FolderContents(

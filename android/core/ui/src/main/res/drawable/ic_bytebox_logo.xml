@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Cloud shape (sky blue) -->
+    <path
+        android:fillColor="#7CB9E8"
+        android:pathData="M88,48c0,-0.5 0,-1 -0.1,-1.5C87.1,35.8 78.2,28 67.5,28c-2.1,0 -4.1,0.3 -6,0.9C57.2,22.5 49.8,18 41.5,18C29.1,18 19,28.1 19,40.5c0,0.8 0,1.7 0.1,2.5C13.5,45.5 9,51.8 9,59c0,9.4 7.6,17 17,17h55c8.3,0 15,-6.7 15,-15C96,54.5 92.6,49.6 88,48z" />
+
+    <!-- Cloud highlight (lighter) -->
+    <path
+        android:fillColor="#A8D4F0"
+        android:pathData="M41.5,22c9.2,0 17,5.5 20.5,13.4c1.7,-0.5 3.5,-0.8 5.5,-0.8c8.8,0 16.1,6 18.2,14.1C89.8,51.1 92,55.5 92,60.5c0,0.2 0,0.3 0,0.5h-1c0,-7 -5.7,-12.7 -12.7,-12.7c-0.6,0 -1.2,0 -1.8,0.1C75.1,39.6 67.3,33 58,33c-5.6,0 -10.7,2.3 -14.3,6.1C41.4,37.7 38.6,37 35.5,37C27.5,37 21,43.3 21,51c0,0.6 0,1.1 0.1,1.7C17.1,53.5 14,56.9 14,61c0,1.2 0.2,2.4 0.6,3.5C12.3,63 11,60.1 11,57c0,-7.2 5.3,-13.1 12.2,-14.1C23.1,42.2 23,41.4 23,40.5C23,30.3 31.3,22 41.5,22z" />
+
+    <!-- 3D Box - top face (medium blue) -->
+    <path
+        android:fillColor="#3A7BC8"
+        android:pathData="M60,45L38,56L60,67L82,56z" />
+
+    <!-- 3D Box - left face (dark navy) -->
+    <path
+        android:fillColor="#1B3A5C"
+        android:pathData="M38,56L38,82L60,93L60,67z" />
+
+    <!-- 3D Box - right face (medium navy) -->
+    <path
+        android:fillColor="#2B5A8C"
+        android:pathData="M60,67L60,93L82,82L82,56z" />
+
+    <!-- "B" letter on front-left face -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M47,64v14h6c2.2,0 4,-0.9 4,-2.5c0,-1.2 -0.8,-2.1 -2,-2.4c0.8,-0.4 1.3,-1.2 1.3,-2.1c0,-1.5 -1.5,-2.5 -3.3,-2.5h-1L47,64zM50,68h2c0.8,0 1.2,0.3 1.2,0.9s-0.4,0.9 -1.2,0.9h-2V68zM50,72.5h2.5c0.9,0 1.5,0.4 1.5,1s-0.6,1 -1.5,1H50V72.5z" />
+
+    <!-- Circuit node top-left -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M43,60.2a1.8,1.8 0,1 1,0 3.6a1.8,1.8 0,1 1,0 -3.6z" />
+
+    <!-- Circuit node middle-left -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M41,67.2a1.8,1.8 0,1 1,0 3.6a1.8,1.8 0,1 1,0 -3.6z" />
+
+    <!-- Circuit node bottom-left -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M43,74.2a1.8,1.8 0,1 1,0 3.6a1.8,1.8 0,1 1,0 -3.6z" />
+
+    <!-- Circuit line vertical -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,63L44,75"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2" />
+
+    <!-- Circuit branch lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="M43,62L47,65"
+        android:fillColor="#00000000" />
+
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="M41,69L47,71"
+        android:fillColor="#00000000" />
+
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.2"
+        android:pathData="M43,76L47,74"
+        android:fillColor="#00000000" />
+
+</vector>

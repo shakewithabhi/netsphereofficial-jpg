@@ -3,6 +3,7 @@ package com.bytebox.feature.settings.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.Result
+import com.bytebox.core.datastore.ThemeMode
 import com.bytebox.core.datastore.UserPreferences
 import com.bytebox.domain.model.User
 import com.bytebox.domain.repository.AuthRepository
@@ -17,7 +18,8 @@ import javax.inject.Inject
 data class SettingsUiState(
     val user: User? = null,
     val isLoading: Boolean = false,
-    val uploadOnWifiOnly: Boolean = true
+    val uploadOnWifiOnly: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 )
 
 @HiltViewModel
@@ -36,6 +38,11 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update { it.copy(uploadOnWifiOnly = wifiOnly) }
             }
         }
+        viewModelScope.launch {
+            userPreferences.themeMode.collect { mode ->
+                _uiState.update { it.copy(themeMode = mode) }
+            }
+        }
     }
 
     fun loadProfile() {
@@ -51,6 +58,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setUploadOnWifiOnly(wifiOnly: Boolean) {
         viewModelScope.launch { userPreferences.setUploadOnWifiOnly(wifiOnly) }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { userPreferences.setThemeMode(mode) }
     }
 
     fun logout(onLoggedOut: () -> Unit) {

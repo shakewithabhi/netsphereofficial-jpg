@@ -49,6 +49,15 @@ class UserPreferences @Inject constructor(
             prefs[WIFI_ONLY_KEY] ?: true
         }
 
+    val themeMode: Flow<ThemeMode>
+        get() = dataStore.data.map { prefs ->
+            when (prefs[THEME_MODE_KEY]) {
+                "light" -> ThemeMode.LIGHT
+                "dark" -> ThemeMode.DARK
+                else -> ThemeMode.SYSTEM
+            }
+        }
+
     suspend fun setViewMode(mode: ViewMode) {
         dataStore.edit { it[VIEW_MODE_KEY] = mode.name.lowercase() }
     }
@@ -65,14 +74,20 @@ class UserPreferences @Inject constructor(
         dataStore.edit { it[WIFI_ONLY_KEY] = wifiOnly }
     }
 
+    suspend fun setThemeMode(mode: ThemeMode) {
+        dataStore.edit { it[THEME_MODE_KEY] = mode.name.lowercase() }
+    }
+
     companion object {
         private val VIEW_MODE_KEY = stringPreferencesKey("view_mode")
         private val SORT_BY_KEY = stringPreferencesKey("sort_by")
         private val SORT_ORDER_KEY = stringPreferencesKey("sort_order")
         private val WIFI_ONLY_KEY = booleanPreferencesKey("wifi_only_upload")
+        private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
     }
 }
 
 enum class ViewMode { LIST, GRID }
 enum class SortBy { NAME, SIZE, DATE, TYPE }
 enum class SortOrder { ASC, DESC }
+enum class ThemeMode { SYSTEM, LIGHT, DARK }

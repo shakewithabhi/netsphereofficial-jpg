@@ -62,13 +62,19 @@ interface FileApi {
     @POST("folders/{id}/restore")
     suspend fun restoreFolder(@Path("id") id: String): Response<Unit>
 
-    @GET("trash")
+    @POST("files/{id}/copy")
+    suspend fun copyFile(
+        @Path("id") id: String,
+        @Body request: CopyFileRequest
+    ): Response<FileDto>
+
+    @GET("files/trash")
     suspend fun getTrashContents(
         @Query("cursor") cursor: String? = null,
         @Query("limit") limit: Int = 50
     ): Response<FolderContentsResponse>
 
-    @GET("search")
+    @GET("files/search")
     suspend fun searchFiles(
         @Query("q") query: String,
         @Query("cursor") cursor: String? = null,

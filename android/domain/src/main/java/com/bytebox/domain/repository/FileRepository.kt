@@ -24,4 +24,5 @@ interface FileRepository {
     suspend fun getTrashContents(cursor: String? = null): Result<FolderContents>
     suspend fun getDownloadUrl(fileId: String): Result<String>
     suspend fun searchFiles(query: String, cursor: String? = null): Result<FolderContents>
+    suspend fun copyFile(fileId: String, folderId: String?): Result<Unit>
 }

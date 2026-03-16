@@ -48,6 +48,11 @@ data class RenameFolderRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class CopyFileRequest(
+    @Json(name = "folder_id") val folderId: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class DownloadUrlResponse(
     val url: String,
     @Json(name = "expires_in") val expiresIn: Long = 3600,

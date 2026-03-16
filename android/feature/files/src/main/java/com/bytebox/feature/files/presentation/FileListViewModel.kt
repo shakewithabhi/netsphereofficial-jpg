@@ -237,6 +237,13 @@ class FileListViewModel @Inject constructor(
         }
     }
 
+    fun copyFile(fileId: String) {
+        viewModelScope.launch {
+            fileRepository.copyFile(fileId, _uiState.value.currentFolderId)
+            loadContents()
+        }
+    }
+
     fun trashFile(fileId: String) {
         viewModelScope.launch {
             fileRepository.trashFile(fileId)

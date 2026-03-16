@@ -2,44 +2,82 @@ package com.bytebox.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary - Blue
-val Blue10 = Color(0xFF001A40)
-val Blue20 = Color(0xFF003380)
-val Blue30 = Color(0xFF004DBF)
-val Blue40 = Color(0xFF0066FF)
-val Blue80 = Color(0xFF99BBFF)
-val Blue90 = Color(0xFFCCDDFF)
+// Primary - Indigo
+val Indigo50 = Color(0xFFEEF2FF)
+val Indigo100 = Color(0xFFE0E7FF)
+val Indigo200 = Color(0xFFC7D2FE)
+val Indigo300 = Color(0xFFA5B4FC)
+val Indigo400 = Color(0xFF818CF8)
+val Indigo500 = Color(0xFF6366F1)
+val Indigo600 = Color(0xFF4F46E5)
+val Indigo700 = Color(0xFF4338CA)
+val Indigo800 = Color(0xFF3730A3)
+val Indigo900 = Color(0xFF312E81)
+val Indigo950 = Color(0xFF1E1B4B)
 
-// Secondary - Teal
-val Teal10 = Color(0xFF001F1F)
-val Teal20 = Color(0xFF003E3E)
-val Teal30 = Color(0xFF005E5E)
-val Teal40 = Color(0xFF007D7D)
-val Teal80 = Color(0xFF80BEBE)
-val Teal90 = Color(0xFFBFDFDF)
+// Secondary - Slate
+val Slate50 = Color(0xFFF8FAFC)
+val Slate100 = Color(0xFFF1F5F9)
+val Slate200 = Color(0xFFE2E8F0)
+val Slate300 = Color(0xFFCBD5E1)
+val Slate400 = Color(0xFF94A3B8)
+val Slate500 = Color(0xFF64748B)
+val Slate600 = Color(0xFF475569)
+val Slate700 = Color(0xFF334155)
+val Slate800 = Color(0xFF1E293B)
+val Slate900 = Color(0xFF0F172A)
 
-// Neutral
-val Gray10 = Color(0xFF1A1C1E)
-val Gray20 = Color(0xFF2F3033)
-val Gray30 = Color(0xFF46474A)
-val Gray40 = Color(0xFF5E5E62)
-val Gray80 = Color(0xFFC7C6CA)
-val Gray90 = Color(0xFFE3E2E6)
-val Gray95 = Color(0xFFF1F0F4)
-val Gray99 = Color(0xFFFDFBFF)
+// Neutral - Zinc
+val Zinc50 = Color(0xFFFAFAFA)
+val Zinc100 = Color(0xFFF4F4F5)
+val Zinc200 = Color(0xFFE4E4E7)
+val Zinc300 = Color(0xFFD4D4D8)
+val Zinc400 = Color(0xFFA1A1AA)
+val Zinc500 = Color(0xFF71717A)
+val Zinc600 = Color(0xFF52525B)
+val Zinc700 = Color(0xFF3F3F46)
+val Zinc800 = Color(0xFF27272A)
+val Zinc900 = Color(0xFF18181B)
+val Zinc950 = Color(0xFF09090B)
 
-// Error
-val Red10 = Color(0xFF410002)
-val Red20 = Color(0xFF690005)
-val Red30 = Color(0xFF93000A)
-val Red40 = Color(0xFFBA1A1A)
-val Red80 = Color(0xFFFFB4AB)
-val Red90 = Color(0xFFFFDAD6)
+// Error - Red
+val Red50 = Color(0xFFFEF2F2)
+val Red100 = Color(0xFFFEE2E2)
+val Red200 = Color(0xFFFECACA)
+val Red400 = Color(0xFFF87171)
+val Red500 = Color(0xFFEF4444)
+val Red600 = Color(0xFFDC2626)
+val Red700 = Color(0xFFB91C1C)
+val Red900 = Color(0xFF7F1D1D)
+val Red950 = Color(0xFF450A0A)
+
+// Success - Green
+val Green50 = Color(0xFFF0FDF4)
+val Green400 = Color(0xFF4ADE80)
+val Green500 = Color(0xFF22C55E)
+val Green600 = Color(0xFF16A34A)
+val Green900 = Color(0xFF14532D)
+val Green950 = Color(0xFF052E16)
+
+// Warning - Amber
+val Amber50 = Color(0xFFFFFBEB)
+val Amber400 = Color(0xFFFBBF24)
+val Amber500 = Color(0xFFF59E0B)
+val Amber600 = Color(0xFFD97706)
+val Amber900 = Color(0xFF78350F)
+val Amber950 = Color(0xFF451A03)
+
+// Info - Blue
+val Blue400 = Color(0xFF60A5FA)
+val Blue500 = Color(0xFF3B82F6)
+val Blue600 = Color(0xFF2563EB)
 
 // File type colors
-val FileImageColor = Color(0xFF4CAF50)
-val FileVideoColor = Color(0xFFE91E63)
-val FileAudioColor = Color(0xFF9C27B0)
-val FilePdfColor = Color(0xFFF44336)
-val FileDocColor = Color(0xFF2196F3)
-val FileOtherColor = Color(0xFF607D8B)
+val FileImageColor = Color(0xFF10B981)   // Emerald
+val FileVideoColor = Color(0xFFF43F5E)   // Rose
+val FileAudioColor = Color(0xFF8B5CF6)   // Violet
+val FilePdfColor = Color(0xFFEF4444)     // Red
+val FileDocColor = Color(0xFF3B82F6)     // Blue
+val FileArchiveColor = Color(0xFFF59E0B) // Amber
+val FileCodeColor = Color(0xFF06B6D4)    // Cyan
+val FileOtherColor = Color(0xFF71717A)   // Zinc

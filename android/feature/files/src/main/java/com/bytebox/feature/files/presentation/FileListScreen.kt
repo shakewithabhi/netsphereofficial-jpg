@@ -3,21 +3,76 @@ package com.bytebox.feature.files.presentation
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -25,14 +80,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.bytebox.core.common.toReadableFileSize
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytebox.core.datastore.ViewMode
+import com.bytebox.core.ui.components.ConfirmationDialog
 import com.bytebox.core.ui.components.EmptyState
 import com.bytebox.core.ui.components.ErrorState
-import com.bytebox.core.ui.components.LoadingIndicator
-import com.bytebox.feature.files.presentation.components.*
+import com.bytebox.core.ui.components.FileListShimmer
+import com.bytebox.core.ui.components.SectionHeader
+import com.bytebox.core.ui.components.SpeedDialFAB
+import com.bytebox.core.ui.components.SpeedDialItem
+import com.bytebox.core.ui.theme.ByteBoxTheme
+import com.bytebox.feature.files.presentation.components.FileGridItem
+import com.bytebox.feature.files.presentation.components.FileListItem
+import com.bytebox.feature.files.presentation.components.FolderBreadcrumb
+import com.bytebox.feature.files.presentation.components.FolderItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,11 +104,11 @@ fun FileListScreen(
     onFileClick: (String, String) -> Unit,
     onNavigateToUpload: (folderId: String?) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToTrash: () -> Unit = {},
     viewModel: FileListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Reload contents when screen becomes visible (e.g., returning from Upload)
     LifecycleResumeEffect(Unit) {
         viewModel.loadContents()
         onPauseOrDispose {}
@@ -62,148 +126,238 @@ fun FileListScreen(
     var deleteTargetName by remember { mutableStateOf("") }
     var deleteTargetIsFolder by remember { mutableStateOf(false) }
     var showDeleteSelectedConfirm by remember { mutableStateOf(false) }
+    var isSearchMode by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var isFabExpanded by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = uiState.breadcrumbs.size > 1 || uiState.isSelectionMode) {
-        if (uiState.isSelectionMode) {
-            viewModel.clearSelection()
-        } else {
-            viewModel.navigateBack()
+    BackHandler(enabled = uiState.breadcrumbs.size > 1 || uiState.isSelectionMode || isSearchMode) {
+        when {
+            isSearchMode -> {
+                isSearchMode = false
+                searchQuery = ""
+                viewModel.search("")
+            }
+            uiState.isSelectionMode -> viewModel.clearSelection()
+            else -> viewModel.navigateBack()
         }
     }
 
     Scaffold(
         topBar = {
-            if (uiState.isSelectionMode) {
-                TopAppBar(
-                    title = { Text("${uiState.selectedItems.size} selected") },
-                    navigationIcon = {
-                        IconButton(onClick = viewModel::clearSelection) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear selection")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { showDeleteSelectedConfirm = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete selected")
-                        }
-                    }
-                )
-            } else {
-                TopAppBar(
-                    title = { Text(uiState.currentFolderName) },
-                    actions = {
-                        IconButton(onClick = onNavigateToSearch) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
-                        }
-                        IconButton(onClick = viewModel::toggleViewMode) {
-                            Icon(
-                                if (uiState.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.Default.ViewList,
-                                contentDescription = "Toggle view"
-                            )
-                        }
-                        Box {
-                            IconButton(onClick = { showSortMenu = true }) {
-                                Icon(Icons.Default.Sort, contentDescription = "Sort")
+            when {
+                uiState.isSelectionMode -> {
+                    TopAppBar(
+                        title = { Text("${uiState.selectedItems.size} selected") },
+                        navigationIcon = {
+                            IconButton(onClick = viewModel::clearSelection) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear selection")
                             }
-                            DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                                com.bytebox.core.datastore.SortBy.entries.forEach { sort ->
+                        },
+                        actions = {
+                            IconButton(onClick = { showDeleteSelectedConfirm = true }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete selected")
+                            }
+                        },
+                    )
+                }
+                isSearchMode -> {
+                    TopAppBar(
+                        title = {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = {
+                                    searchQuery = it
+                                    viewModel.search(it)
+                                },
+                                placeholder = {
+                                    Text(
+                                        "Search files...",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = {
+                                isSearchMode = false
+                                searchQuery = ""
+                                viewModel.search("")
+                            }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        actions = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = {
+                                    searchQuery = ""
+                                    viewModel.search("")
+                                }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                }
+                            }
+                        },
+                    )
+                }
+                else -> {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                uiState.currentFolderName,
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                        },
+                        actions = {
+                            IconButton(onClick = { isSearchMode = true }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
+                            IconButton(onClick = onNavigateToTrash) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Trash")
+                            }
+                            IconButton(onClick = viewModel::toggleViewMode) {
+                                Icon(
+                                    if (uiState.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.Default.ViewList,
+                                    contentDescription = "Toggle view",
+                                )
+                            }
+                            Box {
+                                IconButton(onClick = { showSortMenu = true }) {
+                                    Icon(Icons.Default.Sort, contentDescription = "Sort")
+                                }
+                                DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
+                                    com.bytebox.core.datastore.SortBy.entries.forEach { sort ->
+                                        DropdownMenuItem(
+                                            text = { Text(sort.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                            onClick = {
+                                                viewModel.setSortBy(sort)
+                                                showSortMenu = false
+                                            },
+                                            leadingIcon = {
+                                                if (uiState.sortBy == sort) {
+                                                    Icon(Icons.Default.Check, contentDescription = null)
+                                                }
+                                            },
+                                        )
+                                    }
+                                    HorizontalDivider()
                                     DropdownMenuItem(
-                                        text = { Text(sort.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                        text = { Text(if (uiState.sortOrder == com.bytebox.core.datastore.SortOrder.ASC) "Ascending" else "Descending") },
                                         onClick = {
-                                            viewModel.setSortBy(sort)
+                                            viewModel.toggleSortOrder()
                                             showSortMenu = false
                                         },
                                         leadingIcon = {
-                                            if (uiState.sortBy == sort) {
-                                                Icon(Icons.Default.Check, contentDescription = null)
-                                            }
-                                        }
+                                            Icon(
+                                                if (uiState.sortOrder == com.bytebox.core.datastore.SortOrder.ASC) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                                                contentDescription = null,
+                                            )
+                                        },
                                     )
                                 }
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text(if (uiState.sortOrder == com.bytebox.core.datastore.SortOrder.ASC) "Ascending" else "Descending") },
-                                    onClick = {
-                                        viewModel.toggleSortOrder()
-                                        showSortMenu = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            if (uiState.sortOrder == com.bytebox.core.datastore.SortOrder.ASC) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
                             }
-                        }
-                    }
-                )
+                        },
+                    )
+                }
             }
         },
         floatingActionButton = {
-            if (!uiState.isSelectionMode) {
-                Column {
-                    SmallFloatingActionButton(
-                        onClick = viewModel::showCreateFolderDialog,
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
-                    ) {
-                        Icon(Icons.Default.CreateNewFolder, contentDescription = "New folder")
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    FloatingActionButton(onClick = { onNavigateToUpload(uiState.currentFolderId) }) {
-                        Icon(Icons.Default.CloudUpload, contentDescription = "Upload")
-                    }
-                }
+            if (!uiState.isSelectionMode && !isSearchMode) {
+                SpeedDialFAB(
+                    isExpanded = isFabExpanded,
+                    onToggle = { isFabExpanded = !isFabExpanded },
+                    items = listOf(
+                        SpeedDialItem(
+                            icon = Icons.Default.CreateNewFolder,
+                            label = "New Folder",
+                            onClick = viewModel::showCreateFolderDialog,
+                        ),
+                        SpeedDialItem(
+                            icon = Icons.Default.CloudUpload,
+                            label = "Upload",
+                            onClick = { onNavigateToUpload(uiState.currentFolderId) },
+                        ),
+                    ),
+                )
             }
-        }
+        },
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            if (uiState.breadcrumbs.size > 1) {
-                FolderBreadcrumb(
-                    breadcrumbs = uiState.breadcrumbs,
-                    onItemClick = viewModel::navigateToBreadcrumb
-                )
-            }
+            // Breadcrumb - always visible
+            FolderBreadcrumb(
+                breadcrumbs = uiState.breadcrumbs,
+                onItemClick = viewModel::navigateToBreadcrumb,
+            )
 
             when {
-                uiState.isLoading -> LoadingIndicator()
-                uiState.errorMessage != null -> ErrorState(
-                    message = uiState.errorMessage!!,
-                    onRetry = viewModel::loadContents
-                )
-                uiState.files.isEmpty() && uiState.folders.isEmpty() -> EmptyState(
-                    icon = Icons.Default.FolderOpen,
-                    title = "This folder is empty",
-                    subtitle = "Upload files or create folders to get started"
-                )
+                uiState.isLoading -> {
+                    FileListShimmer(
+                        modifier = Modifier.padding(top = ByteBoxTheme.spacing.xs),
+                    )
+                }
+                uiState.errorMessage != null -> {
+                    ErrorState(
+                        message = uiState.errorMessage!!,
+                        onRetry = viewModel::loadContents,
+                    )
+                }
+                uiState.files.isEmpty() && uiState.folders.isEmpty() -> {
+                    EmptyState(
+                        icon = Icons.Default.FolderOpen,
+                        title = "This folder is empty",
+                        subtitle = "Upload files or create folders to get started",
+                    )
+                }
                 uiState.viewMode == ViewMode.LIST -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(uiState.folders, key = { it.id }) { folder ->
-                            FolderItem(
-                                folder = folder,
-                                isSelected = uiState.selectedItems.contains(folder.id),
-                                onClick = {
-                                    if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
-                                    else viewModel.navigateToFolder(folder)
-                                },
-                                onLongClick = { viewModel.toggleSelection(folder.id) },
-                                onMoreClick = { contextMenuFolderId = folder.id }
-                            )
+                        if (uiState.folders.isNotEmpty()) {
+                            item {
+                                SectionHeader(title = "Folders")
+                            }
+                            items(uiState.folders, key = { it.id }) { folder ->
+                                FolderItem(
+                                    folder = folder,
+                                    isSelected = uiState.selectedItems.contains(folder.id),
+                                    onClick = {
+                                        if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
+                                        else viewModel.navigateToFolder(folder)
+                                    },
+                                    onLongClick = { viewModel.toggleSelection(folder.id) },
+                                    onMoreClick = { contextMenuFolderId = folder.id },
+                                )
+                            }
                         }
-                        items(uiState.files, key = { it.id }) { file ->
-                            FileListItem(
-                                file = file,
-                                isSelected = uiState.selectedItems.contains(file.id),
-                                onClick = {
-                                    if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
-                                    else onFileClick(file.id, file.mimeType)
-                                },
-                                onLongClick = { viewModel.toggleSelection(file.id) },
-                                onMoreClick = { contextMenuFileId = file.id }
-                            )
+                        if (uiState.files.isNotEmpty()) {
+                            item {
+                                SectionHeader(title = "Files")
+                            }
+                            items(uiState.files, key = { it.id }) { file ->
+                                FileListItem(
+                                    file = file,
+                                    isSelected = uiState.selectedItems.contains(file.id),
+                                    onClick = {
+                                        if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
+                                        else onFileClick(file.id, file.mimeType)
+                                    },
+                                    onLongClick = { viewModel.toggleSelection(file.id) },
+                                    onMoreClick = { contextMenuFileId = file.id },
+                                )
+                            }
                         }
                         if (uiState.isLoadingMore) {
                             item {
-                                Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(ByteBoxTheme.spacing.md),
+                                    contentAlignment = Alignment.Center,
+                                ) {
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                                 }
                             }
@@ -212,12 +366,44 @@ fun FileListScreen(
                 }
                 else -> {
                     LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 120.dp),
-                        contentPadding = PaddingValues(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize()
+                        columns = GridCells.Adaptive(minSize = 160.dp),
+                        contentPadding = PaddingValues(ByteBoxTheme.spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(ByteBoxTheme.spacing.xs),
+                        verticalArrangement = Arrangement.spacedBy(ByteBoxTheme.spacing.xs),
+                        modifier = Modifier.fillMaxSize(),
                     ) {
+                        items(uiState.folders, key = { it.id }) { folder ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
+                                        else viewModel.navigateToFolder(folder)
+                                    },
+                                shape = RoundedCornerShape(ByteBoxTheme.radius.md),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(ByteBoxTheme.spacing.md),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Folder,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
+                                    Text(
+                                        text = folder.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
+                        }
                         items(uiState.files, key = { it.id }) { file ->
                             FileGridItem(
                                 file = file,
@@ -226,7 +412,7 @@ fun FileListScreen(
                                     if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
                                     else onFileClick(file.id, file.mimeType)
                                 },
-                                onLongClick = { viewModel.toggleSelection(file.id) }
+                                onLongClick = { viewModel.toggleSelection(file.id) },
                             )
                         }
                     }
@@ -237,79 +423,101 @@ fun FileListScreen(
 
     // Create folder dialog
     if (uiState.showCreateFolderDialog) {
-        AlertDialog(
-            onDismissRequest = viewModel::hideCreateFolderDialog,
-            title = { Text("New Folder") },
-            text = {
-                OutlinedTextField(
-                    value = newFolderName,
-                    onValueChange = { newFolderName = it },
-                    label = { Text("Folder name") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.createFolder(newFolderName)
-                        newFolderName = ""
-                    },
-                    enabled = newFolderName.isNotBlank()
-                ) { Text("Create") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    viewModel.hideCreateFolderDialog()
-                    newFolderName = ""
-                }) { Text("Cancel") }
+        Dialog(onDismissRequest = viewModel::hideCreateFolderDialog) {
+            Card(
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(ByteBoxTheme.spacing.xl)) {
+                    Text("New Folder", style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                    com.bytebox.core.ui.components.ByteBoxTextField(
+                        value = newFolderName,
+                        onValueChange = { newFolderName = it },
+                        label = "Folder name",
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = {
+                            viewModel.hideCreateFolderDialog()
+                            newFolderName = ""
+                        }) { Text("Cancel") }
+                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                        TextButton(
+                            onClick = {
+                                viewModel.createFolder(newFolderName)
+                                newFolderName = ""
+                            },
+                            enabled = newFolderName.isNotBlank(),
+                        ) { Text("Create") }
+                    }
+                }
             }
-        )
+        }
     }
 
     // Rename folder dialog
     if (showRenameFolderDialog) {
-        AlertDialog(
-            onDismissRequest = { showRenameFolderDialog = false },
-            title = { Text("Rename Folder") },
-            text = {
-                OutlinedTextField(
-                    value = renameFolderName,
-                    onValueChange = { renameFolderName = it },
-                    label = { Text("Folder name") },
-                    singleLine = true
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.renameFolder(renameFolderId, renameFolderName)
-                        showRenameFolderDialog = false
-                    },
-                    enabled = renameFolderName.isNotBlank()
-                ) { Text("Rename") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRenameFolderDialog = false }) { Text("Cancel") }
+        Dialog(onDismissRequest = { showRenameFolderDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(ByteBoxTheme.spacing.xl)) {
+                    Text("Rename Folder", style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                    com.bytebox.core.ui.components.ByteBoxTextField(
+                        value = renameFolderName,
+                        onValueChange = { renameFolderName = it },
+                        label = "Folder name",
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = { showRenameFolderDialog = false }) { Text("Cancel") }
+                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                        TextButton(
+                            onClick = {
+                                viewModel.renameFolder(renameFolderId, renameFolderName)
+                                showRenameFolderDialog = false
+                            },
+                            enabled = renameFolderName.isNotBlank(),
+                        ) { Text("Rename") }
+                    }
+                }
             }
-        )
+        }
     }
 
     // Folder context menu
     contextMenuFolderId?.let { folderId ->
         val folder = uiState.folders.find { it.id == folderId }
         if (folder != null) {
-            AlertDialog(
-                onDismissRequest = { contextMenuFolderId = null },
-                title = { Text(folder.name, maxLines = 1) },
-                text = {
-                    Column {
+            Dialog(onDismissRequest = { contextMenuFolderId = null }) {
+                Card(
+                    shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Column(modifier = Modifier.padding(vertical = ByteBoxTheme.spacing.xs)) {
+                        Text(
+                            text = folder.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.lg, vertical = ByteBoxTheme.spacing.sm),
+                        )
                         ListItem(
                             headlineContent = { Text("Share") },
                             leadingContent = { Icon(Icons.Default.Share, contentDescription = null) },
                             modifier = Modifier.clickable {
                                 contextMenuFolderId = null
                                 viewModel.shareFolder(folderId)
-                            }
+                            },
                         )
                         ListItem(
                             headlineContent = { Text("Rename") },
@@ -319,7 +527,7 @@ fun FileListScreen(
                                 renameFolderId = folderId
                                 renameFolderName = folder.name
                                 showRenameFolderDialog = true
-                            }
+                            },
                         )
                         ListItem(
                             headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
@@ -330,15 +538,11 @@ fun FileListScreen(
                                 deleteTargetName = folder.name
                                 deleteTargetIsFolder = true
                                 showDeleteConfirm = true
-                            }
+                            },
                         )
                     }
-                },
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { contextMenuFolderId = null }) { Text("Cancel") }
                 }
-            )
+            }
         }
     }
 
@@ -346,18 +550,34 @@ fun FileListScreen(
     contextMenuFileId?.let { fileId ->
         val file = uiState.files.find { it.id == fileId }
         if (file != null) {
-            AlertDialog(
-                onDismissRequest = { contextMenuFileId = null },
-                title = { Text(file.name, maxLines = 1) },
-                text = {
-                    Column {
+            Dialog(onDismissRequest = { contextMenuFileId = null }) {
+                Card(
+                    shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Column(modifier = Modifier.padding(vertical = ByteBoxTheme.spacing.xs)) {
+                        Text(
+                            text = file.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.lg, vertical = ByteBoxTheme.spacing.sm),
+                        )
                         ListItem(
                             headlineContent = { Text("Share") },
                             leadingContent = { Icon(Icons.Default.Share, contentDescription = null) },
                             modifier = Modifier.clickable {
                                 contextMenuFileId = null
                                 viewModel.shareFile(fileId)
-                            }
+                            },
+                        )
+                        ListItem(
+                            headlineContent = { Text("Copy") },
+                            leadingContent = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                            modifier = Modifier.clickable {
+                                contextMenuFileId = null
+                                viewModel.copyFile(fileId)
+                            },
                         )
                         ListItem(
                             headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
@@ -368,103 +588,87 @@ fun FileListScreen(
                                 deleteTargetName = file.name
                                 deleteTargetIsFolder = false
                                 showDeleteConfirm = true
-                            }
+                            },
                         )
                     }
-                },
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { contextMenuFileId = null }) { Text("Cancel") }
                 }
-            )
+            }
         }
     }
 
-    // Delete confirmation dialog (single item)
+    // Delete confirmation dialogs
     if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete") },
-            text = { Text("Are you sure you want to delete \"$deleteTargetName\"?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (deleteTargetIsFolder) viewModel.trashFolder(deleteTargetId)
-                    else viewModel.trashFile(deleteTargetId)
-                    showDeleteConfirm = false
-                }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmationDialog(
+            title = "Delete",
+            message = "Are you sure you want to delete \"$deleteTargetName\"?",
+            confirmText = "Delete",
+            isDestructive = true,
+            onConfirm = {
+                if (deleteTargetIsFolder) viewModel.trashFolder(deleteTargetId)
+                else viewModel.trashFile(deleteTargetId)
+                showDeleteConfirm = false
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
-            }
+            onDismiss = { showDeleteConfirm = false },
         )
     }
 
-    // Delete confirmation dialog (selected items)
     if (showDeleteSelectedConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteSelectedConfirm = false },
-            title = { Text("Delete ${uiState.selectedItems.size} items") },
-            text = { Text("Are you sure you want to delete the selected items?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    uiState.selectedItems.forEach { id ->
-                        if (uiState.files.any { it.id == id }) viewModel.trashFile(id)
-                        if (uiState.folders.any { it.id == id }) viewModel.trashFolder(id)
-                    }
-                    viewModel.clearSelection()
-                    showDeleteSelectedConfirm = false
-                }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+        ConfirmationDialog(
+            title = "Delete ${uiState.selectedItems.size} items",
+            message = "Are you sure you want to delete the selected items?",
+            confirmText = "Delete",
+            isDestructive = true,
+            onConfirm = {
+                uiState.selectedItems.forEach { id ->
+                    if (uiState.files.any { it.id == id }) viewModel.trashFile(id)
+                    if (uiState.folders.any { it.id == id }) viewModel.trashFolder(id)
                 }
+                viewModel.clearSelection()
+                showDeleteSelectedConfirm = false
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteSelectedConfirm = false }) { Text("Cancel") }
-            }
+            onDismiss = { showDeleteSelectedConfirm = false },
         )
     }
 
-    // Share card dialog (TeraBox-style)
+    // Share dialog
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     uiState.shareUrl?.let { shareUrl ->
         Dialog(onDismissRequest = { viewModel.clearShareUrl() }) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(ByteBoxTheme.radius.xl),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.padding(ByteBoxTheme.spacing.xl),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    // Header with close button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
                             "Share Link",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold,
                         )
                         IconButton(onClick = { viewModel.clearShareUrl() }) {
                             Icon(Icons.Default.Close, contentDescription = "Close")
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
 
                     // File/Folder icon
                     Surface(
-                        modifier = Modifier.size(72.dp),
-                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.size(64.dp),
+                        shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
                         color = if (uiState.shareItemIsFolder)
                             MaterialTheme.colorScheme.primaryContainer
                         else
-                            MaterialTheme.colorScheme.secondaryContainer
+                            MaterialTheme.colorScheme.secondaryContainer,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -477,87 +681,78 @@ fun FileListScreen(
                                     else -> Icons.Default.Description
                                 },
                                 contentDescription = null,
-                                modifier = Modifier.size(36.dp),
+                                modifier = Modifier.size(32.dp),
                                 tint = if (uiState.shareItemIsFolder)
                                     MaterialTheme.colorScheme.primary
                                 else
-                                    MaterialTheme.colorScheme.secondary
+                                    MaterialTheme.colorScheme.secondary,
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
 
-                    // File name
                     Text(
                         text = uiState.shareItemName ?: "File",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
 
-                    // File size
                     if (!uiState.shareItemIsFolder && uiState.shareItemSize > 0) {
                         Text(
                             text = uiState.shareItemSize.toReadableFileSize(),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
 
                     // Link container
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        shape = RoundedCornerShape(ByteBoxTheme.radius.md),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(ByteBoxTheme.spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 Icons.Default.Link,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
                             Text(
                                 text = shareUrl,
                                 style = MaterialTheme.typography.bodySmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
 
-                    // Copy Link button
-                    Button(
+                    com.bytebox.core.ui.components.ByteBoxButton(
+                        text = "Copy Link",
                         onClick = {
                             clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(shareUrl))
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Copy Link", fontWeight = FontWeight.SemiBold)
-                    }
+                        leadingIcon = Icons.Default.ContentCopy,
+                    )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
 
-                    // Share via button
-                    OutlinedButton(
+                    com.bytebox.core.ui.components.ByteBoxOutlinedButton(
+                        text = "Share via...",
                         onClick = {
                             val sendIntent = Intent().apply {
                                 action = Intent.ACTION_SEND
@@ -566,15 +761,8 @@ fun FileListScreen(
                             }
                             context.startActivity(Intent.createChooser(sendIntent, "Share via"))
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Share via...", fontWeight = FontWeight.SemiBold)
-                    }
+                        leadingIcon = Icons.Default.Share,
+                    )
                 }
             }
         }
@@ -584,15 +772,15 @@ fun FileListScreen(
     if (uiState.isCreatingShare) {
         Dialog(onDismissRequest = {}) {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             ) {
                 Row(
-                    modifier = Modifier.padding(24.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.padding(ByteBoxTheme.spacing.xl),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.md))
                     Text("Creating share link...")
                 }
             }

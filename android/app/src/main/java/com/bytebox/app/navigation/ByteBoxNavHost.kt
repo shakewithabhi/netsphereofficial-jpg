@@ -1,14 +1,53 @@
 package com.bytebox.app.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -16,20 +55,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import com.bytebox.app.BuildConfig
 import com.bytebox.core.common.toReadableFileSize
+import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.feature.auth.presentation.login.LoginScreen
 import com.bytebox.feature.auth.presentation.register.RegisterScreen
 import com.bytebox.feature.download.presentation.DownloadScreen
@@ -39,6 +67,7 @@ import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
+import kotlinx.coroutines.launch
 
 data class BottomNavItem(
     val label: String,
@@ -51,21 +80,20 @@ fun ByteBoxNavHost(
     navController: NavHostController = rememberNavController(),
     deepLinkShareCode: String? = null
 ) {
-    // Handle deep link share code
     LaunchedEffect(deepLinkShareCode) {
         if (deepLinkShareCode != null) {
             navController.navigate(Screen.ShareView.createRoute(deepLinkShareCode))
         }
     }
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Simplified 3-tab navigation
     val bottomNavItems = listOf(
         BottomNavItem("Files", { Icon(Icons.Default.Folder, "Files") }, Screen.Files.route),
-        BottomNavItem("Uploads", { Icon(Icons.Default.CloudUpload, "Uploads") }, Screen.Upload.createRoute(null)),
-        BottomNavItem("Downloads", { Icon(Icons.Default.Download, "Downloads") }, Screen.Downloads.route),
         BottomNavItem("Shares", { Icon(Icons.Default.Link, "Shares") }, Screen.Shares.route),
-        BottomNavItem("Settings", { Icon(Icons.Default.Settings, "Settings") }, Screen.Settings.route)
+        BottomNavItem("Settings", { Icon(Icons.Default.Settings, "Settings") }, Screen.Settings.route),
     )
 
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
@@ -73,11 +101,13 @@ fun ByteBoxNavHost(
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    tonalElevation = ByteBoxTheme.elevation.xs,
+                ) {
                     bottomNavItems.forEach { item ->
                         NavigationBarItem(
                             icon = item.icon,
-                            label = { Text(item.label) },
+                            label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
                             selected = currentRoute == item.route,
                             onClick = {
                                 if (currentRoute != item.route) {
@@ -87,17 +117,41 @@ fun ByteBoxNavHost(
                                         restoreState = true
                                     }
                                 }
-                            }
+                            },
                         )
                     }
                 }
             }
-        }
+        },
     ) { padding ->
         NavHost(
             navController = navController,
             startDestination = Screen.Login.route,
-            modifier = Modifier.padding(padding)
+            modifier = Modifier.padding(padding),
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300),
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300),
+                ) + fadeOut(animationSpec = tween(300))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(250),
+                ) + fadeIn(animationSpec = tween(250))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(250),
+                ) + fadeOut(animationSpec = tween(250))
+            },
         ) {
             composable(Screen.Login.route) {
                 LoginScreen(
@@ -109,7 +163,7 @@ fun ByteBoxNavHost(
                     onNavigateToRegister = { navController.navigate(Screen.Register.route) },
                     isDebug = BuildConfig.DEBUG,
                     testEmail = if (BuildConfig.DEBUG) BuildConfig.TEST_EMAIL else "",
-                    testPassword = if (BuildConfig.DEBUG) BuildConfig.TEST_PASSWORD else ""
+                    testPassword = if (BuildConfig.DEBUG) BuildConfig.TEST_PASSWORD else "",
                 )
             }
 
@@ -120,7 +174,7 @@ fun ByteBoxNavHost(
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
 
@@ -132,7 +186,8 @@ fun ByteBoxNavHost(
                     onNavigateToUpload = { folderId ->
                         navController.navigate(Screen.Upload.createRoute(folderId))
                     },
-                    onNavigateToSearch = { /* Search is inline in FileListScreen */ }
+                    onNavigateToSearch = { },
+                    onNavigateToTrash = { navController.navigate(Screen.Trash.route) },
                 )
             }
 
@@ -144,7 +199,7 @@ fun ByteBoxNavHost(
                         nullable = true
                         defaultValue = null
                     }
-                )
+                ),
             ) { backStackEntry ->
                 val folderId = backStackEntry.arguments?.getString("folderId")
                 UploadScreen(
@@ -152,13 +207,13 @@ fun ByteBoxNavHost(
                     onNavigateToPreview = { fileId, mimeType ->
                         navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
                     },
-                    folderId = folderId
+                    folderId = folderId,
                 )
             }
 
             composable(Screen.Downloads.route) {
                 DownloadScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
 
@@ -166,8 +221,8 @@ fun ByteBoxNavHost(
                 route = Screen.Preview.route,
                 arguments = listOf(
                     navArgument("fileId") { type = NavType.StringType },
-                    navArgument("mimeType") { type = NavType.StringType }
-                )
+                    navArgument("mimeType") { type = NavType.StringType },
+                ),
             ) { backStackEntry ->
                 val fileId = backStackEntry.arguments?.getString("fileId") ?: return@composable
                 val mimeType = (backStackEntry.arguments?.getString("mimeType") ?: "").replace("_", "/")
@@ -175,14 +230,14 @@ fun ByteBoxNavHost(
                     fileId = fileId,
                     mimeType = mimeType,
                     onNavigateBack = { navController.popBackStack() },
-                    onDownload = { /* Trigger download via DownloadViewModel */ },
-                    onShare = { navController.navigate(Screen.Shares.route) }
+                    onDownload = { },
+                    onShare = { navController.navigate(Screen.Shares.route) },
                 )
             }
 
             composable(Screen.Shares.route) {
                 ShareScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
 
@@ -191,32 +246,31 @@ fun ByteBoxNavHost(
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onLoggedOut = {
-                        // Restart activity to destroy all ViewModels and clear in-memory state
                         activity?.let {
                             val intent = it.intent
                             it.finish()
                             it.startActivity(intent)
                         }
-                    }
+                    },
                 )
             }
 
             composable(Screen.Trash.route) {
                 TrashScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
 
             composable(
                 route = Screen.ShareView.route,
                 arguments = listOf(
-                    navArgument("code") { type = NavType.StringType }
-                )
+                    navArgument("code") { type = NavType.StringType },
+                ),
             ) { backStackEntry ->
                 val code = backStackEntry.arguments?.getString("code") ?: return@composable
                 ShareViewScreen(
                     code = code,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
         }
@@ -226,14 +280,13 @@ fun ByteBoxNavHost(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var fileName by remember { mutableStateOf("Loading...") }
     var fileSize by remember { mutableStateOf<Long?>(null) }
     var mimeType by remember { mutableStateOf("") }
     var shareType by remember { mutableStateOf("file") }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    var downloadUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(code) {
         try {
@@ -263,39 +316,45 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentAlignment = Alignment.Center
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.Center,
         ) {
             when {
                 isLoading -> CircularProgressIndicator()
                 error != null -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Default.ErrorOutline, null, modifier = Modifier.size(64.dp))
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(error!!)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                        Text(
+                            error!!,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 else -> {
                     Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.padding(ByteBoxTheme.spacing.xxl),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        // File icon
                         Surface(
                             modifier = Modifier.size(96.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
+                            shape = RoundedCornerShape(ByteBoxTheme.radius.xxl),
+                            color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
-                            Box(
-                                contentAlignment = Alignment.Center
-                            ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     when {
                                         shareType == "folder" -> Icons.Default.Folder
@@ -306,27 +365,32 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
                                     },
                                     null,
                                     modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(fileName, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xl))
+                        Text(
+                            fileName,
+                            style = MaterialTheme.typography.headlineMedium,
+                            textAlign = TextAlign.Center,
+                        )
+
                         val sizeVal = fileSize
                         if (sizeVal != null && sizeVal > 0) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxs))
                             Text(
                                 sizeVal.toReadableFileSize(),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))
 
-                        // Download button
-                        Button(
+                        com.bytebox.core.ui.components.ByteBoxButton(
+                            text = "Download",
                             onClick = {
                                 kotlinx.coroutines.MainScope().launch {
                                     try {
@@ -345,13 +409,8 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
                                     } catch (_: Exception) {}
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
-                        ) {
-                            Icon(Icons.Default.Download, null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Download", style = MaterialTheme.typography.titleMedium)
-                        }
+                            leadingIcon = Icons.Default.Download,
+                        )
                     }
                 }
             }
