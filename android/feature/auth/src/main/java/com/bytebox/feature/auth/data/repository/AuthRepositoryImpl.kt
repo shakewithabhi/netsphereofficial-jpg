@@ -1,6 +1,9 @@
 package com.bytebox.feature.auth.data.repository
 
 import com.bytebox.core.common.Result
+import com.bytebox.core.database.dao.FileDao
+import com.bytebox.core.database.dao.FolderDao
+import com.bytebox.core.database.dao.UploadTaskDao
 import com.bytebox.core.datastore.TokenManager
 import com.bytebox.core.network.api.AuthApi
 import com.bytebox.core.network.api.UserApi
@@ -15,7 +18,10 @@ import javax.inject.Inject
 class AuthRepositoryImpl @Inject constructor(
     private val authApi: AuthApi,
     private val userApi: UserApi,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val fileDao: FileDao,
+    private val folderDao: FolderDao,
+    private val uploadTaskDao: UploadTaskDao
 ) : AuthRepository {
 
     override suspend fun login(email: String, password: String): Result<User> {
@@ -49,6 +55,9 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun logout(): Result<Unit> {
         safeApiCall { authApi.logout() }
         tokenManager.clearTokens()
+        fileDao.deleteAll()
+        folderDao.deleteAll()
+        uploadTaskDao.deleteAll()
         return Result.Success(Unit)
     }
 

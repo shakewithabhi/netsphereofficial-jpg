@@ -2,13 +2,22 @@ package auth
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// hashToken returns the SHA-256 hex digest of a refresh token.
+func hashToken(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(h[:])
+}
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -40,16 +49,20 @@ func (r *Repository) CreateUser(ctx context.Context, user *User) error {
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
-		SELECT id, email, password_hash, display_name, avatar_key,
+		SELECT id, email, password_hash, COALESCE(display_name, ''), COALESCE(avatar_key, ''),
 		       storage_used, storage_limit, plan, is_active, is_admin,
-		       email_verified, last_login_at, created_at, updated_at
+		       email_verified, totp_secret_encrypted, totp_enabled, totp_verified_at,
+		       failed_login_attempts, locked_until, password_changed_at,
+		       last_login_at, created_at, updated_at
 		FROM users WHERE email = $1`
 
 	user := &User{}
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.AvatarKey,
 		&user.StorageUsed, &user.StorageLimit, &user.Plan, &user.IsActive, &user.IsAdmin,
-		&user.EmailVerified, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt,
+		&user.EmailVerified, &user.TOTPSecretEncrypted, &user.TOTPEnabled, &user.TOTPVerifiedAt,
+		&user.FailedLoginAttempts, &user.LockedUntil, &user.PasswordChangedAt,
+		&user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -62,16 +75,20 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 
 func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `
-		SELECT id, email, password_hash, display_name, avatar_key,
+		SELECT id, email, password_hash, COALESCE(display_name, ''), COALESCE(avatar_key, ''),
 		       storage_used, storage_limit, plan, is_active, is_admin,
-		       email_verified, last_login_at, created_at, updated_at
+		       email_verified, totp_secret_encrypted, totp_enabled, totp_verified_at,
+		       failed_login_attempts, locked_until, password_changed_at,
+		       last_login_at, created_at, updated_at
 		FROM users WHERE id = $1`
 
 	user := &User{}
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.AvatarKey,
 		&user.StorageUsed, &user.StorageLimit, &user.Plan, &user.IsActive, &user.IsAdmin,
-		&user.EmailVerified, &user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt,
+		&user.EmailVerified, &user.TOTPSecretEncrypted, &user.TOTPEnabled, &user.TOTPVerifiedAt,
+		&user.FailedLoginAttempts, &user.LockedUntil, &user.PasswordChangedAt,
+		&user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -181,12 +198,21 @@ func (r *Repository) CreateSession(ctx context.Context, session *Session) error 
 		VALUES ($1, $2, $3, $4, $5::inet, $6, $7)
 		RETURNING id, created_at`
 
+	// Store hashed refresh token in DB
+	tokenHash := hashToken(session.RefreshToken)
+
+	// PostgreSQL INET type rejects empty string; use nil instead
+	var ipAddr *string
+	if session.IPAddress != "" {
+		ipAddr = &session.IPAddress
+	}
+
 	err := r.db.QueryRow(ctx, query,
 		session.UserID,
-		session.RefreshToken,
+		tokenHash,
 		session.DeviceName,
 		session.DeviceType,
-		session.IPAddress,
+		ipAddr,
 		session.UserAgent,
 		session.ExpiresAt,
 	).Scan(&session.ID, &session.CreatedAt)
@@ -203,8 +229,10 @@ func (r *Repository) GetSessionByToken(ctx context.Context, refreshToken string)
 		FROM sessions
 		WHERE refresh_token = $1 AND expires_at > NOW()`
 
+	tokenHash := hashToken(refreshToken)
+
 	session := &Session{}
-	err := r.db.QueryRow(ctx, query, refreshToken).Scan(
+	err := r.db.QueryRow(ctx, query, tokenHash).Scan(
 		&session.ID, &session.UserID, &session.RefreshToken,
 		&session.DeviceName, &session.DeviceType,
 		&session.IPAddress, &session.UserAgent,
@@ -221,7 +249,8 @@ func (r *Repository) GetSessionByToken(ctx context.Context, refreshToken string)
 
 func (r *Repository) DeleteSession(ctx context.Context, refreshToken string) error {
 	query := `DELETE FROM sessions WHERE refresh_token = $1`
-	_, err := r.db.Exec(ctx, query, refreshToken)
+	tokenHash := hashToken(refreshToken)
+	_, err := r.db.Exec(ctx, query, tokenHash)
 	if err != nil {
 		return fmt.Errorf("delete session: %w", err)
 	}
@@ -286,4 +315,118 @@ func (r *Repository) DeleteExpiredSessions(ctx context.Context) (int64, error) {
 		return 0, fmt.Errorf("delete expired sessions: %w", err)
 	}
 	return result.RowsAffected(), nil
+}
+
+// Account lockout operations
+
+func (r *Repository) IncrementFailedAttempts(ctx context.Context, userID uuid.UUID) (int, error) {
+	query := `UPDATE users SET failed_login_attempts = failed_login_attempts + 1 WHERE id = $1 RETURNING failed_login_attempts`
+	var count int
+	err := r.db.QueryRow(ctx, query, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("increment failed attempts: %w", err)
+	}
+	return count, nil
+}
+
+func (r *Repository) ResetFailedAttempts(ctx context.Context, userID uuid.UUID) error {
+	query := `UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("reset failed attempts: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) LockAccount(ctx context.Context, userID uuid.UUID, until time.Time) error {
+	query := `UPDATE users SET locked_until = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, until, userID)
+	if err != nil {
+		return fmt.Errorf("lock account: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) SetPasswordChangedAt(ctx context.Context, userID uuid.UUID) error {
+	query := `UPDATE users SET password_changed_at = NOW() WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("set password changed at: %w", err)
+	}
+	return nil
+}
+
+// 2FA operations
+
+func (r *Repository) SetTOTPSecret(ctx context.Context, userID uuid.UUID, encrypted []byte) error {
+	query := `UPDATE users SET totp_secret_encrypted = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, encrypted, userID)
+	if err != nil {
+		return fmt.Errorf("set totp secret: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) EnableTOTP(ctx context.Context, userID uuid.UUID) error {
+	query := `UPDATE users SET totp_enabled = true, totp_verified_at = NOW() WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("enable totp: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DisableTOTP(ctx context.Context, userID uuid.UUID) error {
+	query := `UPDATE users SET totp_enabled = false, totp_secret_encrypted = NULL, totp_verified_at = NULL WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("disable totp: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) CreateRecoveryCodes(ctx context.Context, userID uuid.UUID, codeHashes []string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Delete existing codes
+	_, err = tx.Exec(ctx, `DELETE FROM recovery_codes WHERE user_id = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("delete old recovery codes: %w", err)
+	}
+
+	// Insert new codes
+	for _, hash := range codeHashes {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO recovery_codes (user_id, code_hash) VALUES ($1, $2)`,
+			userID, hash,
+		)
+		if err != nil {
+			return fmt.Errorf("insert recovery code: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) UseRecoveryCode(ctx context.Context, userID uuid.UUID, codeHash string) (bool, error) {
+	query := `UPDATE recovery_codes SET used_at = NOW() WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL`
+	result, err := r.db.Exec(ctx, query, userID, codeHash)
+	if err != nil {
+		return false, fmt.Errorf("use recovery code: %w", err)
+	}
+	return result.RowsAffected() > 0, nil
+}
+
+func (r *Repository) CountUnusedRecoveryCodes(ctx context.Context, userID uuid.UUID) (int, error) {
+	query := `SELECT COUNT(*) FROM recovery_codes WHERE user_id = $1 AND used_at IS NULL`
+	var count int
+	err := r.db.QueryRow(ctx, query, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count unused recovery codes: %w", err)
+	}
+	return count, nil
 }

@@ -1,5 +1,6 @@
 package com.bytebox.feature.settings.presentation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -133,7 +134,9 @@ fun SettingsScreen(
                         tint = MaterialTheme.colorScheme.error
                     )
                 },
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .clickable { showLogoutDialog = true }
             )
 
             // Trigger logout

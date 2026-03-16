@@ -29,6 +29,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/upload", h.Upload)
 	r.Get("/search", h.Search)
 	r.Get("/trash", h.ListTrashed)
+	r.Get("/categories/summary", h.CategorySummary)
+	r.Get("/category/{category}", h.ListByCategory)
 	r.Get("/{id}", h.GetByID)
 	r.Put("/{id}", h.Rename)
 	r.Post("/{id}/copy", h.Copy)
@@ -212,8 +214,31 @@ func (h *Handler) Move(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Copy(w http.ResponseWriter, r *http.Request) {
-	// Copy is deferred to Phase 2 — returns not implemented
-	common.JSONError(w, common.ErrBadRequest("copy not yet implemented"))
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	var req CopyFileRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.Copy(r.Context(), claims, id, req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusCreated, resp)
 }
 
 func (h *Handler) Trash(w http.ResponseWriter, r *http.Request) {
@@ -398,6 +423,45 @@ func (h *Handler) DeleteVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, map[string]string{"message": "version deleted"})
+}
+
+func (h *Handler) ListByCategory(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	category := chi.URLParam(r, "category")
+	if _, ok := CategoryMimePatterns[category]; !ok {
+		common.JSONError(w, common.ErrBadRequest("invalid category, must be one of: images, videos, audio, documents"))
+		return
+	}
+
+	params := common.ParsePagination(r)
+	files, hasMore, err := h.service.ListByCategory(r.Context(), claims, category, params)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSONPaginated(w, files, "", hasMore)
+}
+
+func (h *Handler) CategorySummary(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	summary, err := h.service.GetCategorySummary(r.Context(), claims)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, summary)
 }
 
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {

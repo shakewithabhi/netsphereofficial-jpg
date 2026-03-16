@@ -42,4 +42,7 @@ interface UploadTaskDao {
 
     @Query("DELETE FROM upload_tasks WHERE status = 'completed'")
     suspend fun clearCompleted()
+
+    @Query("DELETE FROM upload_tasks")
+    suspend fun deleteAll()
 }

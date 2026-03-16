@@ -394,6 +394,85 @@ func (r *Repository) RestoreVersion(ctx context.Context, fileID uuid.UUID, versi
 	return nil
 }
 
+func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID, userID uuid.UUID) ([]File, error) {
+	query := `
+		SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),
+		       size, mime_type, COALESCE(content_hash, ''), scan_status, current_version,
+		       is_video, COALESCE(stream_video_id, ''), COALESCE(stream_status, ''),
+		       COALESCE(hls_url, ''), COALESCE(video_thumbnail_url, ''),
+		       trashed_at, created_at, updated_at
+		FROM files
+		WHERE id = ANY($1) AND user_id = $2`
+
+	rows, err := r.db.Query(ctx, query, ids, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get files by ids: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		if err := rows.Scan(
+			&f.ID, &f.UserID, &f.FolderID, &f.Name, &f.StorageKey, &f.ThumbnailKey,
+			&f.Size, &f.MimeType, &f.ContentHash, &f.ScanStatus, &f.CurrentVersion,
+			&f.IsVideo, &f.StreamVideoID, &f.StreamStatus, &f.HLSURL, &f.VideoThumbnailURL,
+			&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan file: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, nil
+}
+
+func (r *Repository) TrashMany(ctx context.Context, ids []uuid.UUID, userID uuid.UUID) (int64, error) {
+	query := `UPDATE files SET trashed_at = NOW() WHERE id = ANY($1) AND user_id = $2 AND trashed_at IS NULL`
+	result, err := r.db.Exec(ctx, query, ids, userID)
+	if err != nil {
+		return 0, fmt.Errorf("trash many files: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
+func (r *Repository) MoveMany(ctx context.Context, ids []uuid.UUID, userID uuid.UUID, folderID *uuid.UUID) (int64, error) {
+	query := `UPDATE files SET folder_id = $1 WHERE id = ANY($2) AND user_id = $3 AND trashed_at IS NULL`
+	result, err := r.db.Exec(ctx, query, folderID, ids, userID)
+	if err != nil {
+		return 0, fmt.Errorf("move many files: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
+func (r *Repository) ListNamesByPrefix(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, prefix string) ([]string, error) {
+	var query string
+	var args []any
+
+	if folderID == nil {
+		query = `SELECT name FROM files WHERE user_id = $1 AND folder_id IS NULL AND trashed_at IS NULL AND name LIKE $2 || '%'`
+		args = []any{userID, prefix}
+	} else {
+		query = `SELECT name FROM files WHERE user_id = $1 AND folder_id = $2 AND trashed_at IS NULL AND name LIKE $3 || '%'`
+		args = []any{userID, folderID, prefix}
+	}
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list names by prefix: %w", err)
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scan name: %w", err)
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
 func (r *Repository) NameExistsInFolder(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, name string) (bool, error) {
 	var query string
 	var args []any
@@ -412,6 +491,114 @@ func (r *Repository) NameExistsInFolder(ctx context.Context, userID uuid.UUID, f
 		return false, fmt.Errorf("check file name: %w", err)
 	}
 	return exists, nil
+}
+
+func (r *Repository) ListByMimeTypes(ctx context.Context, userID uuid.UUID, mimePatterns []string, params common.PaginationParams) ([]File, bool, error) {
+	limit := params.Limit + 1
+
+	orderDir := "ASC"
+	if params.Order == "desc" {
+		orderDir = "DESC"
+	}
+
+	sortCol := "created_at"
+	switch params.Sort {
+	case "name":
+		sortCol = "name"
+	case "size":
+		sortCol = "size"
+	case "created_at":
+		sortCol = "created_at"
+	case "updated_at":
+		sortCol = "updated_at"
+	}
+
+	// Build MIME type filter conditions
+	conditions := ""
+	args := []any{userID}
+	for i, pattern := range mimePatterns {
+		if i > 0 {
+			conditions += " OR "
+		}
+		args = append(args, pattern)
+		conditions += fmt.Sprintf("mime_type LIKE $%d", len(args))
+	}
+
+	args = append(args, limit)
+	query := fmt.Sprintf(`
+		SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),
+		       size, mime_type, COALESCE(content_hash, ''), scan_status, current_version,
+		       is_video, COALESCE(stream_video_id, ''), COALESCE(stream_status, ''),
+		       COALESCE(hls_url, ''), COALESCE(video_thumbnail_url, ''),
+		       trashed_at, created_at, updated_at
+		FROM files
+		WHERE user_id = $1 AND trashed_at IS NULL AND (%s)
+		ORDER BY %s %s, id ASC
+		LIMIT $%d`, conditions, sortCol, orderDir, len(args))
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, false, fmt.Errorf("list files by mime: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		if err := rows.Scan(
+			&f.ID, &f.UserID, &f.FolderID, &f.Name, &f.StorageKey, &f.ThumbnailKey,
+			&f.Size, &f.MimeType, &f.ContentHash, &f.ScanStatus, &f.CurrentVersion,
+			&f.IsVideo, &f.StreamVideoID, &f.StreamStatus, &f.HLSURL, &f.VideoThumbnailURL,
+			&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+		); err != nil {
+			return nil, false, fmt.Errorf("scan file: %w", err)
+		}
+		files = append(files, f)
+	}
+
+	hasMore := len(files) > params.Limit
+	if hasMore {
+		files = files[:params.Limit]
+	}
+
+	return files, hasMore, nil
+}
+
+func (r *Repository) CountByCategory(ctx context.Context, userID uuid.UUID) ([]FileCategoryCount, error) {
+	query := `
+		SELECT
+			CASE
+				WHEN mime_type LIKE 'image/%' THEN 'images'
+				WHEN mime_type LIKE 'video/%' THEN 'videos'
+				WHEN mime_type LIKE 'audio/%' THEN 'audio'
+				WHEN mime_type LIKE 'application/pdf'
+				  OR mime_type LIKE 'application/msword'
+				  OR mime_type LIKE 'application/vnd.openxmlformats-%'
+				  OR mime_type LIKE 'text/%' THEN 'documents'
+				ELSE 'other'
+			END AS category,
+			COUNT(*) AS count,
+			COALESCE(SUM(size), 0) AS total_size
+		FROM files
+		WHERE user_id = $1 AND trashed_at IS NULL
+		GROUP BY category
+		ORDER BY count DESC`
+
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("count by category: %w", err)
+	}
+	defer rows.Close()
+
+	var categories []FileCategoryCount
+	for rows.Next() {
+		var c FileCategoryCount
+		if err := rows.Scan(&c.Category, &c.Count, &c.TotalSize); err != nil {
+			return nil, fmt.Errorf("scan category count: %w", err)
+		}
+		categories = append(categories, c)
+	}
+	return categories, nil
 }
 
 func (r *Repository) UpdateVideoFields(ctx context.Context, fileID uuid.UUID, streamVideoID, streamStatus, hlsURL, videoThumbnailURL string) error {

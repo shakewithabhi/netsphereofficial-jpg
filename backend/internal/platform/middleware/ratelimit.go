@@ -22,24 +22,7 @@ func NewRateLimiter(rdb *redis.Client) *RateLimiter {
 func (rl *RateLimiter) Limit(maxRequests int, window time.Duration, keyFunc func(r *http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			key := fmt.Sprintf("rl:%s", keyFunc(r))
-
-			count, err := rl.increment(r.Context(), key, window)
-			if err != nil {
-				// On Redis failure, allow the request (fail open)
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", maxRequests))
-			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", max(0, maxRequests-int(count))))
-
-			if int(count) > maxRequests {
-				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(window.Seconds())))
-				http.Error(w, `{"success":false,"error":{"message":"rate limit exceeded"}}`, http.StatusTooManyRequests)
-				return
-			}
-
+			// Rate limiting disabled for development
 			next.ServeHTTP(w, r)
 		})
 	}

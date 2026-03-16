@@ -91,6 +91,19 @@ func (c *Client) Delete(ctx context.Context, bucket, key string) error {
 	return nil
 }
 
+func (c *Client) Copy(ctx context.Context, bucket, srcKey, dstKey string) error {
+	copySource := fmt.Sprintf("%s/%s", bucket, srcKey)
+	_, err := c.s3.CopyObject(ctx, &s3.CopyObjectInput{
+		Bucket:     aws.String(bucket),
+		CopySource: aws.String(copySource),
+		Key:        aws.String(dstKey),
+	})
+	if err != nil {
+		return fmt.Errorf("copy object: %w", err)
+	}
+	return nil
+}
+
 func (c *Client) PresignGetURL(ctx context.Context, bucket, key string, expiry time.Duration) (string, error) {
 	resp, err := c.presig.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),

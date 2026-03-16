@@ -249,6 +249,50 @@ func (r *Repository) Delete(ctx context.Context, id, userID uuid.UUID) ([]string
 	return keys, nil
 }
 
+func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID, userID uuid.UUID) ([]Folder, error) {
+	query := `
+		SELECT id, user_id, parent_id, name, path, trashed_at, created_at, updated_at
+		FROM folders
+		WHERE id = ANY($1) AND user_id = $2`
+
+	rows, err := r.db.Query(ctx, query, ids, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get folders by ids: %w", err)
+	}
+	defer rows.Close()
+
+	var folders []Folder
+	for rows.Next() {
+		var f Folder
+		if err := rows.Scan(
+			&f.ID, &f.UserID, &f.ParentID, &f.Name, &f.Path,
+			&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan folder: %w", err)
+		}
+		folders = append(folders, f)
+	}
+	return folders, nil
+}
+
+func (r *Repository) TrashMany(ctx context.Context, ids []uuid.UUID, userID uuid.UUID) (int64, error) {
+	query := `UPDATE folders SET trashed_at = NOW() WHERE id = ANY($1) AND user_id = $2 AND trashed_at IS NULL`
+	result, err := r.db.Exec(ctx, query, ids, userID)
+	if err != nil {
+		return 0, fmt.Errorf("trash many folders: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
+func (r *Repository) MoveMany(ctx context.Context, ids []uuid.UUID, userID uuid.UUID, parentID *uuid.UUID, newPath string) (int64, error) {
+	query := `UPDATE folders SET parent_id = $1, path = $2 WHERE id = ANY($3) AND user_id = $4 AND trashed_at IS NULL`
+	result, err := r.db.Exec(ctx, query, parentID, newPath, ids, userID)
+	if err != nil {
+		return 0, fmt.Errorf("move many folders: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
 func (r *Repository) NameExists(ctx context.Context, userID uuid.UUID, parentID *uuid.UUID, name string) (bool, error) {
 	var query string
 	var args []any

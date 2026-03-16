@@ -103,6 +103,7 @@ type AuthConfig struct {
 	AccessTokenTTL     time.Duration
 	RefreshTokenTTL    time.Duration
 	BcryptCost         int
+	TOTPEncryptionKey  string // 32-byte hex-encoded AES-256 key
 }
 
 type AppConfig struct {
@@ -161,6 +162,7 @@ func Load() (*Config, error) {
 			AccessTokenTTL:     time.Duration(getEnvInt("AUTH_ACCESS_TOKEN_TTL_MIN", 15)) * time.Minute,
 			RefreshTokenTTL:    time.Duration(getEnvInt("AUTH_REFRESH_TOKEN_TTL_DAYS", 30)) * 24 * time.Hour,
 			BcryptCost:         getEnvInt("AUTH_BCRYPT_COST", 12),
+			TOTPEncryptionKey:  getEnv("AUTH_TOTP_ENCRYPTION_KEY", ""),
 		},
 		App: AppConfig{
 			Environment:      getEnv("APP_ENV", "development"),

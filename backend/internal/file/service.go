@@ -287,6 +287,130 @@ func (s *Service) Move(ctx context.Context, claims *auth.TokenClaims, id uuid.UU
 	return &resp, nil
 }
 
+func (s *Service) Copy(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID, req CopyFileRequest) (*FileResponse, error) {
+	// Fetch source file
+	source, err := s.repo.GetByID(ctx, id, claims.UserID)
+	if err != nil || source == nil || source.TrashedAt != nil {
+		return nil, common.ErrNotFound("file not found")
+	}
+
+	// Check quota
+	check, err := s.quota.CheckUpload(ctx, claims.UserID, source.Size)
+	if err != nil {
+		slog.Error("failed to check quota for copy", "error", err)
+		return nil, common.ErrInternal("failed to check storage quota")
+	}
+	if !check.Allowed {
+		return nil, common.ErrTooLarge(check.WarningMsg)
+	}
+
+	// Determine target folder
+	targetFolderID := req.FolderID
+	if targetFolderID == nil {
+		targetFolderID = source.FolderID
+	}
+
+	// Generate unique copy name
+	copyName := s.generateCopyName(ctx, claims.UserID, targetFolderID, source.Name)
+
+	// Generate new storage key
+	newFileID := uuid.New()
+	prefix := claims.UserID.String()[:2]
+	storageKey := fmt.Sprintf("files/%s/%s/%s/%s", prefix, claims.UserID, newFileID, copyName)
+
+	// Copy S3 object
+	if err := s.store.Copy(ctx, s.store.BucketFiles(), source.StorageKey, storageKey); err != nil {
+		slog.Error("failed to copy file in storage", "error", err)
+		return nil, common.ErrInternal("failed to copy file")
+	}
+
+	// Create new file record (reset video stream fields — copy needs its own transcode)
+	newFile := &File{
+		ID:          newFileID,
+		UserID:      claims.UserID,
+		FolderID:    targetFolderID,
+		Name:        copyName,
+		StorageKey:  storageKey,
+		Size:        source.Size,
+		MimeType:    source.MimeType,
+		ContentHash: source.ContentHash,
+		IsVideo:     source.IsVideo,
+	}
+
+	if err := s.repo.Create(ctx, newFile); err != nil {
+		s.store.Delete(ctx, s.store.BucketFiles(), storageKey)
+		if strings.Contains(err.Error(), "duplicate key") {
+			return nil, common.ErrConflict("file with this name already exists in this folder")
+		}
+		slog.Error("failed to create copied file record", "error", err)
+		return nil, common.ErrInternal("failed to save copied file")
+	}
+
+	// Update quota
+	if err := s.quota.UpdateUsage(ctx, claims.UserID, source.Size); err != nil {
+		slog.Error("failed to update storage used after copy", "error", err)
+	}
+
+	// Enqueue background tasks for the copy
+	if s.queue != nil {
+		task, err := media.NewThumbnailTask(newFile.ID, newFile.UserID, newFile.StorageKey, newFile.MimeType)
+		if err == nil {
+			if _, err := s.queue.Enqueue(task); err != nil {
+				slog.Error("failed to enqueue thumbnail task for copy", "error", err)
+			}
+		}
+
+		scanTask, err := media.NewVirusScanTask(newFile.ID, newFile.StorageKey)
+		if err == nil {
+			if _, err := s.queue.Enqueue(scanTask); err != nil {
+				slog.Error("failed to enqueue virus scan task for copy", "error", err)
+			}
+		}
+
+		if newFile.IsVideo {
+			transcodeTask, err := media.NewTranscodeVideoTask(newFile.ID, newFile.UserID, newFile.StorageKey, newFile.Name)
+			if err == nil {
+				if _, err := s.queue.Enqueue(transcodeTask); err != nil {
+					slog.Error("failed to enqueue transcode task for copy", "error", err)
+				}
+			}
+		}
+	}
+
+	resp := newFile.ToResponse()
+	return &resp, nil
+}
+
+// generateCopyName creates a unique name like "file (copy).txt", "file (copy 2).txt", etc.
+func (s *Service) generateCopyName(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, originalName string) string {
+	// Split name and extension
+	ext := ""
+	baseName := originalName
+	if dotIdx := strings.LastIndex(originalName, "."); dotIdx > 0 {
+		ext = originalName[dotIdx:]
+		baseName = originalName[:dotIdx]
+	}
+
+	// Check if the original name already exists in the target folder
+	copyName := baseName + " (copy)" + ext
+	exists, _ := s.repo.NameExistsInFolder(ctx, userID, folderID, copyName)
+	if !exists {
+		return copyName
+	}
+
+	// Try incrementing numbers
+	for i := 2; i <= 100; i++ {
+		copyName = fmt.Sprintf("%s (copy %d)%s", baseName, i, ext)
+		exists, _ = s.repo.NameExistsInFolder(ctx, userID, folderID, copyName)
+		if !exists {
+			return copyName
+		}
+	}
+
+	// Fallback: use UUID suffix
+	return fmt.Sprintf("%s (copy %s)%s", baseName, uuid.New().String()[:8], ext)
+}
+
 func (s *Service) Trash(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) error {
 	if err := s.repo.Trash(ctx, id, claims.UserID); err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -454,6 +578,42 @@ func (s *Service) DeleteVersion(ctx context.Context, claims *auth.TokenClaims, f
 	}
 
 	return nil
+}
+
+func (s *Service) ListByCategory(ctx context.Context, claims *auth.TokenClaims, category string, params common.PaginationParams) ([]FileResponse, bool, error) {
+	patterns, ok := CategoryMimePatterns[category]
+	if !ok {
+		return nil, false, common.ErrBadRequest("invalid category, must be one of: images, videos, audio, documents")
+	}
+
+	files, hasMore, err := s.repo.ListByMimeTypes(ctx, claims.UserID, patterns, params)
+	if err != nil {
+		slog.Error("failed to list files by category", "error", err)
+		return nil, false, common.ErrInternal("failed to list files")
+	}
+
+	result := make([]FileResponse, len(files))
+	for i, f := range files {
+		result[i] = f.ToResponse()
+	}
+	return result, hasMore, nil
+}
+
+func (s *Service) GetCategorySummary(ctx context.Context, claims *auth.TokenClaims) (*FileCategorySummary, error) {
+	categories, err := s.repo.CountByCategory(ctx, claims.UserID)
+	if err != nil {
+		slog.Error("failed to get category summary", "error", err)
+		return nil, common.ErrInternal("failed to get category summary")
+	}
+
+	summary := &FileCategorySummary{
+		Categories: categories,
+	}
+	for _, c := range categories {
+		summary.TotalFiles += c.Count
+		summary.TotalSize += c.TotalSize
+	}
+	return summary, nil
 }
 
 func (s *Service) ListTrashed(ctx context.Context, claims *auth.TokenClaims) ([]FileResponse, error) {

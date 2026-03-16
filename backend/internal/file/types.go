@@ -115,6 +115,28 @@ func (v *FileVersion) ToResponse() FileVersionResponse {
 	}
 }
 
+// Category types for quick access by file type
+
+type FileCategoryCount struct {
+	Category  string `json:"category"`
+	Count     int64  `json:"count"`
+	TotalSize int64  `json:"total_size"`
+}
+
+type FileCategorySummary struct {
+	Categories []FileCategoryCount `json:"categories"`
+	TotalFiles int64               `json:"total_files"`
+	TotalSize  int64               `json:"total_size"`
+}
+
+// CategoryMimePatterns maps category names to MIME type SQL LIKE patterns
+var CategoryMimePatterns = map[string][]string{
+	"images":    {"image/%"},
+	"videos":    {"video/%"},
+	"audio":     {"audio/%"},
+	"documents": {"application/pdf", "application/msword", "application/vnd.openxmlformats-%", "text/%"},
+}
+
 type DownloadResponse struct {
 	URL               string `json:"url"`
 	ExpiresIn         int64  `json:"expires_in"` // seconds

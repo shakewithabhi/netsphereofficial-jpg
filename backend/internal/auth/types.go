@@ -36,13 +36,43 @@ type GoogleLoginRequest struct {
 	IDToken string `json:"id_token" validate:"required"`
 }
 
+// 2FA request types
+
+type Enable2FAResponse struct {
+	Secret      string   `json:"secret"`
+	QRCodeURL   string   `json:"qr_code_url"`
+	BackupCodes []string `json:"backup_codes"`
+}
+
+type Verify2FARequest struct {
+	Code string `json:"code" validate:"required,len=6,numeric"`
+}
+
+type Disable2FARequest struct {
+	Code string `json:"code" validate:"required"`
+}
+
+type TwoFactorLoginRequest struct {
+	TempToken string `json:"temp_token" validate:"required"`
+	Code      string `json:"code" validate:"required"`
+}
+
+type TwoFactorLoginResponse struct {
+	RequiresTwoFactor bool   `json:"requires_two_factor"`
+	TempToken         string `json:"temp_token"`
+}
+
 // Response types
 
 type AuthResponse struct {
-	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
-	ExpiresIn    int64        `json:"expires_in"` // seconds
+	User         UserResponse `json:"user,omitempty"`
+	AccessToken  string       `json:"access_token,omitempty"`
+	RefreshToken string       `json:"refresh_token,omitempty"`
+	ExpiresIn    int64        `json:"expires_in,omitempty"` // seconds
+
+	// 2FA challenge fields (present when 2FA is enabled and not yet verified)
+	RequiresTwoFactor bool   `json:"requires_two_factor,omitempty"`
+	TempToken         string `json:"temp_token,omitempty"`
 }
 
 type UserResponse struct {
@@ -55,9 +85,10 @@ type UserResponse struct {
 	Plan          string     `json:"plan"`
 	IsActive      bool       `json:"is_active"`
 	IsAdmin       bool       `json:"is_admin"`
-	EmailVerified bool       `json:"email_verified"`
-	LastLoginAt   *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
+	EmailVerified    bool       `json:"email_verified"`
+	TwoFactorEnabled bool       `json:"two_factor_enabled"`
+	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
 }
 
 // Domain models
@@ -73,12 +104,18 @@ type User struct {
 	Plan          string
 	IsActive      bool
 	IsAdmin       bool
-	EmailVerified bool
-	GoogleID      string
-	AuthProvider  string
-	LastLoginAt   *time.Time
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	EmailVerified       bool
+	GoogleID            string
+	AuthProvider        string
+	TOTPSecretEncrypted []byte
+	TOTPEnabled         bool
+	TOTPVerifiedAt      *time.Time
+	FailedLoginAttempts int
+	LockedUntil         *time.Time
+	PasswordChangedAt   *time.Time
+	LastLoginAt         *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 func (u *User) ToResponse() UserResponse {
@@ -92,9 +129,10 @@ func (u *User) ToResponse() UserResponse {
 		Plan:          u.Plan,
 		IsActive:      u.IsActive,
 		IsAdmin:       u.IsAdmin,
-		EmailVerified: u.EmailVerified,
-		LastLoginAt:   u.LastLoginAt,
-		CreatedAt:     u.CreatedAt,
+		EmailVerified:    u.EmailVerified,
+		TwoFactorEnabled: u.TOTPEnabled,
+		LastLoginAt:      u.LastLoginAt,
+		CreatedAt:        u.CreatedAt,
 	}
 }
 

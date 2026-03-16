@@ -16,7 +16,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/bytebox/backend/internal/admin"
+	"github.com/bytebox/backend/internal/batch"
 	"github.com/bytebox/backend/internal/auth"
+	"github.com/bytebox/backend/internal/common"
 	"github.com/bytebox/backend/internal/billing"
 	"github.com/bytebox/backend/internal/file"
 	"github.com/bytebox/backend/internal/folder"
@@ -84,10 +86,13 @@ func main() {
 	})
 	defer asynqClient.Close()
 
+	// Audit logger
+	auditLogger := common.NewAuditLogger(db)
+
 	// Auth module
 	jwtManager := auth.NewJWTManager(cfg.Auth)
 	authRepo := auth.NewRepository(db)
-	authService := auth.NewService(authRepo, jwtManager, cfg.App, cfg.Auth, cfg.Google.ClientID)
+	authService := auth.NewService(authRepo, jwtManager, auditLogger, rdb, cfg.App, cfg.Auth, cfg.Google.ClientID)
 	authMiddleware := auth.NewMiddleware(jwtManager)
 	authHandler := auth.NewHandler(authService, authMiddleware)
 
@@ -135,6 +140,10 @@ func main() {
 	billingRepo := billing.NewRepository(db)
 	billingService := billing.NewService(billingRepo, cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret, cfg.App.BaseURL)
 	billingHandler := billing.NewHandler(billingService, authMiddleware)
+
+	// Batch module
+	batchService := batch.NewService(fileRepo, folderRepo, fileService, folderService, store)
+	batchHandler := batch.NewHandler(batchService)
 
 	// Admin module
 	adminRepo := admin.NewRepository(db)
@@ -187,6 +196,7 @@ func main() {
 			r.Mount("/folders", folderHandler.Routes())
 			r.Mount("/files", fileHandler.Routes())
 			r.Mount("/shares", shareHandler.Routes())
+			r.Mount("/batch", batchHandler.Routes())
 			r.Mount("/backup", backupHandler.Routes())
 			if searchHandler != nil {
 				r.Mount("/search", searchHandler.Routes())
