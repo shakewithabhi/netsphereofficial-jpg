@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import com.bytebox.app.BuildConfig
 import com.bytebox.core.common.toReadableFileSize
@@ -186,11 +187,15 @@ fun ByteBoxNavHost(
             }
 
             composable(Screen.Settings.route) {
+                val activity = LocalContext.current as? android.app.Activity
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onLoggedOut = {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(0) { inclusive = true }
+                        // Restart activity to destroy all ViewModels and clear in-memory state
+                        activity?.let {
+                            val intent = it.intent
+                            it.finish()
+                            it.startActivity(intent)
                         }
                     }
                 )

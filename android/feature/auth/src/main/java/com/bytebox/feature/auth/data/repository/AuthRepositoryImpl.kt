@@ -25,6 +25,11 @@ class AuthRepositoryImpl @Inject constructor(
 ) : AuthRepository {
 
     override suspend fun login(email: String, password: String): Result<User> {
+        // Clear any cached data from previous user before login
+        fileDao.deleteAll()
+        folderDao.deleteAll()
+        uploadTaskDao.deleteAll()
+
         val result = safeApiCall {
             authApi.login(LoginRequest(email, password, android.os.Build.MODEL))
         }
@@ -39,6 +44,11 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun register(email: String, password: String, displayName: String): Result<User> {
+        // Clear any cached data from previous user before register
+        fileDao.deleteAll()
+        folderDao.deleteAll()
+        uploadTaskDao.deleteAll()
+
         val result = safeApiCall {
             authApi.register(RegisterRequest(email, password, displayName))
         }

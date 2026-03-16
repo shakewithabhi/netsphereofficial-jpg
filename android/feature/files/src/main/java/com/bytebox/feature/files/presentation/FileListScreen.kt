@@ -57,6 +57,11 @@ fun FileListScreen(
     var showRenameFolderDialog by remember { mutableStateOf(false) }
     var renameFolderId by remember { mutableStateOf("") }
     var renameFolderName by remember { mutableStateOf("") }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var deleteTargetId by remember { mutableStateOf("") }
+    var deleteTargetName by remember { mutableStateOf("") }
+    var deleteTargetIsFolder by remember { mutableStateOf(false) }
+    var showDeleteSelectedConfirm by remember { mutableStateOf(false) }
 
     BackHandler(enabled = uiState.breadcrumbs.size > 1 || uiState.isSelectionMode) {
         if (uiState.isSelectionMode) {
@@ -77,13 +82,7 @@ fun FileListScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = {
-                            uiState.selectedItems.forEach { id ->
-                                if (uiState.files.any { it.id == id }) viewModel.trashFile(id)
-                                if (uiState.folders.any { it.id == id }) viewModel.trashFolder(id)
-                            }
-                            viewModel.clearSelection()
-                        }) {
+                        IconButton(onClick = { showDeleteSelectedConfirm = true }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete selected")
                         }
                     }
@@ -327,7 +326,10 @@ fun FileListScreen(
                             leadingContent = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             modifier = Modifier.clickable {
                                 contextMenuFolderId = null
-                                viewModel.trashFolder(folderId)
+                                deleteTargetId = folderId
+                                deleteTargetName = folder.name
+                                deleteTargetIsFolder = true
+                                showDeleteConfirm = true
                             }
                         )
                     }
@@ -362,7 +364,10 @@ fun FileListScreen(
                             leadingContent = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             modifier = Modifier.clickable {
                                 contextMenuFileId = null
-                                viewModel.trashFile(fileId)
+                                deleteTargetId = fileId
+                                deleteTargetName = file.name
+                                deleteTargetIsFolder = false
+                                showDeleteConfirm = true
                             }
                         )
                     }
@@ -373,6 +378,51 @@ fun FileListScreen(
                 }
             )
         }
+    }
+
+    // Delete confirmation dialog (single item)
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete") },
+            text = { Text("Are you sure you want to delete \"$deleteTargetName\"?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (deleteTargetIsFolder) viewModel.trashFolder(deleteTargetId)
+                    else viewModel.trashFile(deleteTargetId)
+                    showDeleteConfirm = false
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Delete confirmation dialog (selected items)
+    if (showDeleteSelectedConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteSelectedConfirm = false },
+            title = { Text("Delete ${uiState.selectedItems.size} items") },
+            text = { Text("Are you sure you want to delete the selected items?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    uiState.selectedItems.forEach { id ->
+                        if (uiState.files.any { it.id == id }) viewModel.trashFile(id)
+                        if (uiState.folders.any { it.id == id }) viewModel.trashFolder(id)
+                    }
+                    viewModel.clearSelection()
+                    showDeleteSelectedConfirm = false
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteSelectedConfirm = false }) { Text("Cancel") }
+            }
+        )
     }
 
     // Share card dialog (TeraBox-style)
