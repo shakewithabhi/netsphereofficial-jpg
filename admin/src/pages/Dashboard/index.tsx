@@ -12,7 +12,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     adminApi.dashboard()
-      .then((res) => setStats(res.data.data))
+      .then((res) => setStats(res.data?.data ?? res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -20,13 +20,14 @@ export default function DashboardPage() {
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
   if (!stats) return null;
 
+  const s = stats as any;
   const cards = [
-    { title: 'Total Users', value: stats.total_users, icon: <TeamOutlined />, color: '#1677ff' },
-    { title: 'Active Users', value: stats.active_users, icon: <UserOutlined />, color: '#52c41a' },
-    { title: 'Signups Today', value: stats.signups_today, icon: <RiseOutlined />, color: '#faad14' },
-    { title: 'Total Files', value: stats.total_files, icon: <FileOutlined />, color: '#722ed1' },
-    { title: 'Storage Used', value: formatBytes(stats.total_storage_used), icon: <CloudOutlined />, color: '#eb2f96' },
-    { title: 'Active Shares', value: stats.active_shares, icon: <ShareAltOutlined />, color: '#13c2c2' },
+    { title: 'Total Users', value: s.total_users ?? 0, icon: <TeamOutlined />, color: '#1677ff' },
+    { title: 'Active Users', value: s.active_users ?? 0, icon: <UserOutlined />, color: '#52c41a' },
+    { title: 'Signups Today', value: s.signups_today ?? s.new_users_today ?? 0, icon: <RiseOutlined />, color: '#faad14' },
+    { title: 'Total Files', value: s.total_files ?? 0, icon: <FileOutlined />, color: '#722ed1' },
+    { title: 'Storage Used', value: formatBytes(s.total_storage_used ?? s.total_storage_bytes ?? 0), icon: <CloudOutlined />, color: '#eb2f96' },
+    { title: 'Active Shares', value: s.active_shares ?? 0, icon: <ShareAltOutlined />, color: '#13c2c2' },
   ];
 
   return (

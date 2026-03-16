@@ -44,7 +44,7 @@ class ShareViewModel @Inject constructor(
 
     fun createShare(fileId: String, password: String? = null, expiresAt: String? = null, maxDownloads: Int? = null) {
         viewModelScope.launch {
-            when (val result = shareRepository.createShare(fileId, password, expiresAt, maxDownloads)) {
+            when (val result = shareRepository.createShare(fileId = fileId, password = password, expiresAt = expiresAt, maxDownloads = maxDownloads)) {
                 is Result.Success -> loadShares()
                 is Result.Error -> _uiState.update { it.copy(errorMessage = result.exception.message) }
                 is Result.Loading -> {}

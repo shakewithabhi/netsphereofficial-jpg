@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Table, Typography, Select, Input, Tag, Space, Card } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { adminApi, AuditLogEntry } from '../../api/admin';
+import { adminApi } from '../../api/admin';
+import type { AuditLogEntry } from '../../api/admin';
 import { formatDate } from '../../utils/format';
 
 const { Title } = Typography;

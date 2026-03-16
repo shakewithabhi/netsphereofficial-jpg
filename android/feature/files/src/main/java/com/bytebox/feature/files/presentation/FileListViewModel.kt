@@ -12,6 +12,7 @@ import com.bytebox.domain.model.FileItem
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.FolderContents
 import com.bytebox.domain.repository.FileRepository
+import com.bytebox.domain.repository.ShareRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,7 +35,13 @@ data class FileListUiState(
     val isSelectionMode: Boolean = false,
     val showCreateFolderDialog: Boolean = false,
     val searchQuery: String = "",
-    val isSearching: Boolean = false
+    val isSearching: Boolean = false,
+    val shareUrl: String? = null,
+    val shareItemName: String? = null,
+    val shareItemSize: Long = 0,
+    val shareItemMimeType: String? = null,
+    val shareItemIsFolder: Boolean = false,
+    val isCreatingShare: Boolean = false
 )
 
 data class BreadcrumbItem(val folderId: String?, val name: String)
@@ -42,6 +49,7 @@ data class BreadcrumbItem(val folderId: String?, val name: String)
 @HiltViewModel
 class FileListViewModel @Inject constructor(
     private val fileRepository: FileRepository,
+    private val shareRepository: ShareRepository,
     private val userPreferences: UserPreferences,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -222,6 +230,13 @@ class FileListViewModel @Inject constructor(
         }
     }
 
+    fun renameFolder(folderId: String, newName: String) {
+        viewModelScope.launch {
+            fileRepository.renameFolder(folderId, newName)
+            loadContents()
+        }
+    }
+
     fun trashFile(fileId: String) {
         viewModelScope.launch {
             fileRepository.trashFile(fileId)
@@ -260,5 +275,51 @@ class FileListViewModel @Inject constructor(
                 is Result.Loading -> {}
             }
         }
+    }
+
+    fun shareFile(fileId: String) {
+        val file = _uiState.value.files.find { it.id == fileId }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingShare = true) }
+            when (val result = shareRepository.createShare(fileId = fileId)) {
+                is Result.Success -> _uiState.update {
+                    it.copy(
+                        shareUrl = result.data.shareUrl,
+                        shareItemName = file?.name ?: "File",
+                        shareItemSize = file?.size ?: 0,
+                        shareItemMimeType = file?.mimeType,
+                        shareItemIsFolder = false,
+                        isCreatingShare = false
+                    )
+                }
+                is Result.Error -> _uiState.update { it.copy(isCreatingShare = false) }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun shareFolder(folderId: String) {
+        val folder = _uiState.value.folders.find { it.id == folderId }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingShare = true) }
+            when (val result = shareRepository.createShare(folderId = folderId)) {
+                is Result.Success -> _uiState.update {
+                    it.copy(
+                        shareUrl = result.data.shareUrl,
+                        shareItemName = folder?.name ?: "Folder",
+                        shareItemSize = 0,
+                        shareItemMimeType = null,
+                        shareItemIsFolder = true,
+                        isCreatingShare = false
+                    )
+                }
+                is Result.Error -> _uiState.update { it.copy(isCreatingShare = false) }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun clearShareUrl() {
+        _uiState.update { it.copy(shareUrl = null, shareItemName = null) }
     }
 }

@@ -31,6 +31,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" android:host="192.168.1.4" android:port="8080" android:pathPrefix="/s/" />
+                <data android:scheme="https" android:host="bytebox.app" android:pathPrefix="/s/" />
+                <data android:scheme="bytebox" android:host="share" />
+            </intent-filter>
         </activity>
 
         <service

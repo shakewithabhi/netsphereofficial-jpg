@@ -101,40 +101,61 @@ func (s *Service) Upload(ctx context.Context, claims *auth.TokenClaims, header *
 	}
 
 	// Check if a file with the same name already exists in this folder (versioning)
-	existingFiles, _, err := s.repo.ListByFolder(ctx, claims.UserID, folderID, common.PaginationParams{Limit: 1000, Sort: "name", Order: "asc"})
-	if err == nil {
-		for _, ef := range existingFiles {
-			if ef.Name == header.Filename {
-				// Create a version entry for the existing file before replacing it
-				latestVer, verErr := s.repo.GetLatestVersionNumber(ctx, ef.ID)
-				if verErr != nil {
-					slog.Error("failed to get latest version number", "error", verErr)
-				} else {
-					version := &FileVersion{
-						FileID:        ef.ID,
-						VersionNumber: latestVer + 1,
-						StorageKey:    ef.StorageKey,
-						Size:          ef.Size,
-						ContentHash:   ef.ContentHash,
-						CreatedBy:     claims.UserID,
-					}
-					if verErr := s.repo.CreateVersion(ctx, version); verErr != nil {
-						slog.Error("failed to create version entry", "error", verErr)
-					}
-				}
-				break
+	var replaced bool
+	existingFile, _ := s.repo.FindByName(ctx, claims.UserID, folderID, header.Filename)
+	if existingFile != nil {
+		// Create a version entry for the existing file before replacing it
+		latestVer, verErr := s.repo.GetLatestVersionNumber(ctx, existingFile.ID)
+		if verErr != nil {
+			slog.Error("failed to get latest version number", "error", verErr)
+		} else {
+			version := &FileVersion{
+				FileID:        existingFile.ID,
+				VersionNumber: latestVer + 1,
+				StorageKey:    existingFile.StorageKey,
+				Size:          existingFile.Size,
+				ContentHash:   existingFile.ContentHash,
+				CreatedBy:     claims.UserID,
+			}
+			if verErr := s.repo.CreateVersion(ctx, version); verErr != nil {
+				slog.Error("failed to create version entry", "error", verErr)
 			}
 		}
+
+		// Update the existing file record instead of creating a new one
+		if err := s.repo.ReplaceFile(ctx, existingFile.ID, claims.UserID, storageKey, file.Size, file.MimeType, contentHash, isVideo); err != nil {
+			s.store.Delete(ctx, s.store.BucketFiles(), storageKey)
+			slog.Error("failed to replace file", "error", err)
+			return nil, common.ErrInternal("failed to replace file")
+		}
+
+		// Update quota delta
+		sizeDelta := file.Size - existingFile.Size
+		if sizeDelta != 0 {
+			if err := s.quota.UpdateUsage(ctx, claims.UserID, sizeDelta); err != nil {
+				slog.Error("failed to update storage used", "error", err)
+			}
+		}
+
+		updated, _ := s.repo.GetByID(ctx, existingFile.ID, claims.UserID)
+		if updated != nil {
+			resp := updated.ToResponse()
+			return &resp, nil
+		}
+		replaced = true
+		file.ID = existingFile.ID
 	}
 
-	if err := s.repo.Create(ctx, file); err != nil {
-		// Cleanup storage on DB failure
-		s.store.Delete(ctx, s.store.BucketFiles(), storageKey)
-		if strings.Contains(err.Error(), "duplicate key") {
-			return nil, common.ErrConflict("file with this name already exists in this folder")
+	if !replaced {
+		if err := s.repo.Create(ctx, file); err != nil {
+			// Cleanup storage on DB failure
+			s.store.Delete(ctx, s.store.BucketFiles(), storageKey)
+			if strings.Contains(err.Error(), "duplicate key") {
+				return nil, common.ErrConflict("file with this name already exists in this folder")
+			}
+			slog.Error("failed to create file record", "error", err)
+			return nil, common.ErrInternal("failed to save file")
 		}
-		slog.Error("failed to create file record", "error", err)
-		return nil, common.ErrInternal("failed to save file")
 	}
 
 	// Update storage used

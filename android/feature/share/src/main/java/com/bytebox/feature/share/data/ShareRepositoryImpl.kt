@@ -15,13 +15,20 @@ class ShareRepositoryImpl @Inject constructor(
 ) : ShareRepository {
 
     override suspend fun createShare(
-        fileId: String,
+        fileId: String?,
+        folderId: String?,
         password: String?,
         expiresAt: String?,
         maxDownloads: Int?
     ): Result<ShareLink> {
         return safeApiCall {
-            shareApi.createShare(CreateShareRequest(fileId, password, expiresAt, maxDownloads))
+            shareApi.createShare(CreateShareRequest(
+                fileId = fileId,
+                folderId = folderId,
+                password = password,
+                expiresAt = expiresAt,
+                maxDownloads = maxDownloads
+            ))
         }.map { it.toDomain() }
     }
 

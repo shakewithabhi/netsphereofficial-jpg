@@ -1,5 +1,6 @@
 package com.bytebox.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,12 +18,31 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val shareCode = extractShareCode(intent)
+
         setContent {
             ByteBoxTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ByteBoxNavHost()
+                    ByteBoxNavHost(deepLinkShareCode = shareCode)
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    private fun extractShareCode(intent: Intent?): String? {
+        val uri = intent?.data ?: return null
+        // Handle http://host/s/{code} or bytebox://share/{code}
+        val path = uri.path ?: return null
+        if (path.startsWith("/s/")) return path.removePrefix("/s/")
+        if (uri.scheme == "bytebox" && uri.host == "share") {
+            return uri.pathSegments.firstOrNull()
+        }
+        return null
     }
 }

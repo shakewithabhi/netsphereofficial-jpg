@@ -5,7 +5,8 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class CreateShareRequest(
-    @Json(name = "file_id") val fileId: String,
+    @Json(name = "file_id") val fileId: String? = null,
+    @Json(name = "folder_id") val folderId: String? = null,
     val password: String? = null,
     @Json(name = "expires_at") val expiresAt: String? = null,
     @Json(name = "max_downloads") val maxDownloads: Int? = null

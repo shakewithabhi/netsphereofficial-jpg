@@ -5,7 +5,8 @@ import com.bytebox.domain.model.ShareLink
 
 interface ShareRepository {
     suspend fun createShare(
-        fileId: String,
+        fileId: String? = null,
+        folderId: String? = null,
         password: String? = null,
         expiresAt: String? = null,
         maxDownloads: Int? = null

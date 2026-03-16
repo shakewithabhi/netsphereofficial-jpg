@@ -96,16 +96,18 @@ func main() {
 	authMiddleware := auth.NewMiddleware(jwtManager)
 	authHandler := auth.NewHandler(authService, authMiddleware)
 
+	// File repository (used by both folder and file modules)
+	fileRepo := file.NewRepository(db)
+
 	// Folder module
 	folderRepo := folder.NewRepository(db)
-	folderService := folder.NewService(folderRepo, store)
+	folderService := folder.NewService(folderRepo, fileRepo, store)
 	folderHandler := folder.NewHandler(folderService)
 
 	// Quota module
 	quotaService := quota.NewService(db)
 
 	// File module
-	fileRepo := file.NewRepository(db)
 	fileService := file.NewService(fileRepo, store, streamClient, quotaService, asynqClient, cfg.App.MaxUploadSize)
 	fileHandler := file.NewHandler(fileService, cfg.App.MaxUploadSize)
 

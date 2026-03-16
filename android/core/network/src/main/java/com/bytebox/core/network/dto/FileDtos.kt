@@ -50,5 +50,8 @@ data class RenameFolderRequest(
 @JsonClass(generateAdapter = true)
 data class DownloadUrlResponse(
     val url: String,
-    @Json(name = "expires_at") val expiresAt: String
+    @Json(name = "expires_in") val expiresIn: Long = 3600,
+    @Json(name = "is_video") val isVideo: Boolean = false,
+    @Json(name = "hls_url") val hlsUrl: String? = null,
+    @Json(name = "video_thumbnail_url") val videoThumbnailUrl: String? = null
 )

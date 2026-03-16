@@ -20,11 +20,18 @@ export default function StoragePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const unwrap = (res: any) => res.data?.data ?? res.data;
     Promise.all([
-      adminApi.storageStats().then((res) => setStats(res.data.data)),
-      adminApi.storagePool().then((res) => setPool(res.data as unknown as StoragePool)).catch(() => {}),
-      adminApi.mimeTypeStats().then((res) => setMimeStats(res.data as unknown as MimeTypeStat[])).catch(() => {}),
-      adminApi.uploadTrends(30).then((res) => setUploadTrends(res.data as unknown as DailyUploadStat[])).catch(() => {}),
+      adminApi.storageStats().then((res) => setStats(unwrap(res))).catch(() => {}),
+      adminApi.storagePool().then((res) => setPool(unwrap(res))).catch(() => {}),
+      adminApi.mimeTypeStats().then((res) => {
+        const d = unwrap(res);
+        setMimeStats(Array.isArray(d) ? d : []);
+      }).catch(() => {}),
+      adminApi.uploadTrends(30).then((res) => {
+        const d = unwrap(res);
+        setUploadTrends(Array.isArray(d) ? d : []);
+      }).catch(() => {}),
     ])
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -33,26 +40,28 @@ export default function StoragePage() {
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
   if (!stats) return null;
 
-  const planData = (stats.by_plan || []).map((p) => ({
+  const s = stats as any;
+
+  const planData = (s.by_plan || []).map((p: any) => ({
     name: planLabel(p.plan),
-    value: p.total_storage,
+    value: p.total_storage ?? p.total_used_bytes ?? 0,
     users: p.user_count,
   }));
 
-  const topUsersData = (stats.top_users || []).map((u) => ({
+  const topUsersData = (s.top_users || []).map((u: any) => ({
     name: u.display_name || u.email.split('@')[0],
     storage: u.storage_used,
     files: u.file_count,
   }));
 
-  const mimeData = (mimeStats || []).map((m) => ({
+  const mimeData = (mimeStats || []).map((m: any) => ({
     name: m.mime_type,
     value: m.total_size,
     count: m.file_count,
   }));
 
-  const trendData = (uploadTrends || []).map((d) => ({
-    date: d.date.slice(5), // MM-DD
+  const trendData = (uploadTrends || []).map((d: any) => ({
+    date: String(d.date || '').slice(5) || d.date, // MM-DD
     files: d.file_count,
     bytes: d.total_bytes,
   }));
@@ -64,17 +73,17 @@ export default function StoragePage() {
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={6}>
           <Card>
-            <Statistic title="Total Files" value={stats.total_files} prefix={<FileOutlined style={{ color: '#722ed1' }} />} />
+            <Statistic title="Total Files" value={s.total_files ?? 0} prefix={<FileOutlined style={{ color: '#722ed1' }} />} />
           </Card>
         </Col>
         <Col xs={24} sm={6}>
           <Card>
-            <Statistic title="Total Storage Used" value={formatBytes(stats.total_size)} prefix={<CloudOutlined style={{ color: '#1677ff' }} />} />
+            <Statistic title="Total Storage Used" value={formatBytes(s.total_size ?? s.total_used_bytes ?? 0)} prefix={<CloudOutlined style={{ color: '#1677ff' }} />} />
           </Card>
         </Col>
         <Col xs={24} sm={6}>
           <Card>
-            <Statistic title="Avg File Size" value={formatBytes(stats.avg_file_size)} prefix={<DatabaseOutlined style={{ color: '#52c41a' }} />} />
+            <Statistic title="Avg File Size" value={formatBytes(s.avg_file_size ?? s.avg_per_user_bytes ?? 0)} prefix={<DatabaseOutlined style={{ color: '#52c41a' }} />} />
           </Card>
         </Col>
         <Col xs={24} sm={6}>
@@ -144,8 +153,8 @@ export default function StoragePage() {
 
       <Card title="Top 10 Users" style={{ marginTop: 16 }}>
         <Table
-          dataSource={stats.top_users || []}
-          rowKey="user_id"
+          dataSource={s.top_users || []}
+          rowKey={(r: any) => r.user_id ?? r.id ?? r.email}
           pagination={false}
           columns={[
             { title: 'Email', dataIndex: 'email', ellipsis: true },

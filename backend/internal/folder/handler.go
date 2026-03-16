@@ -91,15 +91,14 @@ func (h *Handler) ListContents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	folders, err := h.service.ListContents(r.Context(), claims, &id)
+	params := common.ParsePagination(r)
+	result, err := h.service.ListContents(r.Context(), claims, &id, params)
 	if err != nil {
 		common.JSONError(w, err)
 		return
 	}
 
-	common.JSON(w, http.StatusOK, map[string]any{
-		"folders": folders,
-	})
+	common.JSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) ListRootContents(w http.ResponseWriter, r *http.Request) {
@@ -109,15 +108,14 @@ func (h *Handler) ListRootContents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	folders, err := h.service.ListContents(r.Context(), claims, nil)
+	params := common.ParsePagination(r)
+	result, err := h.service.ListContents(r.Context(), claims, nil, params)
 	if err != nil {
 		common.JSONError(w, err)
 		return
 	}
 
-	common.JSON(w, http.StatusOK, map[string]any{
-		"folders": folders,
-	})
+	common.JSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) Rename(w http.ResponseWriter, r *http.Request) {

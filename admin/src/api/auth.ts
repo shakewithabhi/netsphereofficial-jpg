@@ -5,6 +5,12 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  display_name?: string;
+}
+
 export interface AuthResponse {
   access_token: string;
   refresh_token: string;
@@ -25,6 +31,9 @@ export interface UserProfile {
 export const authApi = {
   login: (payload: LoginPayload) =>
     client.post<{ success: boolean; data: AuthResponse }>('/auth/login', payload),
+
+  register: (payload: RegisterPayload) =>
+    client.post<{ success: boolean; data: AuthResponse }>('/auth/register', payload),
 
   me: () =>
     client.get<{ success: boolean; data: UserProfile }>('/auth/me'),

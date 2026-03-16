@@ -10,16 +10,18 @@ import (
 
 	"github.com/bytebox/backend/internal/auth"
 	"github.com/bytebox/backend/internal/common"
+	"github.com/bytebox/backend/internal/file"
 	"github.com/bytebox/backend/internal/storage"
 )
 
 type Service struct {
-	repo  *Repository
-	store *storage.Client
+	repo     *Repository
+	fileRepo *file.Repository
+	store    *storage.Client
 }
 
-func NewService(repo *Repository, store *storage.Client) *Service {
-	return &Service{repo: repo, store: store}
+func NewService(repo *Repository, fileRepo *file.Repository, store *storage.Client) *Service {
+	return &Service{repo: repo, fileRepo: fileRepo, store: store}
 }
 
 func (s *Service) Create(ctx context.Context, claims *auth.TokenClaims, req CreateFolderRequest) (*FolderResponse, error) {
@@ -90,7 +92,12 @@ func (s *Service) GetByID(ctx context.Context, claims *auth.TokenClaims, id uuid
 	return &resp, nil
 }
 
-func (s *Service) ListContents(ctx context.Context, claims *auth.TokenClaims, parentID *uuid.UUID) ([]FolderResponse, error) {
+type FolderContentsResult struct {
+	Folders []FolderResponse      `json:"folders"`
+	Files   []file.FileResponse   `json:"files"`
+}
+
+func (s *Service) ListContents(ctx context.Context, claims *auth.TokenClaims, parentID *uuid.UUID, params common.PaginationParams) (*FolderContentsResult, error) {
 	// If parentID is specified, verify it exists and belongs to user
 	if parentID != nil {
 		folder, err := s.repo.GetByID(ctx, *parentID, claims.UserID)
@@ -109,11 +116,26 @@ func (s *Service) ListContents(ctx context.Context, claims *auth.TokenClaims, pa
 		return nil, common.ErrInternal("failed to list folders")
 	}
 
-	result := make([]FolderResponse, len(folders))
+	folderResponses := make([]FolderResponse, len(folders))
 	for i, f := range folders {
-		result[i] = f.ToResponse()
+		folderResponses[i] = f.ToResponse()
 	}
-	return result, nil
+
+	files, _, err := s.fileRepo.ListByFolder(ctx, claims.UserID, parentID, params)
+	if err != nil {
+		slog.Error("failed to list files", "error", err)
+		return nil, common.ErrInternal("failed to list files")
+	}
+
+	fileResponses := make([]file.FileResponse, len(files))
+	for i, f := range files {
+		fileResponses[i] = f.ToResponse()
+	}
+
+	return &FolderContentsResult{
+		Folders: folderResponses,
+		Files:   fileResponses,
+	}, nil
 }
 
 func (s *Service) Rename(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID, req RenameFolderRequest) (*FolderResponse, error) {

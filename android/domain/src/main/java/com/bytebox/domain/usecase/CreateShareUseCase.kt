@@ -13,5 +13,10 @@ class CreateShareUseCase @Inject constructor(
         password: String? = null,
         expiresAt: String? = null,
         maxDownloads: Int? = null
-    ): Result<ShareLink> = shareRepository.createShare(fileId, password, expiresAt, maxDownloads)
+    ): Result<ShareLink> = shareRepository.createShare(
+        fileId = fileId,
+        password = password,
+        expiresAt = expiresAt,
+        maxDownloads = maxDownloads
+    )
 }

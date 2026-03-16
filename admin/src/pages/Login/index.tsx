@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Card, Form, Input, Typography, message, Space } from 'antd';
 import { LockOutlined, MailOutlined, CloudOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../../api/auth';
 import { useAuthStore } from '../../store/auth';
 
@@ -58,6 +58,10 @@ export default function LoginPage() {
               </Button>
             </Form.Item>
           </Form>
+
+          <Text>
+            Don't have an account? <Link to="/register">Sign Up</Link>
+          </Text>
         </Space>
       </Card>
     </div>

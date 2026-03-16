@@ -3,6 +3,7 @@ import { ConfigProvider } from 'antd';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/Login';
+import RegisterPage from './pages/Register';
 import DashboardPage from './pages/Dashboard';
 import UsersPage from './pages/Users';
 import StoragePage from './pages/Storage';
@@ -14,6 +15,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route
             element={
               <ProtectedRoute>

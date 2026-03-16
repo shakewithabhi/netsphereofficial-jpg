@@ -473,6 +473,63 @@ func (r *Repository) ListNamesByPrefix(ctx context.Context, userID uuid.UUID, fo
 	return names, nil
 }
 
+func (r *Repository) FindByName(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, name string) (*File, error) {
+	var query string
+	var args []any
+
+	if folderID == nil {
+		query = `
+			SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),
+			       size, mime_type, COALESCE(content_hash, ''), scan_status, current_version,
+			       is_video, COALESCE(stream_video_id, ''), COALESCE(stream_status, ''),
+			       COALESCE(hls_url, ''), COALESCE(video_thumbnail_url, ''),
+			       trashed_at, created_at, updated_at
+			FROM files
+			WHERE user_id = $1 AND folder_id IS NULL AND name = $2 AND trashed_at IS NULL`
+		args = []any{userID, name}
+	} else {
+		query = `
+			SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),
+			       size, mime_type, COALESCE(content_hash, ''), scan_status, current_version,
+			       is_video, COALESCE(stream_video_id, ''), COALESCE(stream_status, ''),
+			       COALESCE(hls_url, ''), COALESCE(video_thumbnail_url, ''),
+			       trashed_at, created_at, updated_at
+			FROM files
+			WHERE user_id = $1 AND folder_id = $2 AND name = $3 AND trashed_at IS NULL`
+		args = []any{userID, folderID, name}
+	}
+
+	f := &File{}
+	err := r.db.QueryRow(ctx, query, args...).Scan(
+		&f.ID, &f.UserID, &f.FolderID, &f.Name, &f.StorageKey, &f.ThumbnailKey,
+		&f.Size, &f.MimeType, &f.ContentHash, &f.ScanStatus, &f.CurrentVersion,
+		&f.IsVideo, &f.StreamVideoID, &f.StreamStatus, &f.HLSURL, &f.VideoThumbnailURL,
+		&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find file by name: %w", err)
+	}
+	return f, nil
+}
+
+func (r *Repository) ReplaceFile(ctx context.Context, id, userID uuid.UUID, storageKey string, size int64, mimeType, contentHash string, isVideo bool) error {
+	query := `
+		UPDATE files
+		SET storage_key = $1, size = $2, mime_type = $3, content_hash = $4, is_video = $5,
+		    current_version = current_version + 1,
+		    stream_video_id = NULL, stream_status = NULL, hls_url = NULL, video_thumbnail_url = NULL,
+		    updated_at = NOW()
+		WHERE id = $6 AND user_id = $7`
+	_, err := r.db.Exec(ctx, query, storageKey, size, mimeType, contentHash, isVideo, id, userID)
+	if err != nil {
+		return fmt.Errorf("replace file: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) NameExistsInFolder(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID, name string) (bool, error) {
 	var query string
 	var args []any

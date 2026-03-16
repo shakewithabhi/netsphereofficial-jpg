@@ -1,6 +1,7 @@
 package com.bytebox.feature.upload.presentation
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.domain.model.UploadTask
@@ -17,10 +18,13 @@ data class UploadUiState(
 
 @HiltViewModel
 class UploadViewModel @Inject constructor(
-    private val uploadRepository: UploadRepository
+    private val uploadRepository: UploadRepository,
+    savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(UploadUiState())
+    private val _uiState = MutableStateFlow(UploadUiState(
+        currentFolderId = savedStateHandle.get<String>("folderId")
+    ))
     val uiState: StateFlow<UploadUiState> = _uiState.asStateFlow()
 
     init {

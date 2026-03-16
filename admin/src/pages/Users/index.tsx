@@ -20,8 +20,11 @@ export default function UsersPage() {
     setLoading(true);
     try {
       const res = await adminApi.listUsers({ page, limit: 20, search: search || undefined });
-      setUsers(res.data.data || []);
-      setHasMore(res.data.pagination?.has_more || false);
+      const d = res.data as any;
+      const inner = d.data ?? d;
+      const userList = inner.users ?? inner.data ?? [];
+      setUsers(Array.isArray(userList) ? userList : []);
+      setHasMore(inner.pagination?.has_more ?? (userList.length === 20) ?? false);
     } catch {
       message.error('Failed to load users');
     } finally {
