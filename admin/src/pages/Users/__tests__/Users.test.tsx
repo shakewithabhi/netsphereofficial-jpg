@@ -111,13 +111,13 @@ describe('UsersPage', () => {
     render(<UsersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Email')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'Email' })).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Name')).toBeInTheDocument();
-    expect(screen.getByText('Plan')).toBeInTheDocument();
-    expect(screen.getByText('Storage')).toBeInTheDocument();
-    expect(screen.getByText('Files')).toBeInTheDocument();
-    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Plan' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Storage' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Files' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument();
   });
 });
