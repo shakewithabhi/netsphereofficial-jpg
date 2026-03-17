@@ -61,6 +61,8 @@ import androidx.navigation.navArgument
 import com.bytebox.app.BuildConfig
 import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.theme.ByteBoxTheme
+import com.bytebox.feature.auth.presentation.forgotpassword.ForgotPasswordScreen
+import com.bytebox.feature.auth.presentation.forgotpassword.ResetPasswordScreen
 import com.bytebox.feature.auth.presentation.login.LoginScreen
 import com.bytebox.feature.auth.presentation.onboarding.OnboardingScreen
 import com.bytebox.feature.auth.presentation.register.RegisterScreen
@@ -190,9 +192,11 @@ fun ByteBoxNavHost(
                         }
                     },
                     onNavigateToRegister = { navController.navigate(Screen.Register.route) },
+                    onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) },
                     isDebug = BuildConfig.DEBUG,
                     testEmail = if (BuildConfig.DEBUG) BuildConfig.TEST_EMAIL else "",
                     testPassword = if (BuildConfig.DEBUG) BuildConfig.TEST_PASSWORD else "",
+                    googleClientId = BuildConfig.GOOGLE_CLIENT_ID,
                 )
             }
 
@@ -220,6 +224,35 @@ fun ByteBoxNavHost(
                     },
                     onSeeAllFolders = {
                         navController.navigate(Screen.Files.route)
+                    },
+                )
+            }
+
+            composable(Screen.ForgotPassword.route) {
+                ForgotPasswordScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToResetPassword = { token ->
+                        navController.navigate(Screen.ResetPassword.createRoute(token))
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.ResetPassword.route,
+                arguments = listOf(
+                    navArgument("token") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                ),
+            ) {
+                ResetPasswordScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToLogin = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
                     },
                 )
             }

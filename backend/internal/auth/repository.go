@@ -421,6 +421,43 @@ func (r *Repository) UseRecoveryCode(ctx context.Context, userID uuid.UUID, code
 	return result.RowsAffected() > 0, nil
 }
 
+// Password reset token operations
+
+func (r *Repository) CreatePasswordResetToken(ctx context.Context, userID uuid.UUID, tokenHash string, expiresAt time.Time) error {
+	query := `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`
+	_, err := r.db.Exec(ctx, query, userID, tokenHash, expiresAt)
+	if err != nil {
+		return fmt.Errorf("create password reset token: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetPasswordResetToken(ctx context.Context, tokenHash string) (uuid.UUID, uuid.UUID, error) {
+	query := `
+		SELECT id, user_id
+		FROM password_reset_tokens
+		WHERE token_hash = $1 AND expires_at > NOW() AND used_at IS NULL`
+
+	var id, userID uuid.UUID
+	err := r.db.QueryRow(ctx, query, tokenHash).Scan(&id, &userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, uuid.Nil, nil
+		}
+		return uuid.Nil, uuid.Nil, fmt.Errorf("get password reset token: %w", err)
+	}
+	return id, userID, nil
+}
+
+func (r *Repository) MarkPasswordResetTokenUsed(ctx context.Context, tokenID uuid.UUID) error {
+	query := `UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, tokenID)
+	if err != nil {
+		return fmt.Errorf("mark password reset token used: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) CountUnusedRecoveryCodes(ctx context.Context, userID uuid.UUID) (int, error) {
 	query := `SELECT COUNT(*) FROM recovery_codes WHERE user_id = $1 AND used_at IS NULL`
 	var count int
@@ -429,4 +466,25 @@ func (r *Repository) CountUnusedRecoveryCodes(ctx context.Context, userID uuid.U
 		return 0, fmt.Errorf("count unused recovery codes: %w", err)
 	}
 	return count, nil
+}
+
+// Approval status operations
+
+func (r *Repository) SetApprovalStatus(ctx context.Context, userID uuid.UUID, status string) error {
+	query := `UPDATE users SET approval_status = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, status, userID)
+	if err != nil {
+		return fmt.Errorf("set approval status: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetApprovalStatus(ctx context.Context, userID uuid.UUID) (string, error) {
+	query := `SELECT approval_status FROM users WHERE id = $1`
+	var status string
+	err := r.db.QueryRow(ctx, query, userID).Scan(&status)
+	if err != nil {
+		return "", fmt.Errorf("get approval status: %w", err)
+	}
+	return status, nil
 }

@@ -3,6 +3,7 @@ package com.bytebox.feature.auth.presentation.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.Result
+import com.bytebox.domain.usecase.GoogleLoginUseCase
 import com.bytebox.domain.usecase.LoginUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ data class LoginUiState(
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val loginUseCase: LoginUseCase
+    private val loginUseCase: LoginUseCase,
+    private val googleLoginUseCase: GoogleLoginUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -46,6 +48,22 @@ class LoginViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
             when (val result = loginUseCase(_uiState.value.email, _uiState.value.password)) {
+                is Result.Success -> {
+                    _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isLoading = false, errorMessage = result.exception.message) }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun googleLogin(idToken: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+
+            when (val result = googleLoginUseCase(idToken)) {
                 is Result.Success -> {
                     _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
                 }

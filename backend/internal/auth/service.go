@@ -2,6 +2,9 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -40,6 +43,7 @@ type Service struct {
 	quotaSize         int64
 	googleClientID    string
 	totpEncryptionKey string
+	requireApproval   bool
 }
 
 func NewService(repo *Repository, jwt *JWTManager, audit *common.AuditLogger, rdb *redis.Client, cfg config.AppConfig, authCfg config.AuthConfig, googleClientID string) *Service {
@@ -52,6 +56,7 @@ func NewService(repo *Repository, jwt *JWTManager, audit *common.AuditLogger, rd
 		quotaSize:         cfg.DefaultQuotaSize,
 		googleClientID:    googleClientID,
 		totpEncryptionKey: authCfg.TOTPEncryptionKey,
+		requireApproval:   cfg.RequireApproval,
 	}
 }
 
@@ -137,6 +142,13 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*AuthRespo
 		return nil, common.ErrInternal("failed to create account")
 	}
 
+	if s.requireApproval {
+		if err := s.repo.SetApprovalStatus(ctx, user.ID, "pending"); err != nil {
+			slog.Error("failed to set approval status", "error", err)
+		}
+		return nil, common.ErrForbidden("registration submitted, awaiting admin approval")
+	}
+
 	s.audit.Log(ctx, &user.ID, common.AuditUserRegister, "user", &user.ID, nil, "")
 
 	return s.generateAuthResponse(ctx, user, "", "", "", "")
@@ -160,6 +172,21 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, userAgent, de
 
 	if !user.IsActive {
 		return nil, common.ErrForbidden("account is disabled")
+	}
+
+	// Check approval status
+	if s.requireApproval {
+		status, err := s.repo.GetApprovalStatus(ctx, user.ID)
+		if err != nil {
+			slog.Error("failed to get approval status", "error", err)
+			return nil, common.ErrInternal("login failed")
+		}
+		switch status {
+		case "pending":
+			return nil, common.ErrForbidden("account is pending admin approval")
+		case "rejected":
+			return nil, common.ErrForbidden("account registration was rejected")
+		}
 	}
 
 	// Check account lockout
@@ -538,6 +565,98 @@ func (s *Service) VerifyTwoFactorLogin(ctx context.Context, req TwoFactorLoginRe
 	s.audit.Log(ctx, &user.ID, common.Audit2FALoginVerified, "user", &user.ID, map[string]any{"ip": ip, "device": deviceName}, ip)
 
 	return s.generateAuthResponse(ctx, user, ip, userAgent, deviceName, deviceType)
+}
+
+func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest) (map[string]any, error) {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	user, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		slog.Error("failed to get user for password reset", "error", err)
+		// Always return success to prevent enumeration
+		return map[string]any{"message": "if that email exists, a reset link has been sent"}, nil
+	}
+
+	if user == nil {
+		// Return success even if email doesn't exist (prevent enumeration)
+		return map[string]any{"message": "if that email exists, a reset link has been sent"}, nil
+	}
+
+	// Generate random token (32 bytes, hex encoded)
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		slog.Error("failed to generate reset token", "error", err)
+		return nil, common.ErrInternal("failed to generate reset token")
+	}
+	rawToken := hex.EncodeToString(tokenBytes)
+
+	// Hash token with SHA-256 for storage
+	tokenHashBytes := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(tokenHashBytes[:])
+
+	// Store with 1 hour expiry
+	expiresAt := time.Now().Add(1 * time.Hour)
+	if err := s.repo.CreatePasswordResetToken(ctx, user.ID, tokenHash, expiresAt); err != nil {
+		slog.Error("failed to store password reset token", "error", err)
+		return nil, common.ErrInternal("failed to create reset token")
+	}
+
+	s.audit.Log(ctx, &user.ID, common.AuditPasswordResetRequested, "user", &user.ID, map[string]any{"email": email}, "")
+
+	// In production this would be emailed; for now return in the API response
+	return map[string]any{
+		"message": "if that email exists, a reset link has been sent",
+		"token":   rawToken,
+	}, nil
+}
+
+func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) error {
+	if err := validatePasswordStrength(req.NewPassword); err != nil {
+		return err
+	}
+
+	// Hash the provided token to look up in DB
+	tokenHashBytes := sha256.Sum256([]byte(req.Token))
+	tokenHash := hex.EncodeToString(tokenHashBytes[:])
+
+	tokenID, userID, err := s.repo.GetPasswordResetToken(ctx, tokenHash)
+	if err != nil {
+		slog.Error("failed to get password reset token", "error", err)
+		return common.ErrInternal("failed to validate reset token")
+	}
+	if tokenID == uuid.Nil {
+		return common.ErrBadRequest("invalid or expired reset token")
+	}
+
+	// Hash the new password
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), s.bcryptCost)
+	if err != nil {
+		return common.ErrInternal("failed to hash password")
+	}
+
+	// Update password
+	if err := s.repo.UpdatePassword(ctx, userID, string(hash)); err != nil {
+		slog.Error("failed to update password", "error", err)
+		return common.ErrInternal("failed to reset password")
+	}
+
+	if err := s.repo.SetPasswordChangedAt(ctx, userID); err != nil {
+		slog.Error("failed to set password changed at", "error", err)
+	}
+
+	// Mark token as used
+	if err := s.repo.MarkPasswordResetTokenUsed(ctx, tokenID); err != nil {
+		slog.Error("failed to mark token used", "error", err)
+	}
+
+	// Delete all sessions (force re-login)
+	if err := s.repo.DeleteUserSessions(ctx, userID); err != nil {
+		slog.Error("failed to delete user sessions", "error", err)
+	}
+
+	s.audit.Log(ctx, &userID, common.AuditPasswordReset, "user", &userID, nil, "")
+
+	return nil
 }
 
 func (s *Service) GoogleLogin(ctx context.Context, req GoogleLoginRequest, ip, userAgent, deviceName, deviceType string) (*AuthResponse, error) {

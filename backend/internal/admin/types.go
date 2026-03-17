@@ -22,18 +22,19 @@ type DashboardStats struct {
 // User management
 
 type AdminUserResponse struct {
-	ID            uuid.UUID  `json:"id"`
-	Email         string     `json:"email"`
-	DisplayName   string     `json:"display_name"`
-	StorageUsed   int64      `json:"storage_used"`
-	StorageLimit  int64      `json:"storage_limit"`
-	Plan          string     `json:"plan"`
-	IsActive      bool       `json:"is_active"`
-	IsAdmin       bool       `json:"is_admin"`
-	EmailVerified bool       `json:"email_verified"`
-	FileCount     int64      `json:"file_count"`
-	LastLoginAt   *time.Time `json:"last_login_at"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID             uuid.UUID  `json:"id"`
+	Email          string     `json:"email"`
+	DisplayName    string     `json:"display_name"`
+	StorageUsed    int64      `json:"storage_used"`
+	StorageLimit   int64      `json:"storage_limit"`
+	Plan           string     `json:"plan"`
+	IsActive       bool       `json:"is_active"`
+	IsAdmin        bool       `json:"is_admin"`
+	EmailVerified  bool       `json:"email_verified"`
+	ApprovalStatus string     `json:"approval_status"`
+	FileCount      int64      `json:"file_count"`
+	LastLoginAt    *time.Time `json:"last_login_at"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type UpdateUserRequest struct {

@@ -35,6 +35,9 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/storage/mime-stats", h.MimeTypeStats)
 	r.Get("/storage/upload-trends", h.UploadTrends)
 	r.Get("/audit-logs", h.AuditLogs)
+	r.Get("/pending-registrations", h.PendingRegistrations)
+	r.Post("/users/{id}/approve", h.ApproveUser)
+	r.Post("/users/{id}/reject", h.RejectUser)
 
 	return r
 }
@@ -133,6 +136,63 @@ func (h *Handler) BanUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, map[string]string{"message": "user banned"})
+}
+
+func (h *Handler) PendingRegistrations(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	users, total, err := h.repo.GetPendingRegistrations(r.Context(), limit, offset)
+	if err != nil {
+		slog.Error("failed to list pending registrations", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to list pending registrations"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{
+		"users":  users,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+func (h *Handler) ApproveUser(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid user id"))
+		return
+	}
+
+	if err := h.repo.UpdateApprovalStatus(r.Context(), id, "approved"); err != nil {
+		slog.Error("failed to approve user", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to approve user"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "user approved"})
+}
+
+func (h *Handler) RejectUser(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid user id"))
+		return
+	}
+
+	if err := h.repo.UpdateApprovalStatus(r.Context(), id, "rejected"); err != nil {
+		slog.Error("failed to reject user", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to reject user"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "user rejected"})
 }
 
 func (h *Handler) AuditLogs(w http.ResponseWriter, r *http.Request) {

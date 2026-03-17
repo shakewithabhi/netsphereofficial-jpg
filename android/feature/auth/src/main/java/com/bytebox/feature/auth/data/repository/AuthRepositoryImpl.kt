@@ -7,8 +7,11 @@ import com.bytebox.core.database.dao.UploadTaskDao
 import com.bytebox.core.datastore.TokenManager
 import com.bytebox.core.network.api.AuthApi
 import com.bytebox.core.network.api.UserApi
+import com.bytebox.core.network.dto.ForgotPasswordRequest
+import com.bytebox.core.network.dto.GoogleLoginRequest
 import com.bytebox.core.network.dto.LoginRequest
 import com.bytebox.core.network.dto.RegisterRequest
+import com.bytebox.core.network.dto.ResetPasswordRequest
 import com.bytebox.core.network.safeApiCall
 import com.bytebox.domain.model.User
 import com.bytebox.domain.repository.AuthRepository
@@ -32,6 +35,24 @@ class AuthRepositoryImpl @Inject constructor(
 
         val result = safeApiCall {
             authApi.login(LoginRequest(email, password, android.os.Build.MODEL))
+        }
+        return when (result) {
+            is Result.Success -> {
+                tokenManager.saveTokens(result.data.accessToken, result.data.refreshToken)
+                Result.Success(result.data.user.toDomain())
+            }
+            is Result.Error -> result
+            is Result.Loading -> result
+        }
+    }
+
+    override suspend fun googleLogin(idToken: String): Result<User> {
+        fileDao.deleteAll()
+        folderDao.deleteAll()
+        uploadTaskDao.deleteAll()
+
+        val result = safeApiCall {
+            authApi.googleLogin(GoogleLoginRequest(idToken))
         }
         return when (result) {
             is Result.Success -> {
@@ -80,6 +101,28 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun getProfile(): Result<User> {
         return safeApiCall { userApi.getProfile() }.map { it.toDomain() }
+    }
+
+    override suspend fun forgotPassword(email: String): Result<String?> {
+        val result = safeApiCall {
+            authApi.forgotPassword(ForgotPasswordRequest(email))
+        }
+        return when (result) {
+            is Result.Success -> Result.Success(result.data.token)
+            is Result.Error -> result
+            is Result.Loading -> result
+        }
+    }
+
+    override suspend fun resetPassword(token: String, newPassword: String): Result<Unit> {
+        val result = safeApiCall {
+            authApi.resetPassword(ResetPasswordRequest(token, newPassword))
+        }
+        return when (result) {
+            is Result.Success -> Result.Success(Unit)
+            is Result.Error -> result
+            is Result.Loading -> result
+        }
     }
 
     private fun com.bytebox.core.network.dto.UserDto.toDomain() = User(

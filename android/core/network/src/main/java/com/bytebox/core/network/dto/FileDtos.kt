@@ -60,3 +60,18 @@ data class DownloadUrlResponse(
     @Json(name = "hls_url") val hlsUrl: String? = null,
     @Json(name = "video_thumbnail_url") val videoThumbnailUrl: String? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class FileVersionDto(
+    val id: String,
+    @Json(name = "file_id") val fileId: String,
+    @Json(name = "version_number") val versionNumber: Int,
+    val size: Long,
+    @Json(name = "content_hash") val contentHash: String,
+    @Json(name = "created_at") val createdAt: String
+)
+
+@JsonClass(generateAdapter = true)
+data class FileVersionsResponse(
+    val versions: List<FileVersionDto>
+)

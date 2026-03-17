@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -27,6 +29,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.bytebox.core.common.FileCategory
+import com.bytebox.core.common.toLocalDateTime
+import com.bytebox.core.common.toReadableFileSize
+import com.bytebox.core.common.toRelativeTime
+import com.bytebox.core.ui.components.ConfirmationDialog
+import com.bytebox.core.ui.theme.ByteBoxTheme
+import com.bytebox.domain.model.FileVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -43,13 +51,23 @@ fun PreviewScreen(
     viewModel: PreviewViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showVersionSheet by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(fileId) {
         viewModel.setFileInfo("", mimeType)
         viewModel.loadFile(fileId)
     }
 
+    LaunchedEffect(uiState.versionActionMessage) {
+        uiState.versionActionMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearVersionActionMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(uiState.fileName ?: "Preview") },
@@ -59,6 +77,9 @@ fun PreviewScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showVersionSheet = true }) {
+                        Icon(Icons.Default.History, contentDescription = "Version History")
+                    }
                     IconButton(onClick = { onDownload(fileId) }) {
                         Icon(Icons.Default.Download, contentDescription = "Download")
                     }
@@ -95,6 +116,258 @@ fun PreviewScreen(
                         FileCategory.PDF -> PdfPreview(url = uiState.previewUrl!!)
                         FileCategory.DOCUMENT, FileCategory.OTHER -> UnsupportedPreview(mimeType = mimeType)
                     }
+                }
+            }
+        }
+    }
+
+    if (showVersionSheet) {
+        VersionHistoryBottomSheet(
+            versions = uiState.versions,
+            isLoading = uiState.isLoadingVersions,
+            error = uiState.versionError,
+            onDismiss = { showVersionSheet = false },
+            onRestore = { versionNumber -> viewModel.restoreVersion(versionNumber) },
+            onDelete = { versionNumber -> viewModel.deleteVersion(versionNumber) },
+            onRetry = { viewModel.loadVersions() }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VersionHistoryBottomSheet(
+    versions: List<FileVersion>,
+    isLoading: Boolean,
+    error: String?,
+    onDismiss: () -> Unit,
+    onRestore: (Int) -> Unit,
+    onDelete: (Int) -> Unit,
+    onRetry: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var confirmAction by remember { mutableStateOf<VersionAction?>(null) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        shape = RoundedCornerShape(
+            topStart = ByteBoxTheme.radius.lg,
+            topEnd = ByteBoxTheme.radius.lg
+        ),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ByteBoxTheme.spacing.md)
+                .padding(bottom = ByteBoxTheme.spacing.xl)
+        ) {
+            Text(
+                text = "Version History",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = ByteBoxTheme.spacing.md)
+            )
+
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                error != null -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = ByteBoxTheme.spacing.lg),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                        TextButton(onClick = onRetry) {
+                            Text("Retry")
+                        }
+                    }
+                }
+                versions.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = ByteBoxTheme.spacing.xl),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No version history available",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(ByteBoxTheme.spacing.xxs)
+                    ) {
+                        itemsIndexed(versions) { index, version ->
+                            VersionItem(
+                                version = version,
+                                isCurrent = index == 0,
+                                onRestore = { onRestore(version.versionNumber) },
+                                onDelete = {
+                                    confirmAction = VersionAction.Delete(version.versionNumber)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    confirmAction?.let { action ->
+        when (action) {
+            is VersionAction.Delete -> {
+                ConfirmationDialog(
+                    title = "Delete Version",
+                    message = "Are you sure you want to delete version ${action.versionNumber}? This action cannot be undone.",
+                    confirmText = "Delete",
+                    isDestructive = true,
+                    onConfirm = {
+                        onDelete(action.versionNumber)
+                        confirmAction = null
+                    },
+                    onDismiss = { confirmAction = null }
+                )
+            }
+        }
+    }
+}
+
+private sealed class VersionAction {
+    data class Delete(val versionNumber: Int) : VersionAction()
+}
+
+@Composable
+private fun VersionItem(
+    version: FileVersion,
+    isCurrent: Boolean,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val formattedDate = remember(version.createdAt) {
+        try {
+            version.createdAt.toLocalDateTime().toRelativeTime()
+        } catch (_: Exception) {
+            version.createdAt
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(ByteBoxTheme.radius.md),
+        color = if (isCurrent) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = ByteBoxTheme.spacing.md,
+                    vertical = ByteBoxTheme.spacing.sm
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isCurrent) Icons.Default.CheckCircle else Icons.Default.History,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = if (isCurrent) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+
+            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.sm))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Version ${version.versionNumber}",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    if (isCurrent) {
+                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                        Surface(
+                            shape = RoundedCornerShape(ByteBoxTheme.radius.sm),
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                text = "Current",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.padding(
+                                    horizontal = ByteBoxTheme.spacing.xs,
+                                    vertical = 2.dp
+                                )
+                            )
+                        }
+                    }
+                }
+                Row {
+                    Text(
+                        text = version.size.toReadableFileSize(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = " \u00B7 ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formattedDate,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (!isCurrent) {
+                IconButton(onClick = onRestore) {
+                    Icon(
+                        Icons.Default.RestorePage,
+                        contentDescription = "Restore version ${version.versionNumber}",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "Delete version ${version.versionNumber}",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }

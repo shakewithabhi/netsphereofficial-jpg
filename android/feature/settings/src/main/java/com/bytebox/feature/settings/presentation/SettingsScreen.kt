@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -140,6 +141,29 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+
+            // Auto-Upload Section
+            SectionHeader(title = "Auto-Upload")
+
+            ListItem(
+                headlineContent = { Text("Camera Auto-Upload") },
+                supportingContent = { Text("Automatically upload new photos and videos") },
+                leadingContent = {
+                    Icon(
+                        Icons.Default.PhotoCamera,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.autoUploadEnabled,
+                        onCheckedChange = viewModel::setAutoUploadEnabled,
+                    )
+                },
+            )
+
+            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
 
             // Storage Section
             SectionHeader(title = "Storage")

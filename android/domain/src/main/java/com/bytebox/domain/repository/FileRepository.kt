@@ -2,6 +2,7 @@ package com.bytebox.domain.repository
 
 import com.bytebox.core.common.Result
 import com.bytebox.domain.model.FileItem
+import com.bytebox.domain.model.FileVersion
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.FolderContents
 
@@ -25,4 +26,7 @@ interface FileRepository {
     suspend fun getDownloadUrl(fileId: String): Result<String>
     suspend fun searchFiles(query: String, cursor: String? = null): Result<FolderContents>
     suspend fun copyFile(fileId: String, folderId: String?): Result<Unit>
+    suspend fun listVersions(fileId: String): Result<List<FileVersion>>
+    suspend fun restoreVersion(fileId: String, versionNumber: Int): Result<Unit>
+    suspend fun deleteVersion(fileId: String, versionNumber: Int): Result<Unit>
 }

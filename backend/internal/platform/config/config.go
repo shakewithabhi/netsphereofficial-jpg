@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -107,10 +108,12 @@ type AuthConfig struct {
 }
 
 type AppConfig struct {
-	Environment      string // development, staging, production
-	BaseURL          string // public-facing URL for share links
-	DefaultQuotaSize int64  // bytes
-	MaxUploadSize    int64  // bytes for simple upload
+	Environment      string   // development, staging, production
+	BaseURL          string   // public-facing URL for share links
+	DefaultQuotaSize int64    // bytes
+	MaxUploadSize    int64    // bytes for simple upload
+	CORSOrigins      []string // allowed CORS origins
+	RequireApproval  bool     // require admin approval for new registrations
 }
 
 type StripeConfig struct {
@@ -169,6 +172,8 @@ func Load() (*Config, error) {
 			BaseURL:          getEnv("APP_BASE_URL", "https://byteboxapp.com"),
 			DefaultQuotaSize: int64(getEnvInt("APP_DEFAULT_QUOTA_GB", 5)) * 1024 * 1024 * 1024,
 			MaxUploadSize:    int64(getEnvInt("APP_MAX_UPLOAD_SIZE_MB", 10)) * 1024 * 1024,
+			CORSOrigins:      parseCORSOrigins(getEnv("CORS_ALLOWED_ORIGINS", "")),
+			RequireApproval:  getEnvBool("REQUIRE_REGISTRATION_APPROVAL", false),
 		},
 		Google: GoogleConfig{
 			ClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
@@ -213,6 +218,9 @@ func (c *Config) validate() error {
 	if c.Storage.Endpoint == "" && c.App.Environment == "production" {
 		return fmt.Errorf("STORAGE_ENDPOINT is required in production")
 	}
+	if len(c.App.CORSOrigins) == 0 && c.App.Environment == "production" {
+		return fmt.Errorf("CORS_ALLOWED_ORIGINS is required in production (comma-separated list of origins)")
+	}
 
 	// Set dev defaults for secrets
 	if c.Auth.AccessTokenSecret == "" {
@@ -222,7 +230,26 @@ func (c *Config) validate() error {
 		c.Auth.RefreshTokenSecret = "dev-refresh-secret-change-in-production"
 	}
 
+	// In development, allow all origins if not explicitly configured
+	if len(c.App.CORSOrigins) == 0 {
+		c.App.CORSOrigins = []string{"*"}
+	}
+
 	return nil
+}
+
+func parseCORSOrigins(val string) []string {
+	if val == "" {
+		return nil
+	}
+	var origins []string
+	for _, o := range strings.Split(val, ",") {
+		o = strings.TrimSpace(o)
+		if o != "" {
+			origins = append(origins, o)
+		}
+	}
+	return origins
 }
 
 func getEnv(key, fallback string) string {

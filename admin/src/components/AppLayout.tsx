@@ -1,5 +1,5 @@
 import { Layout, Menu, Typography, Button, Space } from 'antd';
-import { DashboardOutlined, TeamOutlined, CloudOutlined, LogoutOutlined, CloudServerOutlined, AuditOutlined } from '@ant-design/icons';
+import { DashboardOutlined, TeamOutlined, CloudOutlined, LogoutOutlined, CloudServerOutlined, AuditOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 
@@ -10,6 +10,7 @@ const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
   { key: '/users', icon: <TeamOutlined />, label: 'Users' },
   { key: '/storage', icon: <CloudOutlined />, label: 'Storage' },
+  { key: '/pending-approvals', icon: <CheckCircleOutlined />, label: 'Pending Approvals' },
   { key: '/audit-logs', icon: <AuditOutlined />, label: 'Audit Logs' },
 ];
 

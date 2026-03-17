@@ -103,4 +103,13 @@ export const adminApi = {
 
   auditLogs: (params: { limit?: number; offset?: number; action?: string; user_id?: string }) =>
     client.get<{ logs: AuditLogEntry[]; total: number; limit: number; offset: number }>('/admin/audit-logs', { params }),
+
+  pendingRegistrations: (params: { limit?: number; offset?: number }) =>
+    client.get<{ users: AdminUser[]; total: number; limit: number; offset: number }>('/admin/pending-registrations', { params }),
+
+  approveUser: (id: string) =>
+    client.post<{ message: string }>(`/admin/users/${id}/approve`),
+
+  rejectUser: (id: string) =>
+    client.post<{ message: string }>(`/admin/users/${id}/reject`),
 };

@@ -8,6 +8,7 @@ import DashboardPage from './pages/Dashboard';
 import UsersPage from './pages/Users';
 import StoragePage from './pages/Storage';
 import AuditLogsPage from './pages/AuditLogs';
+import PendingApprovalsPage from './pages/PendingApprovals';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/users" element={<UsersPage />} />
             <Route path="/storage" element={<StoragePage />} />
             <Route path="/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/pending-approvals" element={<PendingApprovalsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

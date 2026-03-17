@@ -171,7 +171,28 @@ export default function UsersPage() {
         scroll={{ x: 900 }}
       />
 
-      <Modal title="Edit User" open={!!editUser} onOk={handleSave} onCancel={() => setEditUser(null)} okText="Save">
+      <Modal
+        title="Edit User"
+        open={!!editUser}
+        onOk={() => {
+          const values = form.getFieldsValue();
+          if (values.is_admin !== editUser?.is_admin) {
+            Modal.confirm({
+              title: values.is_admin ? 'Grant admin access?' : 'Revoke admin access?',
+              content: values.is_admin
+                ? 'This user will gain full access to the admin panel.'
+                : 'This user will lose access to the admin panel.',
+              okText: 'Confirm',
+              okType: 'danger',
+              onOk: handleSave,
+            });
+          } else {
+            handleSave();
+          }
+        }}
+        onCancel={() => setEditUser(null)}
+        okText="Save"
+      >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item label="Plan" name="plan">
             <Select options={[
@@ -186,8 +207,10 @@ export default function UsersPage() {
           <Form.Item label="Active" name="is_active" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item label="Admin" name="is_admin" valuePropName="checked">
-            <Switch />
+          <Form.Item label="Admin" extra={<Typography.Text type="warning" style={{ fontSize: 12 }}>Grant admin access to this user</Typography.Text>}>
+            <Form.Item name="is_admin" valuePropName="checked" noStyle>
+              <Switch />
+            </Form.Item>
           </Form.Item>
         </Form>
       </Modal>

@@ -28,15 +28,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytebox.core.ui.components.ByteBoxButton
@@ -44,21 +48,50 @@ import com.bytebox.core.ui.components.ByteBoxTextField
 import com.bytebox.core.ui.components.OrDivider
 import com.bytebox.core.ui.components.SocialLoginButton
 import com.bytebox.core.ui.theme.ByteBoxTheme
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit = {},
     isDebug: Boolean = false,
     testEmail: String = "",
     testPassword: String = "",
+    googleClientId: String = "",
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(uiState.loginSuccess) {
         if (uiState.loginSuccess) onLoginSuccess()
+    }
+
+    val onGoogleSignIn: () -> Unit = {
+        coroutineScope.launch {
+            try {
+                val credentialManager = CredentialManager.create(context)
+                val googleIdOption = GetGoogleIdOption.Builder()
+                    .setFilterByAuthorizedAccounts(false)
+                    .setServerClientId(googleClientId)
+                    .build()
+                val request = GetCredentialRequest.Builder()
+                    .addCredentialOption(googleIdOption)
+                    .build()
+                val result = credentialManager.getCredential(context, request)
+                val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(result.credential.data)
+                viewModel.googleLogin(googleIdTokenCredential.idToken)
+            } catch (e: Exception) {
+                Timber.e(e, "Google sign-in failed")
+                viewModel.clearError()
+            }
+        }
     }
 
     Column(
@@ -149,7 +182,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = { }) {
+                TextButton(onClick = onNavigateToForgotPassword) {
                     Text(
                         text = "Forgot password?",
                         style = MaterialTheme.typography.bodySmall,
@@ -175,6 +208,18 @@ fun LoginScreen(
                 text = "Sign In",
                 onClick = viewModel::login,
                 isLoading = uiState.isLoading,
+            )
+
+            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+
+            OrDivider()
+
+            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+
+            com.bytebox.core.ui.components.ByteBoxOutlinedButton(
+                text = "Continue with Google",
+                onClick = onGoogleSignIn,
+                enabled = !uiState.isLoading && googleClientId.isNotBlank(),
             )
 
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))

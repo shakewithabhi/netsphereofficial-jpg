@@ -22,11 +22,15 @@ object DatabaseModule {
             context,
             ByteBoxDatabase::class.java,
             "bytebox.db"
-        ).addMigrations(ByteBoxDatabase.MIGRATION_1_2, ByteBoxDatabase.MIGRATION_2_3)
-            .fallbackToDestructiveMigration().build()
+        ).addMigrations(
+            ByteBoxDatabase.MIGRATION_1_2,
+            ByteBoxDatabase.MIGRATION_2_3,
+            ByteBoxDatabase.MIGRATION_3_4
+        ).fallbackToDestructiveMigration().build()
 
     @Provides fun provideFileDao(db: ByteBoxDatabase): FileDao = db.fileDao()
     @Provides fun provideFolderDao(db: ByteBoxDatabase): FolderDao = db.folderDao()
     @Provides fun provideUploadTaskDao(db: ByteBoxDatabase): UploadTaskDao = db.uploadTaskDao()
     @Provides fun provideDownloadTaskDao(db: ByteBoxDatabase): DownloadTaskDao = db.downloadTaskDao()
+    @Provides fun providePendingOperationDao(db: ByteBoxDatabase): PendingOperationDao = db.pendingOperationDao()
 }

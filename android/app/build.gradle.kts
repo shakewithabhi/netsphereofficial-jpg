@@ -20,6 +20,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "BASE_URL", "\"https://byteboxapp.com/api/v1/\"")
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"\"")
+
     }
 
     buildTypes {
@@ -27,6 +29,7 @@ android {
             buildConfigField("String", "BASE_URL", "\"https://byteboxapp.com/api/v1/\"")
             buildConfigField("String", "TEST_EMAIL", "\"test@byteboxapp.com\"")
             buildConfigField("String", "TEST_PASSWORD", "\"Test@1234\"")
+            buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${project.findProperty("GOOGLE_CLIENT_ID") ?: ""}\"")
         }
         release {
             isMinifyEnabled = true

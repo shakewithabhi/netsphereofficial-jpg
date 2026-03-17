@@ -18,6 +18,11 @@ data class LoginRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class GoogleLoginRequest(
+    @Json(name = "id_token") val idToken: String
+)
+
+@JsonClass(generateAdapter = true)
 data class RefreshRequest(
     @Json(name = "refresh_token") val refreshToken: String
 )
@@ -27,6 +32,28 @@ data class AuthResponse(
     @Json(name = "access_token") val accessToken: String,
     @Json(name = "refresh_token") val refreshToken: String,
     val user: UserDto
+)
+
+@JsonClass(generateAdapter = true)
+data class ForgotPasswordRequest(
+    val email: String
+)
+
+@JsonClass(generateAdapter = true)
+data class ForgotPasswordResponse(
+    val message: String,
+    val token: String?
+)
+
+@JsonClass(generateAdapter = true)
+data class ResetPasswordRequest(
+    val token: String,
+    @Json(name = "new_password") val newPassword: String
+)
+
+@JsonClass(generateAdapter = true)
+data class MessageResponse(
+    val message: String
 )
 
 @JsonClass(generateAdapter = true)

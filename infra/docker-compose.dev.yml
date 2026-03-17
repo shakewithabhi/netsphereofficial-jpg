@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: bytebox
       POSTGRES_DB: bytebox
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -17,17 +17,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   redis:
     image: redis:7-alpine
     container_name: bytebox-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   minio:
     image: minio/minio
@@ -37,10 +41,64 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9002:9000"
+      - "9003:9001"
     volumes:
       - miniodata:/data
+    networks:
+      - internal
+
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: bytebox-clamav-dev
+    restart: unless-stopped
+    volumes:
+      - clamav-data:/var/lib/clamav
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: bytebox-api-dev
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: minioadmin
+      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      CLAMAV_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: bytebox-worker-dev
+    command: ["./worker"]
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: minioadmin
+      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      CLAMAV_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
 
   # Auto-create buckets on startup
   minio-init:
@@ -57,7 +115,14 @@ services:
       mc mb --ignore-existing local/bytebox-temp;
       echo 'Buckets created successfully';
       "
+    networks:
+      - internal
 
 volumes:
   pgdata:
   miniodata:
+  clamav-data:
+
+networks:
+  internal:
+    driver: bridge

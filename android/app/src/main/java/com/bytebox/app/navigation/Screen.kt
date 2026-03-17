@@ -16,6 +16,11 @@ sealed class Screen(val route: String) {
             "preview/$fileId/${mimeType.replace("/", "_")}"
     }
     data object Shares : Screen("shares")
+    data object ForgotPassword : Screen("forgot_password")
+    data object ResetPassword : Screen("reset_password?token={token}") {
+        fun createRoute(token: String?) =
+            if (token != null) "reset_password?token=$token" else "reset_password"
+    }
     data object Settings : Screen("settings")
     data object Profile : Screen("profile")
     data object StorageAnalytics : Screen("storage_analytics")

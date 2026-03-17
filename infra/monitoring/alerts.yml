@@ -1,0 +1,42 @@
+groups:
+  - name: bytebox
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(bytebox_http_requests_total{status=~"5.."}[5m])) / sum(rate(bytebox_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: High error rate (>5%)
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(bytebox_http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High p95 latency (>2s)
+
+      - alert: ServiceDown
+        expr: up{job="bytebox-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: ByteBox API is down
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Disk usage above 85%
+
+      - alert: DatabaseConnectionsHigh
+        expr: pg_stat_activity_count > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High number of database connections

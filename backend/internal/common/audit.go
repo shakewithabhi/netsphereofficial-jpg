@@ -61,6 +61,8 @@ const (
 	Audit2FAEnabled        = "user.2fa_enabled"
 	Audit2FADisabled       = "user.2fa_disabled"
 	Audit2FALoginVerified  = "user.2fa_login_verified"
-	AuditAdminUserUpdate   = "admin.user.update"
-	AuditAdminUserBan      = "admin.user.ban"
+	AuditPasswordResetRequested = "user.password_reset_requested"
+	AuditPasswordReset          = "user.password_reset"
+	AuditAdminUserUpdate        = "admin.user.update"
+	AuditAdminUserBan           = "admin.user.ban"
 )

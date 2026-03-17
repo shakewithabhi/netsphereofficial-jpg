@@ -12,9 +12,10 @@ import com.bytebox.core.database.entity.*
         CachedFileEntity::class,
         CachedFolderEntity::class,
         UploadTaskEntity::class,
-        DownloadTaskEntity::class
+        DownloadTaskEntity::class,
+        PendingOperationEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class ByteBoxDatabase : RoomDatabase() {
@@ -22,6 +23,7 @@ abstract class ByteBoxDatabase : RoomDatabase() {
     abstract fun folderDao(): FolderDao
     abstract fun uploadTaskDao(): UploadTaskDao
     abstract fun downloadTaskDao(): DownloadTaskDao
+    abstract fun pendingOperationDao(): PendingOperationDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -32,6 +34,21 @@ abstract class ByteBoxDatabase : RoomDatabase() {
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE upload_tasks ADD COLUMN share_url TEXT")
+            }
+        }
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS pending_operations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        operation_type TEXT NOT NULL,
+                        file_id TEXT NOT NULL,
+                        payload TEXT,
+                        status TEXT NOT NULL DEFAULT 'PENDING',
+                        retry_count INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL
+                    )"""
+                )
             }
         }
     }

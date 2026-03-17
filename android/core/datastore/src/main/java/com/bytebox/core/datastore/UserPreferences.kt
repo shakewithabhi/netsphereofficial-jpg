@@ -58,6 +58,21 @@ class UserPreferences @Inject constructor(
             }
         }
 
+    val autoUploadEnabled: Flow<Boolean>
+        get() = dataStore.data.map { prefs ->
+            prefs[AUTO_UPLOAD_ENABLED_KEY] ?: false
+        }
+
+    val autoUploadFolderId: Flow<String?>
+        get() = dataStore.data.map { prefs ->
+            prefs[AUTO_UPLOAD_FOLDER_ID_KEY]
+        }
+
+    val lastAutoUploadTimestamp: Flow<Long>
+        get() = dataStore.data.map { prefs ->
+            prefs[LAST_AUTO_UPLOAD_TIMESTAMP_KEY] ?: 0L
+        }
+
     suspend fun setViewMode(mode: ViewMode) {
         dataStore.edit { it[VIEW_MODE_KEY] = mode.name.lowercase() }
     }
@@ -78,12 +93,30 @@ class UserPreferences @Inject constructor(
         dataStore.edit { it[THEME_MODE_KEY] = mode.name.lowercase() }
     }
 
+    suspend fun setAutoUploadEnabled(enabled: Boolean) {
+        dataStore.edit { it[AUTO_UPLOAD_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setAutoUploadFolderId(folderId: String?) {
+        dataStore.edit {
+            if (folderId != null) it[AUTO_UPLOAD_FOLDER_ID_KEY] = folderId
+            else it.remove(AUTO_UPLOAD_FOLDER_ID_KEY)
+        }
+    }
+
+    suspend fun setLastAutoUploadTimestamp(timestamp: Long) {
+        dataStore.edit { it[LAST_AUTO_UPLOAD_TIMESTAMP_KEY] = timestamp }
+    }
+
     companion object {
         private val VIEW_MODE_KEY = stringPreferencesKey("view_mode")
         private val SORT_BY_KEY = stringPreferencesKey("sort_by")
         private val SORT_ORDER_KEY = stringPreferencesKey("sort_order")
         private val WIFI_ONLY_KEY = booleanPreferencesKey("wifi_only_upload")
         private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
+        private val AUTO_UPLOAD_ENABLED_KEY = booleanPreferencesKey("auto_upload_enabled")
+        private val AUTO_UPLOAD_FOLDER_ID_KEY = stringPreferencesKey("auto_upload_folder_id")
+        private val LAST_AUTO_UPLOAD_TIMESTAMP_KEY = longPreferencesKey("last_auto_upload_timestamp")
     }
 }
 

@@ -31,6 +31,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/google", h.GoogleLogin)
 	r.Post("/refresh", h.Refresh)
 	r.Post("/2fa/verify-login", h.VerifyTwoFactorLogin)
+	r.Post("/forgot-password", h.ForgotPassword)
+	r.Post("/reset-password", h.ResetPassword)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
@@ -337,6 +339,37 @@ func (h *Handler) VerifyTwoFactorLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req ForgotPasswordRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.ForgotPassword(r.Context(), req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req ResetPasswordRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	if err := h.service.ResetPassword(r.Context(), req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "password has been reset"})
 }
 
 func (h *Handler) RevokeSession(w http.ResponseWriter, r *http.Request) {

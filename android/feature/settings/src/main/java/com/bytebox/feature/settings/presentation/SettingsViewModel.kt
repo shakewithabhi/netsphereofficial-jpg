@@ -1,16 +1,20 @@
 package com.bytebox.feature.settings.presentation
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.Result
 import com.bytebox.core.datastore.ThemeMode
 import com.bytebox.core.datastore.UserPreferences
+import com.bytebox.core.worker.AutoUploadWorker
 import com.bytebox.domain.model.User
 import com.bytebox.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -19,13 +23,15 @@ data class SettingsUiState(
     val user: User? = null,
     val isLoading: Boolean = false,
     val uploadOnWifiOnly: Boolean = true,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val autoUploadEnabled: Boolean = false
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -41,6 +47,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferences.themeMode.collect { mode ->
                 _uiState.update { it.copy(themeMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            userPreferences.autoUploadEnabled.collect { enabled ->
+                _uiState.update { it.copy(autoUploadEnabled = enabled) }
             }
         }
     }
@@ -62,6 +73,18 @@ class SettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { userPreferences.setThemeMode(mode) }
+    }
+
+    fun setAutoUploadEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferences.setAutoUploadEnabled(enabled)
+            if (enabled) {
+                val wifiOnly = userPreferences.uploadOnWifiOnly.first()
+                AutoUploadWorker.enqueue(appContext, wifiOnly)
+            } else {
+                AutoUploadWorker.cancel(appContext)
+            }
+        }
     }
 
     fun logout(onLoggedOut: () -> Unit) {

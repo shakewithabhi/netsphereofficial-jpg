@@ -80,4 +80,19 @@ interface FileApi {
         @Query("cursor") cursor: String? = null,
         @Query("limit") limit: Int = 50
     ): Response<FolderContentsResponse>
+
+    @GET("files/{id}/versions")
+    suspend fun listVersions(@Path("id") fileId: String): Response<FileVersionsResponse>
+
+    @POST("files/{id}/versions/{version}/restore")
+    suspend fun restoreVersion(
+        @Path("id") fileId: String,
+        @Path("version") version: Int
+    ): Response<Unit>
+
+    @DELETE("files/{id}/versions/{version}")
+    suspend fun deleteVersion(
+        @Path("id") fileId: String,
+        @Path("version") version: Int
+    ): Response<Unit>
 }

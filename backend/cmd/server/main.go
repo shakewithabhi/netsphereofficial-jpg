@@ -162,7 +162,7 @@ func main() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.SecurityHeaders)
-	r.Use(middleware.CORS([]string{"*"})) // TODO: restrict in production
+	r.Use(middleware.CORS(cfg.App.CORSOrigins))
 	r.Use(middleware.Metrics)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Compress(5))

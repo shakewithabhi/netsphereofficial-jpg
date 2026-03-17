@@ -67,7 +67,7 @@ func (r *Repository) ListUsers(ctx context.Context, limit, offset int, search st
 	if search != "" {
 		query = `
 			SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
-			       u.plan, u.is_active, u.is_admin, u.email_verified, u.last_login_at, u.created_at,
+			       u.plan, u.is_active, u.is_admin, u.email_verified, u.approval_status, u.last_login_at, u.created_at,
 			       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
 			FROM users u
 			WHERE u.email ILIKE $1 OR u.display_name ILIKE $1
@@ -77,7 +77,7 @@ func (r *Repository) ListUsers(ctx context.Context, limit, offset int, search st
 	} else {
 		query = `
 			SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
-			       u.plan, u.is_active, u.is_admin, u.email_verified, u.last_login_at, u.created_at,
+			       u.plan, u.is_active, u.is_admin, u.email_verified, u.approval_status, u.last_login_at, u.created_at,
 			       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
 			FROM users u
 			ORDER BY u.created_at DESC
@@ -96,7 +96,7 @@ func (r *Repository) ListUsers(ctx context.Context, limit, offset int, search st
 		var u AdminUserResponse
 		if err := rows.Scan(
 			&u.ID, &u.Email, &u.DisplayName, &u.StorageUsed, &u.StorageLimit,
-			&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.LastLoginAt, &u.CreatedAt,
+			&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.ApprovalStatus, &u.LastLoginAt, &u.CreatedAt,
 			&u.FileCount,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan user: %w", err)
@@ -110,7 +110,7 @@ func (r *Repository) ListUsers(ctx context.Context, limit, offset int, search st
 func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (*AdminUserResponse, error) {
 	query := `
 		SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
-		       u.plan, u.is_active, u.is_admin, u.email_verified, u.last_login_at, u.created_at,
+		       u.plan, u.is_active, u.is_admin, u.email_verified, u.approval_status, u.last_login_at, u.created_at,
 		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
 		FROM users u
 		WHERE u.id = $1`
@@ -118,7 +118,7 @@ func (r *Repository) GetUserByID(ctx context.Context, id uuid.UUID) (*AdminUserR
 	u := &AdminUserResponse{}
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&u.ID, &u.Email, &u.DisplayName, &u.StorageUsed, &u.StorageLimit,
-		&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.LastLoginAt, &u.CreatedAt,
+		&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.ApprovalStatus, &u.LastLoginAt, &u.CreatedAt,
 		&u.FileCount,
 	)
 	if err != nil {
@@ -163,6 +163,51 @@ func (r *Repository) BanUser(ctx context.Context, id uuid.UUID) error {
 	_, err = r.db.Exec(ctx, `DELETE FROM sessions WHERE user_id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("delete sessions: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetPendingRegistrations(ctx context.Context, limit, offset int) ([]AdminUserResponse, int64, error) {
+	var total int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE approval_status = 'pending'`).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count pending: %w", err)
+	}
+
+	query := `
+		SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
+		       u.plan, u.is_active, u.is_admin, u.email_verified, u.approval_status, u.last_login_at, u.created_at,
+		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+		FROM users u
+		WHERE u.approval_status = 'pending'
+		ORDER BY u.created_at ASC
+		LIMIT $1 OFFSET $2`
+
+	rows, err := r.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list pending: %w", err)
+	}
+	defer rows.Close()
+
+	var users []AdminUserResponse
+	for rows.Next() {
+		var u AdminUserResponse
+		if err := rows.Scan(
+			&u.ID, &u.Email, &u.DisplayName, &u.StorageUsed, &u.StorageLimit,
+			&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.ApprovalStatus, &u.LastLoginAt, &u.CreatedAt,
+			&u.FileCount,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan pending user: %w", err)
+		}
+		users = append(users, u)
+	}
+
+	return users, total, nil
+}
+
+func (r *Repository) UpdateApprovalStatus(ctx context.Context, userID uuid.UUID, status string) error {
+	_, err := r.db.Exec(ctx, `UPDATE users SET approval_status = $1 WHERE id = $2`, status, userID)
+	if err != nil {
+		return fmt.Errorf("update approval status: %w", err)
 	}
 	return nil
 }
