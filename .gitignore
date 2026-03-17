@@ -1,6 +1,8 @@
 .DS_Store
 .env
+.env.*
 *.swp
 *.swo
 .claude/
 android/.kotlin/
+backend/server.exe

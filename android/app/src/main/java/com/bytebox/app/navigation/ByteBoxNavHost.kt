@@ -58,7 +58,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.bytebox.app.BuildConfig
+import com.byteboxapp.com.BuildConfig
 import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.feature.auth.presentation.forgotpassword.ForgotPasswordScreen
@@ -409,7 +409,7 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
 
     LaunchedEffect(code) {
         try {
-            val resp = java.net.URL("https://byteboxapp.com/api/v1/s/$code").openConnection() as java.net.HttpURLConnection
+            val resp = java.net.URL("${BuildConfig.BASE_URL}s/$code").openConnection() as java.net.HttpURLConnection
             resp.setRequestProperty("Accept", "application/json")
             if (resp.responseCode == 200) {
                 val json = org.json.JSONObject(resp.inputStream.bufferedReader().readText())
@@ -513,7 +513,7 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
                             onClick = {
                                 kotlinx.coroutines.MainScope().launch {
                                     try {
-                                        val conn = java.net.URL("https://byteboxapp.com/api/v1/s/$code/download").openConnection() as java.net.HttpURLConnection
+                                        val conn = java.net.URL("${BuildConfig.BASE_URL}s/$code/download").openConnection() as java.net.HttpURLConnection
                                         conn.requestMethod = "POST"
                                         conn.setRequestProperty("Content-Type", "application/json")
                                         conn.doOutput = true

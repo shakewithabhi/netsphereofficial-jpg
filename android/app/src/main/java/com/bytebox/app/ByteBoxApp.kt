@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import com.byteboxapp.com.BuildConfig
 import javax.inject.Inject
 
 @HiltAndroidApp

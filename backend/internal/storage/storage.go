@@ -24,23 +24,26 @@ type Client struct {
 }
 
 func New(cfg config.StorageConfig) (*Client, error) {
-	endpointResolver := aws.EndpointResolverWithOptionsFunc(
-		func(service, region string, options ...any) (aws.Endpoint, error) {
-			return aws.Endpoint{
-				URL:               cfg.Endpoint,
-				SigningRegion:      cfg.Region,
-				HostnameImmutable: true,
-			}, nil
-		},
-	)
+	makeConfig := func(endpoint string) (aws.Config, error) {
+		resolver := aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...any) (aws.Endpoint, error) {
+				return aws.Endpoint{
+					URL:               endpoint,
+					SigningRegion:      cfg.Region,
+					HostnameImmutable: true,
+				}, nil
+			},
+		)
+		return awsconfig.LoadDefaultConfig(context.Background(),
+			awsconfig.WithEndpointResolverWithOptions(resolver),
+			awsconfig.WithCredentialsProvider(
+				credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+			),
+			awsconfig.WithRegion(cfg.Region),
+		)
+	}
 
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithEndpointResolverWithOptions(endpointResolver),
-		awsconfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-		),
-		awsconfig.WithRegion(cfg.Region),
-	)
+	awsCfg, err := makeConfig(cfg.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("load aws config: %w", err)
 	}
@@ -49,9 +52,23 @@ func New(cfg config.StorageConfig) (*Client, error) {
 		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
 		o.UsePathStyle = true
 	})
-	presigClient := s3.NewPresignClient(s3Client)
 
-	slog.Info("storage connected", "endpoint", cfg.Endpoint)
+	// Presign client uses public endpoint so URLs are accessible from outside Docker
+	presignEndpoint := cfg.Endpoint
+	if cfg.PublicEndpoint != "" {
+		presignEndpoint = cfg.PublicEndpoint
+	}
+	presignCfg, err := makeConfig(presignEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("load presign config: %w", err)
+	}
+	presignS3 := s3.NewFromConfig(presignCfg, func(o *s3.Options) {
+		o.RequestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
+		o.UsePathStyle = true
+	})
+	presigClient := s3.NewPresignClient(presignS3)
+
+	slog.Info("storage connected", "endpoint", cfg.Endpoint, "public_endpoint", presignEndpoint)
 
 	return &Client{
 		s3:     s3Client,

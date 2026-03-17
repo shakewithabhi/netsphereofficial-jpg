@@ -6,6 +6,6 @@ import retrofit2.http.GET
 
 interface UserApi {
 
-    @GET("users/me")
+    @GET("auth/me")
     suspend fun getProfile(): Response<UserDto>
 }

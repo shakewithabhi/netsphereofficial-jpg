@@ -2,7 +2,7 @@ package com.bytebox.app.di
 
 import android.content.Context
 import androidx.work.WorkManager
-import com.bytebox.app.BuildConfig
+import com.byteboxapp.com.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

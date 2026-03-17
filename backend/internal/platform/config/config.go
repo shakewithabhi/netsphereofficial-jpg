@@ -89,6 +89,7 @@ func (c RedisConfig) Addr() string {
 
 type StorageConfig struct {
 	Endpoint        string
+	PublicEndpoint  string
 	Region          string
 	AccessKeyID     string
 	SecretAccessKey string
@@ -151,6 +152,7 @@ func Load() (*Config, error) {
 		},
 		Storage: StorageConfig{
 			Endpoint:        getEnv("STORAGE_ENDPOINT", ""),
+			PublicEndpoint:  getEnv("STORAGE_PUBLIC_ENDPOINT", ""),
 			Region:          getEnv("STORAGE_REGION", "us-east-1"),
 			AccessKeyID:     getEnv("STORAGE_ACCESS_KEY_ID", ""),
 			SecretAccessKey: getEnv("STORAGE_SECRET_ACCESS_KEY", ""),

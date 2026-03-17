@@ -44,7 +44,8 @@ class UploadWorker @AssistedInject constructor(
     private val uploadApi: UploadApi,
     private val shareApi: ShareApi,
     private val uploadTaskDao: UploadTaskDao,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    @javax.inject.Named("base_url") private val baseUrl: String
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -252,7 +253,7 @@ class UploadWorker @AssistedInject constructor(
     }
 
     private fun getBaseUrl(): String {
-        return "https://byteboxapp.com/api/v1/"
+        return baseUrl
     }
 
     private fun createForegroundInfo(fileName: String, progress: Float): ForegroundInfo {

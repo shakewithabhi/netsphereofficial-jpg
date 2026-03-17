@@ -139,18 +139,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))
 
-            // Social login
-            SocialLoginButton(
-                text = "Continue with Google",
-                icon = Icons.Default.Email,
-                onClick = { },
-            )
 
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
-
-            OrDivider()
-
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
 
             ByteBoxTextField(
                 value = uiState.email,
