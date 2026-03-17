@@ -1,21 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, Col, Row, Statistic, Spin, Typography } from 'antd';
-import { UserOutlined, FileOutlined, CloudOutlined, ShareAltOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
-import { adminApi, type DashboardStats } from '../../api/admin';
+import {
+  UserOutlined, FileOutlined, CloudOutlined, ShareAltOutlined,
+  TeamOutlined, RiseOutlined, DeleteOutlined, UploadOutlined,
+} from '@ant-design/icons';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend, AreaChart, Area,
+} from 'recharts';
+import { adminApi, type DashboardStats, type DailySignupStat, type DailyUploadStat } from '../../api/admin';
 import { formatBytes } from '../../utils/format';
+import { usePolling } from '../../hooks/usePolling';
 
 const { Title } = Typography;
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [signupTrends, setSignupTrends] = useState<DailySignupStat[]>([]);
+  const [uploadTrends, setUploadTrends] = useState<DailyUploadStat[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    adminApi.dashboard()
-      .then((res) => setStats(res.data?.data ?? res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const unwrap = (res: any) => res.data?.data ?? res.data;
+
+  const fetchData = useCallback(() => {
+    Promise.all([
+      adminApi.dashboard().then((res) => setStats(unwrap(res))).catch(() => {}),
+      adminApi.signupTrends(30).then((res) => {
+        const d = unwrap(res);
+        setSignupTrends(Array.isArray(d) ? d : []);
+      }).catch(() => {}),
+      adminApi.uploadTrends(30).then((res) => {
+        const d = unwrap(res);
+        setUploadTrends(Array.isArray(d) ? d : []);
+      }).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+  usePolling(fetchData, 30000);
 
   if (loading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
   if (!stats) return null;
@@ -28,14 +50,27 @@ export default function DashboardPage() {
     { title: 'Total Files', value: s.total_files ?? 0, icon: <FileOutlined />, color: '#722ed1' },
     { title: 'Storage Used', value: formatBytes(s.total_storage_used ?? s.total_storage_bytes ?? 0), icon: <CloudOutlined />, color: '#eb2f96' },
     { title: 'Active Shares', value: s.active_shares ?? 0, icon: <ShareAltOutlined />, color: '#13c2c2' },
+    { title: 'Uploads Today', value: s.uploads_today ?? 0, icon: <UploadOutlined />, color: '#fa8c16' },
+    { title: 'Trashed Files', value: s.trashed_files ?? 0, icon: <DeleteOutlined />, color: '#f5222d' },
   ];
+
+  const signupData = signupTrends.map((d) => ({
+    date: String(d.date || '').slice(5),
+    signups: d.count,
+  }));
+
+  const uploadData = uploadTrends.map((d: any) => ({
+    date: String(d.date || '').slice(5),
+    files: d.file_count,
+    bytes: d.total_bytes,
+  }));
 
   return (
     <div>
       <Title level={4}>Dashboard</Title>
       <Row gutter={[16, 16]}>
         {cards.map((c) => (
-          <Col xs={24} sm={12} lg={8} key={c.title}>
+          <Col xs={24} sm={12} lg={6} key={c.title}>
             <Card>
               <Statistic
                 title={c.title}
@@ -45,6 +80,43 @@ export default function DashboardPage() {
             </Card>
           </Col>
         ))}
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        {signupData.length > 0 && (
+          <Col xs={24} lg={12}>
+            <Card title="Signup Trends (Last 30 Days)">
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={signupData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="signups" stroke="#1677ff" fill="#1677ff" fillOpacity={0.2} name="Signups" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        )}
+
+        {uploadData.length > 0 && (
+          <Col xs={24} lg={12}>
+            <Card title="Upload Trends (Last 30 Days)">
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={uploadData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => formatBytes(v)} />
+                  <Tooltip formatter={(v: number, name: string) => name === 'Bytes' ? formatBytes(v) : v} />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="files" stroke="#722ed1" name="Files" />
+                  <Line yAxisId="right" type="monotone" dataKey="bytes" stroke="#52c41a" name="Bytes" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+          </Col>
+        )}
       </Row>
     </div>
   );

@@ -4,11 +4,16 @@ export interface DashboardStats {
   total_users: number;
   active_users: number;
   total_files: number;
+  total_storage_bytes: number;
   total_storage_used: number;
   total_storage_allocated: number;
   total_shares: number;
   active_shares: number;
   signups_today: number;
+  new_users_today: number;
+  uploads_today: number;
+  trashed_files: number;
+  active_uploads: number;
 }
 
 export interface AdminUser {
@@ -20,6 +25,8 @@ export interface AdminUser {
   storage_limit: number;
   is_active: boolean;
   is_admin: boolean;
+  email_verified: boolean;
+  approval_status: string;
   file_count: number;
   last_login_at: string | null;
   created_at: string;
@@ -35,9 +42,13 @@ export interface UpdateUserPayload {
 export interface StorageStats {
   total_files: number;
   total_size: number;
+  total_used_bytes: number;
+  total_allocated_bytes: number;
+  user_count: number;
   avg_file_size: number;
-  top_users: { user_id: string; email: string; display_name: string; storage_used: number; file_count: number }[];
-  by_plan: { plan: string; user_count: number; total_storage: number }[];
+  avg_per_user_bytes: number;
+  top_users: { user_id: string; id: string; email: string; display_name: string; storage_used: number; file_count: number }[];
+  by_plan: { plan: string; user_count: number; total_storage: number; total_used_bytes: number }[];
 }
 
 export interface MimeTypeStat {
@@ -70,11 +81,40 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
+export interface AdminFile {
+  id: string;
+  user_id: string;
+  user_email: string;
+  name: string;
+  mime_type: string;
+  size: number;
+  folder_id: string | null;
+  trashed_at: string | null;
+  created_at: string;
+}
+
+export interface PlatformSettings {
+  default_storage_limit_free: number;
+  default_storage_limit_pro: number;
+  default_storage_limit_premium: number;
+  max_upload_size_mb: number;
+  maintenance_mode: boolean;
+  require_approval: boolean;
+  allow_registration: boolean;
+}
+
+export interface DailySignupStat {
+  date: string;
+  count: number;
+}
+
 export const adminApi = {
+  // Dashboard
   dashboard: () =>
     client.get<{ success: boolean; data: DashboardStats }>('/admin/dashboard'),
 
-  listUsers: (params: { page?: number; limit?: number; search?: string }) =>
+  // Users
+  listUsers: (params: { page?: number; limit?: number; offset?: number; search?: string }) =>
     client.get<{ success: boolean; data: AdminUser[]; pagination: { has_more: boolean } }>('/admin/users', { params }),
 
   getUser: (id: string) =>
@@ -86,6 +126,17 @@ export const adminApi = {
   banUser: (id: string) =>
     client.post<{ success: boolean }>(`/admin/users/${id}/ban`),
 
+  bulkUserAction: (userIds: string[], action: string, plan?: string) =>
+    client.post<{ message: string; affected: number }>('/admin/users/bulk', {
+      user_ids: userIds,
+      action,
+      plan,
+    }),
+
+  userActivity: (id: string, params: { limit?: number; offset?: number }) =>
+    client.get<{ logs: AuditLogEntry[]; total: number }>(`/admin/users/${id}/activity`, { params }),
+
+  // Storage
   storagePool: () =>
     client.get<StoragePool>('/admin/storage/pool'),
 
@@ -101,9 +152,11 @@ export const adminApi = {
   uploadTrends: (days?: number) =>
     client.get<DailyUploadStat[]>('/admin/storage/upload-trends', { params: { days } }),
 
+  // Audit Logs
   auditLogs: (params: { limit?: number; offset?: number; action?: string; user_id?: string }) =>
     client.get<{ logs: AuditLogEntry[]; total: number; limit: number; offset: number }>('/admin/audit-logs', { params }),
 
+  // Pending Approvals
   pendingRegistrations: (params: { limit?: number; offset?: number }) =>
     client.get<{ users: AdminUser[]; total: number; limit: number; offset: number }>('/admin/pending-registrations', { params }),
 
@@ -112,4 +165,22 @@ export const adminApi = {
 
   rejectUser: (id: string) =>
     client.post<{ message: string }>(`/admin/users/${id}/reject`),
+
+  // Files
+  listFiles: (params: { limit?: number; offset?: number; search?: string; user_id?: string; mime?: string }) =>
+    client.get<{ files: AdminFile[]; total: number }>('/admin/files', { params }),
+
+  deleteFile: (id: string) =>
+    client.delete<{ message: string }>(`/admin/files/${id}`),
+
+  // Settings
+  getSettings: () =>
+    client.get<PlatformSettings>('/admin/settings'),
+
+  updateSettings: (settings: PlatformSettings) =>
+    client.put<PlatformSettings>('/admin/settings', settings),
+
+  // Signup Trends
+  signupTrends: (days?: number) =>
+    client.get<DailySignupStat[]>('/admin/signup-trends', { params: { days } }),
 };

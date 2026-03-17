@@ -138,7 +138,7 @@ func Load() (*Config, error) {
 			User:            getEnv("DB_USER", "bytebox"),
 			Password:        getEnv("DB_PASSWORD", "bytebox"),
 			Name:            getEnv("DB_NAME", "bytebox"),
-			SSLMode:         getEnv("DB_SSL_MODE", "disable"),
+			SSLMode:         getEnv("DB_SSL_MODE", "require"),
 			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),
 			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 10),
 			ConnMaxLifetime: time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME_MIN", 30)) * time.Minute,
@@ -164,7 +164,7 @@ func Load() (*Config, error) {
 			RefreshTokenSecret: getEnv("AUTH_REFRESH_TOKEN_SECRET", ""),
 			AccessTokenTTL:     time.Duration(getEnvInt("AUTH_ACCESS_TOKEN_TTL_MIN", 15)) * time.Minute,
 			RefreshTokenTTL:    time.Duration(getEnvInt("AUTH_REFRESH_TOKEN_TTL_DAYS", 30)) * 24 * time.Hour,
-			BcryptCost:         getEnvInt("AUTH_BCRYPT_COST", 12),
+			BcryptCost:         getEnvInt("AUTH_BCRYPT_COST", 13),
 			TOTPEncryptionKey:  getEnv("AUTH_TOTP_ENCRYPTION_KEY", ""),
 		},
 		App: AppConfig{
@@ -230,9 +230,18 @@ func (c *Config) validate() error {
 		c.Auth.RefreshTokenSecret = "dev-refresh-secret-change-in-production"
 	}
 
-	// In development, allow all origins if not explicitly configured
+	// Only allow wildcard CORS in development
 	if len(c.App.CORSOrigins) == 0 {
-		c.App.CORSOrigins = []string{"*"}
+		if c.App.Environment == "development" {
+			c.App.CORSOrigins = []string{"*"}
+		} else {
+			return fmt.Errorf("CORS_ALLOWED_ORIGINS must be set in %s environment", c.App.Environment)
+		}
+	}
+
+	// In production, require SSL for database
+	if c.App.Environment == "production" && c.Database.SSLMode == "disable" {
+		return fmt.Errorf("DB_SSL_MODE cannot be 'disable' in production")
 	}
 
 	return nil

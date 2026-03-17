@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Table, Typography, Select, Input, Tag, Space, Card } from 'antd';
+import { Table, Typography, Select, Input, Tag, Space, Card, Button, message } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../api/admin';
 import type { AuditLogEntry } from '../../api/admin';
 import { formatDate } from '../../utils/format';
+import { exportToCSV } from '../../utils/export';
+import { usePolling } from '../../hooks/usePolling';
 
 const { Title } = Typography;
 
@@ -65,6 +68,23 @@ export default function AuditLogsPage() {
   useEffect(() => {
     fetchLogs();
   }, [page, actionFilter, userIdFilter]);
+
+  usePolling(fetchLogs, 30000);
+
+  const handleExportCSV = () => {
+    const data = logs.map((l) => ({
+      time: l.created_at,
+      action: l.action,
+      user_email: l.user_email || 'System',
+      user_id: l.user_id || '',
+      resource_type: l.resource_type || '',
+      resource_id: l.resource_id || '',
+      ip_address: l.ip_address || '',
+      metadata: l.metadata ? JSON.stringify(l.metadata) : '',
+    }));
+    exportToCSV(data, 'bytebox-audit-logs');
+    message.success('Audit logs exported');
+  };
 
   const columns: ColumnsType<AuditLogEntry> = [
     {
@@ -128,7 +148,10 @@ export default function AuditLogsPage() {
 
   return (
     <div>
-      <Title level={4}>Audit Logs</Title>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Title level={4} style={{ margin: 0 }}>Audit Logs</Title>
+        <Button icon={<DownloadOutlined />} onClick={handleExportCSV}>Export CSV</Button>
+      </Space>
       <Card style={{ marginBottom: 16 }}>
         <Space wrap>
           <Select

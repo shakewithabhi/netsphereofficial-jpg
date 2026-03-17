@@ -82,6 +82,43 @@ type DailyUploadStats struct {
 	TotalBytes int64  `json:"total_bytes"`
 }
 
+// Bulk user action
+type BulkUserActionRequest struct {
+	UserIDs []uuid.UUID `json:"user_ids" validate:"required,min=1"`
+	Action  string      `json:"action" validate:"required,oneof=ban activate deactivate set_plan"`
+	Plan    string      `json:"plan,omitempty"`
+}
+
+// Admin file listing
+type AdminFileResponse struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	UserEmail string     `json:"user_email"`
+	Name      string     `json:"name"`
+	MimeType  string     `json:"mime_type"`
+	Size      int64      `json:"size"`
+	FolderID  *uuid.UUID `json:"folder_id"`
+	TrashedAt *time.Time `json:"trashed_at"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+// Platform settings
+type PlatformSettings struct {
+	DefaultStorageLimitFree    int64  `json:"default_storage_limit_free"`
+	DefaultStorageLimitPro     int64  `json:"default_storage_limit_pro"`
+	DefaultStorageLimitPremium int64  `json:"default_storage_limit_premium"`
+	MaxUploadSizeMB            int64  `json:"max_upload_size_mb"`
+	MaintenanceMode            bool   `json:"maintenance_mode"`
+	RequireApproval            bool   `json:"require_approval"`
+	AllowRegistration          bool   `json:"allow_registration"`
+}
+
+// Signup trends
+type DailySignupStats struct {
+	Date  string `json:"date"`
+	Count int64  `json:"count"`
+}
+
 // Audit logs
 
 type AuditLogEntry struct {

@@ -603,10 +603,12 @@ func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 
 	s.audit.Log(ctx, &user.ID, common.AuditPasswordResetRequested, "user", &user.ID, map[string]any{"email": email}, "")
 
-	// In production this would be emailed; for now return in the API response
+	// TODO: Send rawToken via email (e.g., s.emailService.SendPasswordReset(email, rawToken))
+	// Token is NOT returned in the API response for security
+	slog.Info("password reset token generated", "user_id", user.ID, "email", email)
+
 	return map[string]any{
 		"message": "if that email exists, a reset link has been sent",
-		"token":   rawToken,
 	}, nil
 }
 

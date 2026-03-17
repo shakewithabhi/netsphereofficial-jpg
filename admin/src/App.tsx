@@ -9,6 +9,8 @@ import UsersPage from './pages/Users';
 import StoragePage from './pages/Storage';
 import AuditLogsPage from './pages/AuditLogs';
 import PendingApprovalsPage from './pages/PendingApprovals';
+import SettingsPage from './pages/Settings';
+import FilesPage from './pages/Files';
 
 export default function App() {
   return (
@@ -26,9 +28,11 @@ export default function App() {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/files" element={<FilesPage />} />
             <Route path="/storage" element={<StoragePage />} />
             <Route path="/audit-logs" element={<AuditLogsPage />} />
             <Route path="/pending-approvals" element={<PendingApprovalsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

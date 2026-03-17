@@ -21,12 +21,19 @@ FROM alpine:3.19
 
 RUN apk --no-cache add ca-certificates tzdata curl
 
+# Run as non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 WORKDIR /app
 
 COPY --from=builder /server .
 COPY --from=builder /worker .
 COPY --from=builder /go/bin/migrate /usr/local/bin/migrate
 COPY migrations/ ./migrations/
+
+RUN chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 8080
 

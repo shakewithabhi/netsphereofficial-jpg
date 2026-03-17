@@ -393,3 +393,238 @@ func (r *Repository) GetDailyUploadStats(ctx context.Context, days int) ([]Daily
 	}
 	return stats, nil
 }
+
+func (r *Repository) BulkUpdateUsers(ctx context.Context, ids []uuid.UUID, action string, plan string) (int64, error) {
+	var query string
+	var args []any
+
+	switch action {
+	case "ban":
+		query = `UPDATE users SET is_active = false WHERE id = ANY($1)`
+		args = []any{ids}
+	case "activate":
+		query = `UPDATE users SET is_active = true WHERE id = ANY($1)`
+		args = []any{ids}
+	case "deactivate":
+		query = `UPDATE users SET is_active = false WHERE id = ANY($1)`
+		args = []any{ids}
+	case "set_plan":
+		query = `UPDATE users SET plan = $2 WHERE id = ANY($1)`
+		args = []any{ids, plan}
+	default:
+		return 0, fmt.Errorf("unknown action: %s", action)
+	}
+
+	tag, err := r.db.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("bulk update: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *Repository) GetUserActivity(ctx context.Context, userID uuid.UUID, limit, offset int) ([]AuditLogEntry, int64, error) {
+	var total int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM audit_logs WHERE user_id = $1`, userID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count user activity: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT a.id, a.user_id, u.email, a.action, a.resource_type, a.resource_id,
+		       a.metadata, a.ip_address, a.created_at
+		FROM audit_logs a
+		LEFT JOIN users u ON u.id = a.user_id
+		WHERE a.user_id = $1
+		ORDER BY a.created_at DESC
+		LIMIT $2 OFFSET $3`, userID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list user activity: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []AuditLogEntry
+	for rows.Next() {
+		var entry AuditLogEntry
+		var metaJSON []byte
+		if err := rows.Scan(
+			&entry.ID, &entry.UserID, &entry.UserEmail, &entry.Action,
+			&entry.ResourceType, &entry.ResourceID,
+			&metaJSON, &entry.IPAddress, &entry.CreatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan activity: %w", err)
+		}
+		if metaJSON != nil {
+			json.Unmarshal(metaJSON, &entry.Metadata)
+		}
+		logs = append(logs, entry)
+	}
+
+	return logs, total, nil
+}
+
+func (r *Repository) ListFiles(ctx context.Context, limit, offset int, search, userID, mimeFilter string) ([]AdminFileResponse, int64, error) {
+	var total int64
+	countQuery := `SELECT COUNT(*) FROM files f JOIN users u ON u.id = f.user_id WHERE 1=1`
+	var countArgs []any
+	argIdx := 1
+
+	if search != "" {
+		countQuery += fmt.Sprintf(` AND f.name ILIKE $%d`, argIdx)
+		countArgs = append(countArgs, "%"+search+"%")
+		argIdx++
+	}
+	if userID != "" {
+		countQuery += fmt.Sprintf(` AND f.user_id = $%d`, argIdx)
+		countArgs = append(countArgs, userID)
+		argIdx++
+	}
+	if mimeFilter != "" {
+		countQuery += fmt.Sprintf(` AND f.mime_type LIKE $%d`, argIdx)
+		countArgs = append(countArgs, mimeFilter+"%")
+		argIdx++
+	}
+
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count files: %w", err)
+	}
+
+	query := `
+		SELECT f.id, f.user_id, u.email, f.name, f.mime_type, f.size, f.folder_id, f.trashed_at, f.created_at
+		FROM files f
+		JOIN users u ON u.id = f.user_id
+		WHERE 1=1`
+	args := make([]any, 0)
+	argIdx = 1
+
+	if search != "" {
+		query += fmt.Sprintf(` AND f.name ILIKE $%d`, argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	if userID != "" {
+		query += fmt.Sprintf(` AND f.user_id = $%d`, argIdx)
+		args = append(args, userID)
+		argIdx++
+	}
+	if mimeFilter != "" {
+		query += fmt.Sprintf(` AND f.mime_type LIKE $%d`, argIdx)
+		args = append(args, mimeFilter+"%")
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` ORDER BY f.created_at DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []AdminFileResponse
+	for rows.Next() {
+		var f AdminFileResponse
+		if err := rows.Scan(&f.ID, &f.UserID, &f.UserEmail, &f.Name, &f.MimeType, &f.Size, &f.FolderID, &f.TrashedAt, &f.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan file: %w", err)
+		}
+		files = append(files, f)
+	}
+
+	return files, total, nil
+}
+
+func (r *Repository) AdminDeleteFile(ctx context.Context, fileID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM files WHERE id = $1`, fileID)
+	if err != nil {
+		return fmt.Errorf("delete file: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetSettings(ctx context.Context) (*PlatformSettings, error) {
+	settings := &PlatformSettings{
+		DefaultStorageLimitFree:    5 * 1024 * 1024 * 1024,
+		DefaultStorageLimitPro:     50 * 1024 * 1024 * 1024,
+		DefaultStorageLimitPremium: 200 * 1024 * 1024 * 1024,
+		MaxUploadSizeMB:            500,
+		MaintenanceMode:            false,
+		RequireApproval:            false,
+		AllowRegistration:          true,
+	}
+
+	rows, err := r.db.Query(ctx, `SELECT key, value FROM platform_settings`)
+	if err != nil {
+		// Table may not exist yet, return defaults
+		return settings, nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			continue
+		}
+		switch key {
+		case "default_storage_limit_free":
+			fmt.Sscanf(value, "%d", &settings.DefaultStorageLimitFree)
+		case "default_storage_limit_pro":
+			fmt.Sscanf(value, "%d", &settings.DefaultStorageLimitPro)
+		case "default_storage_limit_premium":
+			fmt.Sscanf(value, "%d", &settings.DefaultStorageLimitPremium)
+		case "max_upload_size_mb":
+			fmt.Sscanf(value, "%d", &settings.MaxUploadSizeMB)
+		case "maintenance_mode":
+			settings.MaintenanceMode = value == "true"
+		case "require_approval":
+			settings.RequireApproval = value == "true"
+		case "allow_registration":
+			settings.AllowRegistration = value == "true"
+		}
+	}
+
+	return settings, nil
+}
+
+func (r *Repository) UpdateSettings(ctx context.Context, settings *PlatformSettings) error {
+	pairs := map[string]string{
+		"default_storage_limit_free":    fmt.Sprintf("%d", settings.DefaultStorageLimitFree),
+		"default_storage_limit_pro":     fmt.Sprintf("%d", settings.DefaultStorageLimitPro),
+		"default_storage_limit_premium": fmt.Sprintf("%d", settings.DefaultStorageLimitPremium),
+		"max_upload_size_mb":            fmt.Sprintf("%d", settings.MaxUploadSizeMB),
+		"maintenance_mode":              fmt.Sprintf("%v", settings.MaintenanceMode),
+		"require_approval":              fmt.Sprintf("%v", settings.RequireApproval),
+		"allow_registration":            fmt.Sprintf("%v", settings.AllowRegistration),
+	}
+
+	for key, value := range pairs {
+		_, err := r.db.Exec(ctx, `
+			INSERT INTO platform_settings (key, value) VALUES ($1, $2)
+			ON CONFLICT (key) DO UPDATE SET value = $2`, key, value)
+		if err != nil {
+			return fmt.Errorf("update setting %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
+func (r *Repository) GetSignupTrends(ctx context.Context, days int) ([]DailySignupStats, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT date_trunc('day', created_at)::date::text as day, COUNT(*) as count
+		FROM users
+		WHERE created_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+		GROUP BY day
+		ORDER BY day`, days)
+	if err != nil {
+		return nil, fmt.Errorf("signup trends: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []DailySignupStats
+	for rows.Next() {
+		var s DailySignupStats
+		if err := rows.Scan(&s.Date, &s.Count); err != nil {
+			return nil, fmt.Errorf("scan signup stat: %w", err)
+		}
+		stats = append(stats, s)
+	}
+	return stats, nil
+}

@@ -38,6 +38,13 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/pending-registrations", h.PendingRegistrations)
 	r.Post("/users/{id}/approve", h.ApproveUser)
 	r.Post("/users/{id}/reject", h.RejectUser)
+	r.Post("/users/bulk", h.BulkUserAction)
+	r.Get("/users/{id}/activity", h.UserActivity)
+	r.Get("/files", h.ListFiles)
+	r.Delete("/files/{id}", h.DeleteFile)
+	r.Get("/settings", h.GetSettings)
+	r.Put("/settings", h.UpdateSettings)
+	r.Get("/signup-trends", h.SignupTrends)
 
 	return r
 }
@@ -280,6 +287,129 @@ func (h *Handler) UploadTrends(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("failed to get upload trends", "error", err)
 		common.JSONError(w, common.ErrInternal("failed to get upload trends"))
+		return
+	}
+	common.JSON(w, http.StatusOK, stats)
+}
+
+func (h *Handler) BulkUserAction(w http.ResponseWriter, r *http.Request) {
+	var req BulkUserActionRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	affected, err := h.repo.BulkUpdateUsers(r.Context(), req.UserIDs, req.Action, req.Plan)
+	if err != nil {
+		slog.Error("failed to bulk update users", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to bulk update users"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{"message": "bulk action completed", "affected": affected})
+}
+
+func (h *Handler) UserActivity(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid user id"))
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	logs, total, err := h.repo.GetUserActivity(r.Context(), id, limit, offset)
+	if err != nil {
+		slog.Error("failed to get user activity", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get user activity"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{"logs": logs, "total": total, "limit": limit, "offset": offset})
+}
+
+func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+	search := r.URL.Query().Get("search")
+	userID := r.URL.Query().Get("user_id")
+	mimeFilter := r.URL.Query().Get("mime")
+
+	files, total, err := h.repo.ListFiles(r.Context(), limit, offset, search, userID, mimeFilter)
+	if err != nil {
+		slog.Error("failed to list files", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to list files"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{"files": files, "total": total, "limit": limit, "offset": offset})
+}
+
+func (h *Handler) DeleteFile(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	if err := h.repo.AdminDeleteFile(r.Context(), id); err != nil {
+		slog.Error("failed to delete file", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to delete file"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "file deleted"})
+}
+
+func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.repo.GetSettings(r.Context())
+	if err != nil {
+		slog.Error("failed to get settings", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get settings"))
+		return
+	}
+	common.JSON(w, http.StatusOK, settings)
+}
+
+func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	var settings PlatformSettings
+	if err := common.DecodeAndValidate(r, &settings); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	if err := h.repo.UpdateSettings(r.Context(), &settings); err != nil {
+		slog.Error("failed to update settings", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to update settings"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, settings)
+}
+
+func (h *Handler) SignupTrends(w http.ResponseWriter, r *http.Request) {
+	days, _ := strconv.Atoi(r.URL.Query().Get("days"))
+	if days <= 0 || days > 90 {
+		days = 30
+	}
+
+	stats, err := h.repo.GetSignupTrends(r.Context(), days)
+	if err != nil {
+		slog.Error("failed to get signup trends", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get signup trends"))
 		return
 	}
 	common.JSON(w, http.StatusOK, stats)
