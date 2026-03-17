@@ -1,8 +1,10 @@
 package com.bytebox.app.navigation
 
 sealed class Screen(val route: String) {
+    data object Onboarding : Screen("onboarding")
     data object Login : Screen("login")
     data object Register : Screen("register")
+    data object Dashboard : Screen("dashboard")
     data object Files : Screen("files")
     data object Upload : Screen("upload?folderId={folderId}") {
         fun createRoute(folderId: String?) =
@@ -15,6 +17,8 @@ sealed class Screen(val route: String) {
     }
     data object Shares : Screen("shares")
     data object Settings : Screen("settings")
+    data object Profile : Screen("profile")
+    data object StorageAnalytics : Screen("storage_analytics")
     data object Trash : Screen("trash")
     data object ShareView : Screen("share_view/{code}") {
         fun createRoute(code: String) = "share_view/$code"

@@ -20,9 +20,11 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
@@ -33,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,11 +62,15 @@ import com.bytebox.app.BuildConfig
 import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.feature.auth.presentation.login.LoginScreen
+import com.bytebox.feature.auth.presentation.onboarding.OnboardingScreen
 import com.bytebox.feature.auth.presentation.register.RegisterScreen
+import com.bytebox.feature.dashboard.presentation.DashboardScreen
 import com.bytebox.feature.download.presentation.DownloadScreen
 import com.bytebox.feature.files.presentation.FileListScreen
 import com.bytebox.feature.preview.presentation.PreviewScreen
+import com.bytebox.feature.settings.presentation.ProfileScreen
 import com.bytebox.feature.settings.presentation.SettingsScreen
+import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
@@ -89,11 +96,12 @@ fun ByteBoxNavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Simplified 3-tab navigation
+    // 4-tab navigation: Home, Files, Shares, Profile
     val bottomNavItems = listOf(
+        BottomNavItem("Home", { Icon(Icons.Default.Home, "Home") }, Screen.Dashboard.route),
         BottomNavItem("Files", { Icon(Icons.Default.Folder, "Files") }, Screen.Files.route),
         BottomNavItem("Shares", { Icon(Icons.Default.Link, "Shares") }, Screen.Shares.route),
-        BottomNavItem("Settings", { Icon(Icons.Default.Settings, "Settings") }, Screen.Settings.route),
+        BottomNavItem("Profile", { Icon(Icons.Default.Person, "Profile") }, Screen.Profile.route),
     )
 
     val showBottomBar = currentRoute in bottomNavItems.map { it.route }
@@ -102,7 +110,8 @@ fun ByteBoxNavHost(
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    tonalElevation = ByteBoxTheme.elevation.xs,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
                 ) {
                     bottomNavItems.forEach { item ->
                         NavigationBarItem(
@@ -112,12 +121,17 @@ fun ByteBoxNavHost(
                             onClick = {
                                 if (currentRoute != item.route) {
                                     navController.navigate(item.route) {
-                                        popUpTo(Screen.Files.route) { saveState = true }
+                                        popUpTo(Screen.Dashboard.route) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
                                     }
                                 }
                             },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            ),
                         )
                     }
                 }
@@ -153,10 +167,25 @@ fun ByteBoxNavHost(
                 ) + fadeOut(animationSpec = tween(250))
             },
         ) {
+            composable(Screen.Onboarding.route) {
+                OnboardingScreen(
+                    onGetStarted = {
+                        navController.navigate(Screen.Register.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    },
+                    onSignIn = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
             composable(Screen.Login.route) {
                 LoginScreen(
                     onLoginSuccess = {
-                        navController.navigate(Screen.Files.route) {
+                        navController.navigate(Screen.Dashboard.route) {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
@@ -170,11 +199,28 @@ fun ByteBoxNavHost(
             composable(Screen.Register.route) {
                 RegisterScreen(
                     onRegisterSuccess = {
-                        navController.navigate(Screen.Files.route) {
+                        navController.navigate(Screen.Dashboard.route) {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
                     onNavigateBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Screen.Dashboard.route) {
+                DashboardScreen(
+                    onFolderClick = { folderId ->
+                        navController.navigate(Screen.Files.route)
+                    },
+                    onFileClick = { fileId, mimeType ->
+                        navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
+                    },
+                    onUploadClick = {
+                        navController.navigate(Screen.Upload.createRoute(null))
+                    },
+                    onSeeAllFolders = {
+                        navController.navigate(Screen.Files.route)
+                    },
                 )
             }
 
@@ -241,6 +287,40 @@ fun ByteBoxNavHost(
                 )
             }
 
+            composable(Screen.Profile.route) {
+                val activity = LocalContext.current as? android.app.Activity
+                ProfileScreen(
+                    onNavigateToDashboard = {
+                        navController.navigate(Screen.Dashboard.route) {
+                            popUpTo(Screen.Dashboard.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateToStorage = {
+                        navController.navigate(Screen.StorageAnalytics.route)
+                    },
+                    onNavigateToShares = {
+                        navController.navigate(Screen.Shares.route) {
+                            popUpTo(Screen.Dashboard.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onNavigateToTrash = {
+                        navController.navigate(Screen.Trash.route)
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route)
+                    },
+                    onLoggedOut = {
+                        activity?.let {
+                            val intent = it.intent
+                            it.finish()
+                            it.startActivity(intent)
+                        }
+                    },
+                )
+            }
+
             composable(Screen.Settings.route) {
                 val activity = LocalContext.current as? android.app.Activity
                 SettingsScreen(
@@ -252,6 +332,12 @@ fun ByteBoxNavHost(
                             it.startActivity(intent)
                         }
                     },
+                )
+            }
+
+            composable(Screen.StorageAnalytics.route) {
+                StorageAnalyticsScreen(
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
 
@@ -290,7 +376,7 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
 
     LaunchedEffect(code) {
         try {
-            val resp = java.net.URL("http://192.168.1.4:8080/api/v1/s/$code").openConnection() as java.net.HttpURLConnection
+            val resp = java.net.URL("https://bytebox.com/api/v1/s/$code").openConnection() as java.net.HttpURLConnection
             resp.setRequestProperty("Accept", "application/json")
             if (resp.responseCode == 200) {
                 val json = org.json.JSONObject(resp.inputStream.bufferedReader().readText())
@@ -394,7 +480,7 @@ private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
                             onClick = {
                                 kotlinx.coroutines.MainScope().launch {
                                     try {
-                                        val conn = java.net.URL("http://192.168.1.4:8080/api/v1/s/$code/download").openConnection() as java.net.HttpURLConnection
+                                        val conn = java.net.URL("https://bytebox.com/api/v1/s/$code/download").openConnection() as java.net.HttpURLConnection
                                         conn.requestMethod = "POST"
                                         conn.setRequestProperty("Content-Type", "application/json")
                                         conn.doOutput = true

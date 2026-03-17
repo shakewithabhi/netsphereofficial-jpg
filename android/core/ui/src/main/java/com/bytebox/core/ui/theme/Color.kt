@@ -2,7 +2,20 @@ package com.bytebox.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary - Indigo
+// Primary - Blue (main brand color)
+val Blue50 = Color(0xFFEFF6FF)
+val Blue100 = Color(0xFFDBEAFE)
+val Blue200 = Color(0xFFBFDBFE)
+val Blue300 = Color(0xFF93C5FD)
+val Blue400 = Color(0xFF60A5FA)
+val Blue500 = Color(0xFF3B82F6)
+val Blue600 = Color(0xFF2563EB)
+val Blue700 = Color(0xFF1D4ED8)
+val Blue800 = Color(0xFF1E40AF)
+val Blue900 = Color(0xFF1E3A8A)
+val Blue950 = Color(0xFF172554)
+
+// Legacy - Indigo (kept for compatibility)
 val Indigo50 = Color(0xFFEEF2FF)
 val Indigo100 = Color(0xFFE0E7FF)
 val Indigo200 = Color(0xFFC7D2FE)
@@ -67,10 +80,25 @@ val Amber600 = Color(0xFFD97706)
 val Amber900 = Color(0xFF78350F)
 val Amber950 = Color(0xFF451A03)
 
-// Info - Blue
-val Blue400 = Color(0xFF60A5FA)
-val Blue500 = Color(0xFF3B82F6)
-val Blue600 = Color(0xFF2563EB)
+// Folder accent colors
+val FolderBlue = Color(0xFF3B82F6)
+val FolderPurple = Color(0xFF8B5CF6)
+val FolderPink = Color(0xFFEC4899)
+val FolderOrange = Color(0xFFF97316)
+val FolderGreen = Color(0xFF22C55E)
+val FolderYellow = Color(0xFFEAB308)
+val FolderRed = Color(0xFFEF4444)
+val FolderTeal = Color(0xFF14B8A6)
+
+// Folder accent backgrounds (light tints)
+val FolderBlueBg = Color(0xFFEFF6FF)
+val FolderPurpleBg = Color(0xFFF5F3FF)
+val FolderPinkBg = Color(0xFFFDF2F8)
+val FolderOrangeBg = Color(0xFFFFF7ED)
+val FolderGreenBg = Color(0xFFF0FDF4)
+val FolderYellowBg = Color(0xFFFEFCE8)
+val FolderRedBg = Color(0xFFFEF2F2)
+val FolderTealBg = Color(0xFFF0FDFA)
 
 // File type colors
 val FileImageColor = Color(0xFF10B981)   // Emerald

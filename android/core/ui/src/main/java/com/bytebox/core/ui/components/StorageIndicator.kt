@@ -29,8 +29,8 @@ import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.core.ui.theme.Green500
 import com.bytebox.core.ui.theme.Amber500
 import com.bytebox.core.ui.theme.Red500
-import com.bytebox.core.ui.theme.Indigo500
-import com.bytebox.core.ui.theme.Indigo400
+import com.bytebox.core.ui.theme.Blue500
+import com.bytebox.core.ui.theme.Blue400
 
 @Composable
 fun StorageIndicator(
@@ -54,7 +54,7 @@ fun StorageIndicator(
     val progressBrush = when {
         targetProgress > 0.9f -> Brush.horizontalGradient(listOf(Red500, Red500))
         targetProgress > 0.75f -> Brush.horizontalGradient(listOf(Amber500, Amber500))
-        else -> Brush.horizontalGradient(listOf(Indigo500, Indigo400))
+        else -> Brush.horizontalGradient(listOf(Blue500, Blue400))
     }
 
     val percentText = "${(targetProgress * 100).toInt()}%"
@@ -79,7 +79,7 @@ fun StorageIndicator(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
+                .height(10.dp)
                 .clip(RoundedCornerShape(ByteBoxTheme.radius.full))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {

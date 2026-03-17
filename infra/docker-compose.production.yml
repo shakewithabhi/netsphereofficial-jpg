@@ -1,0 +1,140 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bytebox-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-bytebox}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      POSTGRES_DB: ${DB_NAME:-bytebox}
+    volumes:
+      - bytebox-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bytebox}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bytebox-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: bytebox-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bytebox-net
+
+  minio:
+    image: minio/minio
+    container_name: bytebox-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bytebox}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD required}
+    volumes:
+      - bytebox-miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - bytebox-net
+
+  minio-init:
+    image: minio/mc
+    container_name: bytebox-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${MINIO_ROOT_USER:-bytebox} $${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing local/bytebox-files;
+      mc mb --ignore-existing local/bytebox-thumbnails;
+      mc mb --ignore-existing local/bytebox-temp;
+      echo 'Buckets created successfully';
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bytebox}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD required}
+    networks:
+      - bytebox-net
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: bytebox-api
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - bytebox-net
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: bytebox-worker
+    restart: unless-stopped
+    command: ["./worker"]
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bytebox-net
+
+  admin:
+    build:
+      context: ../admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://bytebox.com/api/v1
+    container_name: bytebox-admin
+    restart: unless-stopped
+    networks:
+      - bytebox-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: bytebox-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx-production.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - api
+      - admin
+    networks:
+      - bytebox-net
+
+volumes:
+  bytebox-pgdata:
+  bytebox-miniodata:
+
+networks:
+  bytebox-net:
+    driver: bridge

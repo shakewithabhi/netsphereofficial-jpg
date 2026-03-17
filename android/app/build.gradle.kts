@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.bytebox.app"
+    namespace = "com.bytebox.com"
     compileSdk = libs.versions.compile.sdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.bytebox.app"
+        applicationId = "com.bytebox.com"
         minSdk = libs.versions.min.sdk.get().toInt()
         targetSdk = libs.versions.target.sdk.get().toInt()
         versionCode = 1
@@ -19,13 +19,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "BASE_URL", "\"https://api.bytebox.app/api/v1/\"")
+        buildConfigField("String", "BASE_URL", "\"https://bytebox.com/api/v1/\"")
     }
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://192.168.1.4:8080/api/v1/\"")
-            buildConfigField("String", "TEST_EMAIL", "\"test@bytebox.dev\"")
+            buildConfigField("String", "BASE_URL", "\"https://bytebox.com/api/v1/\"")
+            buildConfigField("String", "TEST_EMAIL", "\"test@bytebox.com\"")
             buildConfigField("String", "TEST_PASSWORD", "\"Test@1234\"")
         }
         release {
@@ -62,6 +62,7 @@ dependencies {
     implementation(project(":core:worker"))
     implementation(project(":domain"))
     implementation(project(":feature:auth"))
+    implementation(project(":feature:dashboard"))
     implementation(project(":feature:files"))
     implementation(project(":feature:upload"))
     implementation(project(":feature:download"))

@@ -10,47 +10,48 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColorScheme = lightColorScheme(
-    primary = Indigo600,
-    onPrimary = Zinc50,
-    primaryContainer = Indigo100,
-    onPrimaryContainer = Indigo900,
+    primary = Blue500,
+    onPrimary = Color.White,
+    primaryContainer = Blue100,
+    onPrimaryContainer = Blue900,
     secondary = Slate600,
-    onSecondary = Zinc50,
+    onSecondary = Color.White,
     secondaryContainer = Slate100,
     onSecondaryContainer = Slate900,
-    tertiary = Indigo500,
-    onTertiary = Zinc50,
+    tertiary = Blue400,
+    onTertiary = Color.White,
     error = Red600,
-    onError = Zinc50,
+    onError = Color.White,
     errorContainer = Red50,
     onErrorContainer = Red900,
-    background = Zinc50,
-    onBackground = Zinc900,
-    surface = Zinc50,
-    onSurface = Zinc900,
-    surfaceVariant = Zinc100,
-    onSurfaceVariant = Zinc600,
-    outline = Zinc300,
-    outlineVariant = Zinc200,
-    inverseSurface = Zinc900,
-    inverseOnSurface = Zinc100,
-    surfaceTint = Indigo600,
+    background = Slate50,
+    onBackground = Slate900,
+    surface = Color.White,
+    onSurface = Slate900,
+    surfaceVariant = Slate100,
+    onSurfaceVariant = Slate500,
+    outline = Slate300,
+    outlineVariant = Slate200,
+    inverseSurface = Slate900,
+    inverseOnSurface = Slate100,
+    surfaceTint = Blue500,
 )
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Indigo400,
-    onPrimary = Indigo950,
-    primaryContainer = Indigo900,
-    onPrimaryContainer = Indigo100,
+    primary = Blue400,
+    onPrimary = Blue950,
+    primaryContainer = Blue900,
+    onPrimaryContainer = Blue100,
     secondary = Slate400,
     onSecondary = Slate900,
     secondaryContainer = Slate800,
     onSecondaryContainer = Slate100,
-    tertiary = Indigo300,
-    onTertiary = Indigo950,
+    tertiary = Blue300,
+    onTertiary = Blue950,
     error = Red400,
     onError = Red950,
     errorContainer = Red950,
@@ -65,13 +66,13 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = Zinc800,
     inverseSurface = Zinc100,
     inverseOnSurface = Zinc900,
-    surfaceTint = Indigo400,
+    surfaceTint = Blue400,
 )
 
 @Composable
 fun ByteBoxTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {

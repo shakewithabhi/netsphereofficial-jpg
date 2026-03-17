@@ -373,36 +373,16 @@ fun FileListScreen(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         items(uiState.folders, key = { it.id }) { folder ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
-                                        else viewModel.navigateToFolder(folder)
-                                    },
-                                shape = RoundedCornerShape(ByteBoxTheme.radius.md),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(ByteBoxTheme.spacing.md),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Folder,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(48.dp),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
-                                    Text(
-                                        text = folder.name,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
-                                    )
-                                }
-                            }
+                            val folderIndex = uiState.folders.indexOf(folder)
+                            com.bytebox.core.ui.components.ColoredFolderCard(
+                                name = folder.name,
+                                index = folderIndex,
+                                onClick = {
+                                    if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
+                                    else viewModel.navigateToFolder(folder)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                         items(uiState.files, key = { it.id }) { file ->
                             FileGridItem(

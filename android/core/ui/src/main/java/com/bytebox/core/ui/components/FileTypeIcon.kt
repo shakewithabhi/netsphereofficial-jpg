@@ -59,8 +59,8 @@ fun FileTypeIcon(
         modifier = modifier
             .size(containerSize)
             .background(
-                color = color.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(10.dp),
+                color = color.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(14.dp),
             ),
         contentAlignment = Alignment.Center,
     ) {

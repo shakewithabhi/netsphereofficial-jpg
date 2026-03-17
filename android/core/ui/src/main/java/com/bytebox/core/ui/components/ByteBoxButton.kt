@@ -40,8 +40,12 @@ fun ByteBoxButton(
             .fillMaxWidth()
             .height(52.dp),
         enabled = enabled && !isLoading,
-        shape = RoundedCornerShape(ByteBoxTheme.radius.md),
+        shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 0.dp,
+        ),
     ) {
         if (isLoading) {
             CircularProgressIndicator(
@@ -80,7 +84,7 @@ fun ByteBoxOutlinedButton(
             .fillMaxWidth()
             .height(52.dp),
         enabled = enabled,
-        shape = RoundedCornerShape(ByteBoxTheme.radius.md),
+        shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
     ) {
         if (leadingIcon != null) {

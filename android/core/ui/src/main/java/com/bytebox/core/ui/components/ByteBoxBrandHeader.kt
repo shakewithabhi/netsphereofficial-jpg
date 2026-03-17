@@ -21,6 +21,7 @@ import com.bytebox.core.ui.theme.ByteBoxTheme
 fun ByteBoxBrandHeader(
     modifier: Modifier = Modifier,
     showTagline: Boolean = true,
+    subtitle: String? = null,
     logoSize: Dp = 96.dp,
 ) {
     Column(
@@ -42,7 +43,7 @@ fun ByteBoxBrandHeader(
         if (showTagline) {
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxs))
             Text(
-                text = "Cloud Storage",
+                text = subtitle ?: "Cloud Storage",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

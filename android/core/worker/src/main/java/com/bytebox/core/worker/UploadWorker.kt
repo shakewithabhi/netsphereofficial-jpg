@@ -252,7 +252,7 @@ class UploadWorker @AssistedInject constructor(
     }
 
     private fun getBaseUrl(): String {
-        return "http://192.168.1.4:8080/api/v1/"
+        return "https://bytebox.com/api/v1/"
     }
 
     private fun createForegroundInfo(fileName: String, progress: Float): ForegroundInfo {
