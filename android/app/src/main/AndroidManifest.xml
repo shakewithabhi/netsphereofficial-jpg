@@ -35,7 +35,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="bytebox.com" android:pathPrefix="/s/" />
+                <data android:scheme="https" android:host="byteboxapp.com" android:pathPrefix="/s/" />
                 <data android:scheme="bytebox" android:host="share" />
             </intent-filter>
         </activity>

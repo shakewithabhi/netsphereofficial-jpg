@@ -43,7 +43,7 @@ $COMPOSE up -d
 echo "→ Checking health..."
 sleep 5
 
-if curl -sf https://bytebox.com/health > /dev/null 2>&1; then
+if curl -sf https://byteboxapp.com/health > /dev/null 2>&1; then
     echo "✓ Deploy successful! Server is healthy."
 elif curl -sf http://localhost/health > /dev/null 2>&1; then
     echo "✓ Deploy successful! (HTTP only)"

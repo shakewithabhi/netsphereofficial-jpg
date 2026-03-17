@@ -168,7 +168,7 @@ A cloud storage platform where users can securely store, organize, preview, and 
 
 ### Share by Link
 1. User taps Share → POST `/api/v1/shares` with `{file_id, password?, expires_at?, max_downloads?}`
-2. Server generates unique short code, returns share URL: `https://bytebox.com/s/abc123`
+2. Server generates unique short code, returns share URL: `https://byteboxapp.com/s/abc123`
 3. Anyone with link → GET `/api/v1/shares/{code}` returns file info
 4. Download via GET `/api/v1/shares/{code}/download` (checks password, expiry, download count)
 

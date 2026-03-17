@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ByteBox Production Setup Script
-# Server: 178.156.255.1 | Domain: bytebox.com
+# Server: 178.156.255.1 | Domain: byteboxapp.com
 #
 # Usage: ssh root@178.156.255.1
 #        git clone <repo> /opt/bytebox
@@ -11,7 +11,7 @@ set -euo pipefail
 echo "========================================="
 echo "  ByteBox Production Setup"
 echo "  Server: $(hostname -I | awk '{print $1}')"
-echo "  Domain: bytebox.com"
+echo "  Domain: byteboxapp.com"
 echo "========================================="
 
 PROJECT_DIR="/opt/bytebox"
@@ -76,7 +76,7 @@ cat > "$ENV_FILE" << EOF
 
 # App
 APP_ENV=production
-APP_BASE_URL=https://bytebox.com
+APP_BASE_URL=https://byteboxapp.com
 APP_DEFAULT_QUOTA_GB=5
 APP_MAX_UPLOAD_SIZE_MB=100
 
@@ -134,7 +134,7 @@ MEILISEARCH_API_KEY=
 # Google OAuth (disabled)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URL=https://bytebox.com/auth/google/callback
+GOOGLE_REDIRECT_URL=https://byteboxapp.com/auth/google/callback
 
 # Stripe (disabled)
 STRIPE_SECRET_KEY=
@@ -150,9 +150,9 @@ echo "✓ .env.production created"
 # -------------------------------------------
 # Step 5: Get SSL certificate
 # -------------------------------------------
-if [ ! -f "/etc/letsencrypt/live/bytebox.com/fullchain.pem" ]; then
+if [ ! -f "/etc/letsencrypt/live/byteboxapp.com/fullchain.pem" ]; then
     echo ""
-    echo "→ Getting SSL certificate for bytebox.com..."
+    echo "→ Getting SSL certificate for byteboxapp.com..."
     echo "  Make sure DNS A record points to this server first!"
     echo ""
 
@@ -161,15 +161,15 @@ if [ ! -f "/etc/letsencrypt/live/bytebox.com/fullchain.pem" ]; then
         --standalone \
         --non-interactive \
         --agree-tos \
-        --email admin@bytebox.com \
-        -d bytebox.com \
-        -d www.bytebox.com \
+        --email admin@byteboxapp.com \
+        -d byteboxapp.com \
+        -d www.byteboxapp.com \
         || {
             echo ""
             echo "⚠ SSL certificate failed."
-            echo "  1. Make sure bytebox.com DNS points to $(hostname -I | awk '{print $1}')"
+            echo "  1. Make sure byteboxapp.com DNS points to $(hostname -I | awk '{print $1}')"
             echo "  2. Make sure port 80 is open"
-            echo "  3. Run: certbot certonly --standalone -d bytebox.com -d www.bytebox.com"
+            echo "  3. Run: certbot certonly --standalone -d byteboxapp.com -d www.byteboxapp.com"
             echo ""
             echo "  Continuing without SSL (HTTP only)..."
         }
@@ -218,11 +218,11 @@ echo ""
 echo "→ Running health check..."
 sleep 5
 
-if curl -sf https://bytebox.com/health 2>/dev/null; then
+if curl -sf https://byteboxapp.com/health 2>/dev/null; then
     echo ""
     echo "========================================="
     echo "  ✓ ByteBox is live!"
-    echo "  https://bytebox.com"
+    echo "  https://byteboxapp.com"
     echo "========================================="
 elif curl -sf http://localhost/health 2>/dev/null; then
     echo ""

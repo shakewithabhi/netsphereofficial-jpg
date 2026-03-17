@@ -109,7 +109,7 @@ services:
       context: ../admin
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://bytebox.com/api/v1
+        VITE_API_URL: https://byteboxapp.com/api/v1
     container_name: bytebox-admin
     restart: unless-stopped
     networks:

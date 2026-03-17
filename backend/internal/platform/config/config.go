@@ -166,7 +166,7 @@ func Load() (*Config, error) {
 		},
 		App: AppConfig{
 			Environment:      getEnv("APP_ENV", "development"),
-			BaseURL:          getEnv("APP_BASE_URL", "https://bytebox.com"),
+			BaseURL:          getEnv("APP_BASE_URL", "https://byteboxapp.com"),
 			DefaultQuotaSize: int64(getEnvInt("APP_DEFAULT_QUOTA_GB", 5)) * 1024 * 1024 * 1024,
 			MaxUploadSize:    int64(getEnvInt("APP_MAX_UPLOAD_SIZE_MB", 10)) * 1024 * 1024,
 		},

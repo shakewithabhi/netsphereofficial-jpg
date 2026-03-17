@@ -2,7 +2,7 @@
 
 ## Server Info
 - **IP:** `178.156.255.1`
-- **Domain:** `bytebox.com`
+- **Domain:** `byteboxapp.com`
 - **Deploy method:** Docker Compose (fully isolated)
 - **Storage:** MinIO (self-hosted S3)
 
@@ -11,8 +11,8 @@
 ## Pre-Deploy: DNS Setup
 Point these DNS records to the server **before** running setup:
 ```
-bytebox.com      A    178.156.255.1
-www.bytebox.com  A    178.156.255.1
+byteboxapp.com      A    178.156.255.1
+www.byteboxapp.com  A    178.156.255.1
 ```
 
 ---
@@ -36,7 +36,7 @@ The setup script automatically:
 - Installs Certbot
 - Generates all secrets (DB, Redis, MinIO, JWT, TOTP)
 - Creates `.env.production` with generated secrets
-- Gets SSL certificate for bytebox.com
+- Gets SSL certificate for byteboxapp.com
 - Builds all Docker images
 - Starts all services
 - Runs database migrations

@@ -23,7 +23,7 @@ type Service struct {
 	fileRepo   *file.Repository
 	folderRepo *folder.Repository
 	store      *storage.Client
-	baseURL    string // e.g., "https://bytebox.com"
+	baseURL    string // e.g., "https://byteboxapp.com"
 }
 
 func NewService(repo *Repository, fileRepo *file.Repository, folderRepo *folder.Repository, store *storage.Client, baseURL string) *Service {
