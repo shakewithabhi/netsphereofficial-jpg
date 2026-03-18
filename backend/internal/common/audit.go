@@ -65,4 +65,5 @@ const (
 	AuditPasswordReset          = "user.password_reset"
 	AuditAdminUserUpdate        = "admin.user.update"
 	AuditAdminUserBan           = "admin.user.ban"
+	AuditPlanChange             = "billing.plan_change"
 )

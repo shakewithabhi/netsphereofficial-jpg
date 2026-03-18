@@ -3,7 +3,7 @@ import { Card, Col, Row, Statistic, Spin, Typography } from 'antd';
 import {
   UserOutlined, FileOutlined, CloudOutlined, ShareAltOutlined,
   TeamOutlined, RiseOutlined, DeleteOutlined, UploadOutlined,
-  CommentOutlined, StarOutlined,
+  CommentOutlined, StarOutlined, BellOutlined,
 } from '@ant-design/icons';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -55,6 +55,8 @@ export default function DashboardPage() {
     { title: 'Trashed Files', value: s.trashed_files ?? 0, icon: <DeleteOutlined />, color: '#f5222d' },
     { title: 'Total Comments', value: s.total_comments ?? 0, icon: <CommentOutlined />, color: '#2f54eb' },
     { title: 'Total Stars', value: s.total_stars ?? 0, icon: <StarOutlined />, color: '#fadb14' },
+    { title: 'Notifications Sent', value: s.total_notifications ?? 0, icon: <BellOutlined />, color: '#597ef7' },
+    { title: 'Unread Notifications', value: s.unread_notifications ?? 0, icon: <BellOutlined />, color: '#ff7a45' },
   ];
 
   const signupData = signupTrends.map((d) => ({

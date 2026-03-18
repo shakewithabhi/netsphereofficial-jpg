@@ -17,8 +17,10 @@ type DashboardStats struct {
 	NewUsersToday   int64 `json:"new_users_today"`
 	TrashedFiles    int64 `json:"trashed_files"`
 	ActiveUploads   int64 `json:"active_uploads"`
-	TotalComments   int64 `json:"total_comments"`
-	TotalStars      int64 `json:"total_stars"`
+	TotalComments        int64 `json:"total_comments"`
+	TotalStars           int64 `json:"total_stars"`
+	TotalNotifications   int64 `json:"total_notifications"`
+	UnreadNotifications  int64 `json:"unread_notifications"`
 }
 
 // User management
@@ -169,6 +171,22 @@ type UpdateAdSettingsRequest struct {
 	WebAdClient      *string `json:"web_ad_client"`
 	WebBannerSlot    *string `json:"web_banner_slot"`
 	WebSidebarSlot   *string `json:"web_sidebar_slot"`
+}
+
+// Ad analytics
+
+type AdAnalytics struct {
+	TotalFreeUsers       int64       `json:"total_free_users"`
+	TotalPaidUsers       int64       `json:"total_paid_users"`
+	FreeUserPercentage   float64     `json:"free_user_percentage"`
+	PlanDistribution     []PlanCount `json:"plan_distribution"`
+	EstimatedImpressions int64       `json:"estimated_impressions"`
+	RevenueEstimate      float64     `json:"revenue_estimate"`
+}
+
+type PlanCount struct {
+	Plan  string `json:"plan"`
+	Count int64  `json:"count"`
 }
 
 // Starred files stats

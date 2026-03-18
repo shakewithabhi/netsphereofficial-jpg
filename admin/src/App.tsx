@@ -12,6 +12,7 @@ import PendingApprovalsPage from './pages/PendingApprovals';
 import SettingsPage from './pages/Settings';
 import FilesPage from './pages/Files';
 import CommentsPage from './pages/Comments';
+import AdAnalyticsPage from './pages/AdAnalytics';
 import AdSettingsPage from './pages/AdSettings';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="/audit-logs" element={<AuditLogsPage />} />
             <Route path="/pending-approvals" element={<PendingApprovalsPage />} />
             <Route path="/comments" element={<CommentsPage />} />
+            <Route path="/ad-analytics" element={<AdAnalyticsPage />} />
             <Route path="/ad-settings" element={<AdSettingsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

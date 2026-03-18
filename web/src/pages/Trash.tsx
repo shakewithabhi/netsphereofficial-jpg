@@ -144,7 +144,7 @@ export default function Trash() {
 
   return (
     <Layout onRefresh={refresh}>
-      <div className="p-6">
+      <div className="p-6 dark:bg-slate-900 min-h-full">
         <div className="flex items-center justify-between mb-6">
           <Breadcrumb crumbs={[{ label: 'Trash' }]} />
           {!isEmpty && (
@@ -155,7 +155,7 @@ export default function Trash() {
         </div>
 
         {error && (
-          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">
+          <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm">
             <span className="flex-1">{error}</span>
             <button onClick={() => setError('')}><X size={16} /></button>
           </div>
@@ -167,10 +167,10 @@ export default function Trash() {
           </div>
         ) : isEmpty ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <Trash2 size={48} className="text-slate-200 mb-4" />
-            <p className="text-slate-500 font-medium">Trash is empty</p>
-            <p className="text-sm text-slate-400 mt-1">
-              Items you delete will appear here
+            <Trash2 size={64} className="text-slate-200 dark:text-slate-700 mb-4" />
+            <p className="text-lg font-medium text-slate-600 dark:text-slate-400">Trash is empty</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+              Items you delete will appear here for 30 days
             </p>
           </div>
         ) : (
@@ -179,10 +179,10 @@ export default function Trash() {
             {folders.map((folder) => (
               <div
                 key={folder.id}
-                className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-xl group hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl group hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
               >
                 <Folder size={20} className="text-slate-400 shrink-0" />
-                <span className="flex-1 text-sm font-medium text-slate-700 truncate line-through decoration-slate-300">
+                <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-300 truncate line-through decoration-slate-300 dark:decoration-slate-600">
                   {folder.name}
                 </span>
                 <span className="text-xs text-slate-400 hidden sm:block">
@@ -192,7 +192,7 @@ export default function Trash() {
                   <button
                     onClick={() => handleRestoreFolder(folder.id)}
                     title="Restore"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-lg transition-colors"
                   >
                     <RotateCcw size={14} />
                     Restore
@@ -202,7 +202,7 @@ export default function Trash() {
                       setConfirmDelete({ type: 'folder', id: folder.id, name: folder.name })
                     }
                     title="Delete permanently"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
                   >
                     <Trash2 size={14} />
                     Delete
@@ -219,7 +219,7 @@ export default function Trash() {
               return (
                 <div
                   key={file.id}
-                  className="bg-white border border-slate-100 rounded-xl group hover:border-slate-200 hover:shadow-sm transition-all overflow-hidden"
+                  className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl group hover:border-slate-200 dark:hover:border-slate-600 hover:shadow-sm transition-all overflow-hidden"
                 >
                   <div className="flex items-start gap-3 p-4">
                     {/* Thumbnail / Icon */}
@@ -227,7 +227,7 @@ export default function Trash() {
                       {isImage && thumbUrl ? (
                         <button
                           onClick={() => handlePreview(file)}
-                          className="relative block w-14 h-14 rounded-lg overflow-hidden bg-slate-100 hover:opacity-90 transition-opacity"
+                          className="relative block w-14 h-14 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 hover:opacity-90 transition-opacity"
                         >
                           <img
                             src={thumbUrl}
@@ -239,7 +239,7 @@ export default function Trash() {
                           </div>
                         </button>
                       ) : (
-                        <div className="w-14 h-14 rounded-lg bg-slate-50 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-lg bg-slate-50 dark:bg-slate-700 flex items-center justify-center">
                           <FileIcon mimeType={file.mime_type} size={24} className="text-slate-400" />
                         </div>
                       )}
@@ -247,7 +247,7 @@ export default function Trash() {
 
                     {/* File info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{file.name}</p>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="flex items-center gap-1 text-xs text-slate-400">
                           <HardDrive size={12} />
@@ -259,7 +259,7 @@ export default function Trash() {
                             Trashed {timeAgo(file.trashed_at)}
                           </span>
                         )}
-                        <span className="text-xs text-slate-300 hidden sm:block">
+                        <span className="text-xs text-slate-300 dark:text-slate-600 hidden sm:block">
                           {file.mime_type}
                         </span>
                       </div>
@@ -271,7 +271,7 @@ export default function Trash() {
                         <button
                           onClick={() => handlePreview(file)}
                           title="Preview"
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
                         >
                           <Eye size={14} />
                           Preview
@@ -280,7 +280,7 @@ export default function Trash() {
                       <button
                         onClick={() => handleRestoreFile(file.id)}
                         title="Restore"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-lg transition-colors"
                       >
                         <RotateCcw size={14} />
                         Restore
@@ -290,7 +290,7 @@ export default function Trash() {
                           setConfirmDelete({ type: 'file', id: file.id, name: file.name })
                         }
                         title="Delete permanently"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
                       >
                         <Trash2 size={14} />
                         Delete
@@ -307,24 +307,24 @@ export default function Trash() {
       {/* Confirm delete dialog */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center shrink-0">
                   <AlertTriangle size={20} className="text-red-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-800">Delete permanently?</h3>
-                  <p className="text-sm text-slate-500 mt-0.5">This cannot be undone.</p>
+                  <h3 className="font-semibold text-slate-800 dark:text-slate-200">Delete permanently?</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">This cannot be undone.</p>
                 </div>
               </div>
-              <p className="text-sm text-slate-600 bg-slate-50 px-3 py-2 rounded-lg mb-5 truncate">
+              <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-3 py-2 rounded-lg mb-5 truncate">
                 "{confirmDelete.name}"
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setConfirmDelete(null)}
-                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                 >
                   Cancel
                 </button>
@@ -358,15 +358,15 @@ export default function Trash() {
           >
             <button
               onClick={() => setPreviewFile(null)}
-              className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
+              className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white dark:bg-slate-700 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
             >
-              <X size={16} className="text-slate-600" />
+              <X size={16} className="text-slate-600 dark:text-slate-300" />
             </button>
-            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100">
-                <p className="text-sm font-medium text-slate-700 truncate">{previewFile.name}</p>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{previewFile.name}</p>
               </div>
-              <div className="p-2 flex items-center justify-center bg-slate-50">
+              <div className="p-2 flex items-center justify-center bg-slate-50 dark:bg-slate-900">
                 <img
                   src={previewFile.url}
                   alt={previewFile.name}

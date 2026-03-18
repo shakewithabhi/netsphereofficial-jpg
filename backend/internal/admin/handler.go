@@ -53,9 +53,10 @@ func (h *Handler) Routes() chi.Router {
 	// Starred files
 	r.Get("/starred-stats", h.StarredStats)
 
-	// Ad settings
+	// Ad settings & analytics
 	r.Get("/ad-settings", h.GetAdSettings)
 	r.Put("/ad-settings", h.UpdateAdSettings)
+	r.Get("/ad-analytics", h.AdAnalytics)
 
 	return r
 }
@@ -492,6 +493,16 @@ func (h *Handler) StarredStats(w http.ResponseWriter, r *http.Request) {
 		"total_stars":  totalStars,
 		"most_starred": mostStarred,
 	})
+}
+
+func (h *Handler) AdAnalytics(w http.ResponseWriter, r *http.Request) {
+	analytics, err := h.repo.GetAdAnalytics(r.Context())
+	if err != nil {
+		slog.Error("failed to get ad analytics", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get ad analytics"))
+		return
+	}
+	common.JSON(w, http.StatusOK, analytics)
 }
 
 func (h *Handler) GetAdSettings(w http.ResponseWriter, r *http.Request) {

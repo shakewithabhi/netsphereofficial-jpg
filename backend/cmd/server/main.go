@@ -23,6 +23,7 @@ import (
 	"github.com/bytebox/backend/internal/file"
 	"github.com/bytebox/backend/internal/folder"
 	"github.com/bytebox/backend/internal/media"
+	"github.com/bytebox/backend/internal/notification"
 	"github.com/bytebox/backend/internal/platform/cache"
 	"github.com/bytebox/backend/internal/platform/config"
 	"github.com/bytebox/backend/internal/platform/database"
@@ -147,6 +148,18 @@ func main() {
 	batchService := batch.NewService(fileRepo, folderRepo, fileService, folderService, store)
 	batchHandler := batch.NewHandler(batchService)
 
+	// Notification module
+	notifRepo := notification.NewRepository(db)
+	notifService := notification.NewService(notifRepo)
+	notifHandler := notification.NewHandler(notifService)
+
+	// Inject notification service into file service
+	fileService.SetNotificationService(notifService)
+
+	// Inject notification service into billing service
+	billingService.SetNotificationService(notifService)
+	billingService.SetAuditLogger(auditLogger)
+
 	// Admin module
 	adminRepo := admin.NewRepository(db)
 	adminHandler := admin.NewHandler(adminRepo, quotaService)
@@ -203,6 +216,26 @@ func main() {
 			if searchHandler != nil {
 				r.Mount("/search", searchHandler.Routes())
 			}
+		})
+
+		// Stricter rate limits for specific file endpoints
+		r.Group(func(r chi.Router) {
+			r.Use(authMiddleware.Authenticate)
+			// Starred: 60 req/min
+			r.With(rateLimiter.Limit(60, time.Minute, middleware.ByUserOrIP)).Get("/files/starred", fileHandler.ListStarred)
+			// Star/unstar: 30 req/min
+			r.With(rateLimiter.Limit(30, time.Minute, middleware.ByUserOrIP)).Post("/files/{id}/star", fileHandler.Star)
+			r.With(rateLimiter.Limit(30, time.Minute, middleware.ByUserOrIP)).Delete("/files/{id}/star", fileHandler.Unstar)
+			// Comments: 30 req/min
+			r.With(rateLimiter.Limit(30, time.Minute, middleware.ByUserOrIP)).Get("/files/{id}/comments", fileHandler.ListComments)
+			r.With(rateLimiter.Limit(30, time.Minute, middleware.ByUserOrIP)).Post("/files/{id}/comments", fileHandler.CreateComment)
+		})
+
+		// Notification routes: 60 req/min by user
+		r.Group(func(r chi.Router) {
+			r.Use(authMiddleware.Authenticate)
+			r.Use(rateLimiter.Limit(60, time.Minute, middleware.ByUserOrIP))
+			r.Mount("/notifications", notifHandler.Routes())
 		})
 
 		// Upload routes: 10 req/min by user

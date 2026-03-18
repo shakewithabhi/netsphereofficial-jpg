@@ -12,11 +12,14 @@ import {
   X,
   ChevronRight,
   Menu,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import { UploadModal } from './UploadModal';
 import { SidebarAd } from './AdBanner';
+import { useTheme } from '../hooks/useTheme';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,6 +31,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isDark, toggle: toggleTheme } = useTheme();
   const [showUpload, setShowUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -148,7 +152,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-col lg:shrink-0">
         {sidebar}
@@ -170,9 +174,9 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="bg-white border-b border-slate-100 px-4 lg:px-6 py-3 flex items-center gap-3 shrink-0">
+        <header className="bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 px-4 lg:px-6 py-3 flex items-center gap-3 shrink-0">
           <button
-            className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu size={20} />
@@ -190,7 +194,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search files and folders..."
-                className="w-full pl-9 pr-8 py-2 bg-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-colors placeholder:text-slate-400"
+                className="w-full pl-9 pr-8 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-600 transition-colors placeholder:text-slate-400 text-slate-800 dark:text-slate-200"
               />
               {searchQuery && (
                 <button
@@ -203,6 +207,14 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
               )}
             </div>
           </form>
+
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
 
           <button
             onClick={() => setShowUpload(true)}
@@ -240,13 +252,13 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
 export function Breadcrumb({
   crumbs,
 }: {
-  crumbs: { label: string; to?: string }[];
+  crumbs: { label: string; to?: string; id?: string }[];
 }) {
   return (
-    <nav className="flex items-center gap-1 text-sm text-slate-500">
+    <nav className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
       {crumbs.map((crumb, i) => (
         <span key={i} className="flex items-center gap-1">
-          {i > 0 && <ChevronRight size={14} className="text-slate-300" />}
+          {i > 0 && <ChevronRight size={14} className="text-slate-300 dark:text-slate-600" />}
           {crumb.to ? (
             <Link
               to={crumb.to}
@@ -255,7 +267,7 @@ export function Breadcrumb({
               {crumb.label}
             </Link>
           ) : (
-            <span className="text-slate-800 font-medium">{crumb.label}</span>
+            <span className="text-slate-800 dark:text-slate-200 font-medium">{crumb.label}</span>
           )}
         </span>
       ))}

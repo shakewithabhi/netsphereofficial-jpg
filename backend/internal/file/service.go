@@ -13,12 +13,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 
+	"html"
+
 	"github.com/bytebox/backend/internal/auth"
 	"github.com/bytebox/backend/internal/common"
 	"github.com/bytebox/backend/internal/media"
 	"github.com/bytebox/backend/internal/quota"
 	"github.com/bytebox/backend/internal/storage"
 )
+
+// NotificationSender is an interface to avoid circular imports with the notification package.
+type NotificationSender interface {
+	NotifyNewComment(ctx context.Context, ownerID uuid.UUID, fileName, commenterEmail, commentContent string)
+}
 
 type Service struct {
 	repo          *Repository
@@ -27,6 +34,12 @@ type Service struct {
 	quota         *quota.Service
 	queue         *asynq.Client
 	maxUploadSize int64
+	notifier      NotificationSender
+}
+
+// SetNotificationService injects the notification service after construction to avoid circular dependencies.
+func (s *Service) SetNotificationService(n NotificationSender) {
+	s.notifier = n
 }
 
 func NewService(repo *Repository, store *storage.Client, stream *storage.StreamClient, quotaSvc *quota.Service, queue *asynq.Client, maxUploadSize int64) *Service {
@@ -699,10 +712,16 @@ func (s *Service) CreateComment(ctx context.Context, claims *auth.TokenClaims, f
 		return nil, common.ErrNotFound("file not found")
 	}
 
+	// Sanitize comment content: strip HTML and trim whitespace
+	sanitized := strings.TrimSpace(html.EscapeString(req.Content))
+	if sanitized == "" {
+		return nil, common.ErrBadRequest("comment content cannot be empty")
+	}
+
 	comment := &Comment{
 		FileID:  fileID,
 		UserID:  claims.UserID,
-		Content: req.Content,
+		Content: sanitized,
 	}
 
 	if err := s.repo.CreateComment(ctx, comment); err != nil {
@@ -715,6 +734,11 @@ func (s *Service) CreateComment(ctx context.Context, claims *auth.TokenClaims, f
 	if err != nil || created == nil {
 		slog.Error("failed to get created comment", "error", err)
 		return nil, common.ErrInternal("failed to get comment")
+	}
+
+	// Notify file owner about the new comment (only if commenter is not the owner)
+	if s.notifier != nil && file.UserID != claims.UserID {
+		go s.notifier.NotifyNewComment(context.Background(), file.UserID, file.Name, claims.Email, sanitized)
 	}
 
 	resp := created.ToResponse()
@@ -746,7 +770,13 @@ func (s *Service) UpdateComment(ctx context.Context, claims *auth.TokenClaims, f
 		return nil, common.ErrNotFound("file not found")
 	}
 
-	if err := s.repo.UpdateComment(ctx, commentID, claims.UserID, req.Content); err != nil {
+	// Sanitize comment content: strip HTML and trim whitespace
+	sanitized := strings.TrimSpace(html.EscapeString(req.Content))
+	if sanitized == "" {
+		return nil, common.ErrBadRequest("comment content cannot be empty")
+	}
+
+	if err := s.repo.UpdateComment(ctx, commentID, claims.UserID, sanitized); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return nil, common.ErrNotFound("comment not found")
 		}

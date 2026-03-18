@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { User, Check, X, HardDrive } from 'lucide-react';
+import { User, Check, X, HardDrive, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import client from '../api/client';
@@ -48,17 +49,17 @@ export default function Settings() {
 
   return (
     <Layout>
-      <div className="p-6 max-w-2xl">
+      <div className="p-6 max-w-2xl dark:bg-slate-900 min-h-full">
         <div className="mb-6">
           <Breadcrumb crumbs={[{ label: 'Settings' }]} />
         </div>
 
         <div className="space-y-6">
           {/* Profile section */}
-          <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-              <User size={16} className="text-slate-500" />
-              <h2 className="font-semibold text-slate-800">Profile</h2>
+          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+              <User size={16} className="text-slate-500 dark:text-slate-400" />
+              <h2 className="font-semibold text-slate-800 dark:text-slate-200">Profile</h2>
             </div>
             <div className="p-6">
               <div className="flex items-center gap-4 mb-6">
@@ -66,29 +67,29 @@ export default function Settings() {
                   {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-800">{user?.display_name}</p>
-                  <p className="text-sm text-slate-500">{user?.email}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.display_name}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{user?.email}</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                     Member since{' '}
                     {user?.created_at
                       ? new Date(user.created_at).toLocaleDateString('en-US', {
                           month: 'long',
                           year: 'numeric',
                         })
-                      : '—'}
+                      : '---'}
                   </p>
                 </div>
               </div>
 
               {success && (
-                <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-100 text-green-700 rounded-xl text-sm">
+                <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/30 border border-green-100 dark:border-green-800 text-green-700 dark:text-green-400 rounded-xl text-sm">
                   <Check size={16} />
                   {success}
                 </div>
               )}
 
               {error && (
-                <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">
+                <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm">
                   <X size={16} />
                   {error}
                 </div>
@@ -96,26 +97,26 @@ export default function Settings() {
 
               <form onSubmit={handleSave} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Display name
                   </label>
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                     Email address
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
                   />
                 </div>
 
@@ -133,18 +134,18 @@ export default function Settings() {
           </div>
 
           {/* Storage section */}
-          <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-              <HardDrive size={16} className="text-slate-500" />
-              <h2 className="font-semibold text-slate-800">Storage</h2>
+          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+              <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
+              <h2 className="font-semibold text-slate-800 dark:text-slate-200">Storage</h2>
             </div>
             <div className="p-6">
               <div className="flex items-end justify-between mb-3">
                 <div>
-                  <p className="text-2xl font-bold text-slate-800">
+                  <p className="text-2xl font-bold text-slate-800 dark:text-slate-200">
                     {formatBytes(storageUsed)}
                   </p>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     of {formatBytes(storageLimit)} used
                   </p>
                 </div>
@@ -157,7 +158,7 @@ export default function Settings() {
                 </span>
               </div>
 
-              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                 <div
                   className={`h-3 rounded-full transition-all ${
                     storagePercent > 90 ? 'bg-red-500' : 'bg-blue-600'
@@ -167,20 +168,44 @@ export default function Settings() {
               </div>
 
               {storagePercent > 80 && (
-                <p className="mt-3 text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                <p className="mt-3 text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/30 px-3 py-2 rounded-lg">
                   You're running low on storage. Consider deleting files to free up space.
                 </p>
               )}
 
               {/* Rewarded ad for free-tier users */}
               {(!user?.plan || user.plan === 'free') && (
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                  <p className="text-sm text-slate-600 mb-3">
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                     Need more space? Watch a short ad to earn extra storage.
                   </p>
                   <RewardedAdButton />
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Legal section */}
+          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+              <FileText size={16} className="text-slate-500 dark:text-slate-400" />
+              <h2 className="font-semibold text-slate-800 dark:text-slate-200">Legal</h2>
+            </div>
+            <div className="p-6 space-y-3">
+              <Link
+                to="/privacy"
+                className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors group"
+              >
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Privacy Policy</span>
+                <span className="text-xs text-slate-400 group-hover:text-blue-600 transition-colors">View</span>
+              </Link>
+              <Link
+                to="/terms"
+                className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors group"
+              >
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Terms of Service</span>
+                <span className="text-xs text-slate-400 group-hover:text-blue-600 transition-colors">View</span>
+              </Link>
             </div>
           </div>
         </div>

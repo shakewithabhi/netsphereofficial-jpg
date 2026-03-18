@@ -18,11 +18,28 @@ import (
 	"github.com/bytebox/backend/internal/common"
 )
 
+// NotificationSender is an interface to avoid circular imports with the notification package.
+type NotificationSender interface {
+	Notify(ctx context.Context, userID uuid.UUID, notifType, title, message string, data map[string]interface{}) error
+}
+
 type Service struct {
 	repo           *Repository
 	stripeKey      string
 	webhookSecret  string
 	appBaseURL     string
+	notifier       NotificationSender
+	auditLogger    *common.AuditLogger
+}
+
+// SetNotificationService injects the notification service after construction.
+func (s *Service) SetNotificationService(n NotificationSender) {
+	s.notifier = n
+}
+
+// SetAuditLogger injects the audit logger after construction.
+func (s *Service) SetAuditLogger(a *common.AuditLogger) {
+	s.auditLogger = a
 }
 
 func NewService(repo *Repository, stripeKey, webhookSecret, appBaseURL string) *Service {
@@ -262,6 +279,21 @@ func (s *Service) handleCheckoutCompleted(ctx context.Context, event *stripe.Eve
 		return common.ErrInternal("failed to update user plan")
 	}
 
+	// Send notification about plan change
+	if s.notifier != nil {
+		s.notifier.Notify(ctx, userID, "plan_change",
+			"Plan upgraded",
+			fmt.Sprintf("Your plan has been upgraded to %s", plan.Name),
+			map[string]interface{}{"plan": planKey},
+		)
+	}
+
+	// Audit log for plan change
+	if s.auditLogger != nil {
+		s.auditLogger.Log(ctx, &userID, common.AuditPlanChange, "subscription", nil,
+			map[string]any{"plan": planKey, "action": "checkout_completed"}, "")
+	}
+
 	slog.Info("checkout completed", "user_id", userID, "plan", planKey)
 	return nil
 }
@@ -299,8 +331,52 @@ func (s *Service) handleSubscriptionUpdated(ctx context.Context, event *stripe.E
 		return common.ErrInternal("failed to update subscription")
 	}
 
+	// Detect plan upgrade/downgrade from Stripe items
+	if items, ok := event.Data.Object["items"].(map[string]interface{}); ok {
+		if data, ok := items["data"].([]interface{}); ok && len(data) > 0 {
+			if item, ok := data[0].(map[string]interface{}); ok {
+				if price, ok := item["price"].(map[string]interface{}); ok {
+					if priceID, ok := price["id"].(string); ok {
+						newPlan := s.planKeyFromPriceID(priceID)
+						if newPlan != "" && newPlan != sub.Plan {
+							plan := GetPlan(newPlan)
+							if plan != nil {
+								if err := s.repo.UpdateSubscriptionPlan(ctx, sub.ID, newPlan, mappedStatus); err != nil {
+									slog.Error("failed to update subscription plan on update", "error", err)
+								}
+								if err := s.repo.UpdateUserPlan(ctx, sub.UserID, newPlan, plan.SoftStorageLimit); err != nil {
+									slog.Error("failed to update user plan on subscription update", "error", err)
+								}
+								if s.notifier != nil {
+									s.notifier.Notify(ctx, sub.UserID, "plan_change",
+										"Plan changed",
+										fmt.Sprintf("Your plan has been changed to %s", plan.Name),
+										map[string]interface{}{"plan": newPlan, "previous_plan": sub.Plan},
+									)
+								}
+								if s.auditLogger != nil {
+									s.auditLogger.Log(ctx, &sub.UserID, common.AuditPlanChange, "subscription", &sub.ID,
+										map[string]any{"plan": newPlan, "previous_plan": sub.Plan, "action": "subscription_updated"}, "")
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	slog.Info("subscription updated", "subscription_id", sub.ID, "status", mappedStatus)
 	return nil
+}
+
+func (s *Service) planKeyFromPriceID(priceID string) string {
+	for key, plan := range Plans {
+		if plan.StripePriceID == priceID {
+			return key
+		}
+	}
+	return ""
 }
 
 func (s *Service) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event) error {
@@ -320,6 +396,7 @@ func (s *Service) handleSubscriptionDeleted(ctx context.Context, event *stripe.E
 	}
 
 	// Downgrade to free
+	previousPlan := sub.Plan
 	freePlan := GetPlan("free")
 	if err := s.repo.UpdateSubscriptionPlan(ctx, sub.ID, "free", "cancelled"); err != nil {
 		slog.Error("failed to update subscription to free", "error", err)
@@ -327,6 +404,21 @@ func (s *Service) handleSubscriptionDeleted(ctx context.Context, event *stripe.E
 	if err := s.repo.UpdateUserPlan(ctx, sub.UserID, "free", freePlan.SoftStorageLimit); err != nil {
 		slog.Error("failed to downgrade user plan", "error", err)
 		return common.ErrInternal("failed to downgrade user plan")
+	}
+
+	// Send notification about cancellation
+	if s.notifier != nil {
+		s.notifier.Notify(ctx, sub.UserID, "plan_change",
+			"Subscription cancelled",
+			"Your subscription has been cancelled and your plan has been reverted to Free",
+			map[string]interface{}{"plan": "free", "previous_plan": previousPlan},
+		)
+	}
+
+	// Audit log for cancellation
+	if s.auditLogger != nil {
+		s.auditLogger.Log(ctx, &sub.UserID, common.AuditPlanChange, "subscription", &sub.ID,
+			map[string]any{"plan": "free", "previous_plan": previousPlan, "action": "subscription_deleted"}, "")
 	}
 
 	slog.Info("subscription deleted, downgraded to free", "user_id", sub.UserID)
@@ -353,6 +445,15 @@ func (s *Service) handlePaymentFailed(ctx context.Context, event *stripe.Event) 
 	if err := s.repo.UpdateSubscription(ctx, sub.ID, "past_due", sub.CurrentPeriodStart, sub.CurrentPeriodEnd); err != nil {
 		slog.Error("failed to mark subscription as past_due", "error", err)
 		return common.ErrInternal("failed to update subscription status")
+	}
+
+	// Notify user about payment failure
+	if s.notifier != nil {
+		s.notifier.Notify(ctx, sub.UserID, "payment_failed",
+			"Payment failed",
+			"Your subscription payment has failed. Please update your payment method to avoid service interruption.",
+			map[string]interface{}{"plan": sub.Plan},
+		)
 	}
 
 	slog.Info("subscription marked past_due due to payment failure", "subscription_id", sub.ID)

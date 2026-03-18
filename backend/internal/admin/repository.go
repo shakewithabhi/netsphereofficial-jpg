@@ -36,6 +36,8 @@ func (r *Repository) GetDashboardStats(ctx context.Context) (*DashboardStats, er
 		{`SELECT COUNT(*) FROM upload_sessions WHERE status = 'active'`, &stats.ActiveUploads},
 		{`SELECT COUNT(*) FROM file_comments`, &stats.TotalComments},
 		{`SELECT COUNT(*) FROM file_stars`, &stats.TotalStars},
+		{`SELECT COUNT(*) FROM notifications`, &stats.TotalNotifications},
+		{`SELECT COUNT(*) FROM notifications WHERE read_at IS NULL`, &stats.UnreadNotifications},
 	}
 
 	for _, q := range queries {
@@ -765,6 +767,44 @@ func (r *Repository) UpdateAdSettings(ctx context.Context, settings *AdSettings)
 		}
 	}
 	return nil
+}
+
+func (r *Repository) GetAdAnalytics(ctx context.Context) (*AdAnalytics, error) {
+	analytics := &AdAnalytics{}
+
+	rows, err := r.db.Query(ctx, `SELECT plan, COUNT(*) FROM users WHERE is_active = true GROUP BY plan ORDER BY plan`)
+	if err != nil {
+		return nil, fmt.Errorf("ad analytics plan distribution: %w", err)
+	}
+	defer rows.Close()
+
+	var totalActive int64
+	for rows.Next() {
+		var pc PlanCount
+		if err := rows.Scan(&pc.Plan, &pc.Count); err != nil {
+			return nil, fmt.Errorf("scan plan count: %w", err)
+		}
+		analytics.PlanDistribution = append(analytics.PlanDistribution, pc)
+		totalActive += pc.Count
+
+		if pc.Plan == "free" {
+			analytics.TotalFreeUsers = pc.Count
+		} else {
+			analytics.TotalPaidUsers += pc.Count
+		}
+	}
+
+	if totalActive > 0 {
+		analytics.FreeUserPercentage = float64(analytics.TotalFreeUsers) / float64(totalActive) * 100
+	}
+
+	// Estimate impressions: free_users * 10 (avg daily sessions) * 3 (avg ads per session)
+	analytics.EstimatedImpressions = analytics.TotalFreeUsers * 10 * 3
+
+	// Estimate revenue: impressions * 0.002 (avg CPM $2)
+	analytics.RevenueEstimate = float64(analytics.EstimatedImpressions) * 0.002
+
+	return analytics, nil
 }
 
 func (r *Repository) GetSignupTrends(ctx context.Context, days int) ([]DailySignupStats, error) {

@@ -178,6 +178,18 @@ export async function deleteComment(fileId: string, commentId: string): Promise<
   await client.delete(`/files/${fileId}/comments/${commentId}`);
 }
 
+export async function moveFile(id: string, folderId: string | null): Promise<void> {
+  await client.put(`/files/${id}`, { folder_id: folderId });
+}
+
+export async function batchTrash(fileIds: string[], folderIds: string[]): Promise<void> {
+  await client.post('/batch/trash', { file_ids: fileIds, folder_ids: folderIds });
+}
+
+export async function batchMove(fileIds: string[], folderIds: string[], targetFolderId: string | null): Promise<void> {
+  await client.post('/batch/move', { file_ids: fileIds, folder_ids: folderIds, folder_id: targetFolderId });
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;

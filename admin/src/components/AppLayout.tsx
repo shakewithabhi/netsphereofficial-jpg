@@ -3,6 +3,7 @@ import {
   DashboardOutlined, TeamOutlined, CloudOutlined, LogoutOutlined,
   CloudServerOutlined, AuditOutlined, CheckCircleOutlined,
   SettingOutlined, FolderOutlined, CommentOutlined, DollarOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -18,6 +19,7 @@ const menuItems = [
   { key: '/pending-approvals', icon: <CheckCircleOutlined />, label: 'Approvals' },
   { key: '/comments', icon: <CommentOutlined />, label: 'Comments' },
   { key: '/audit-logs', icon: <AuditOutlined />, label: 'Audit Logs' },
+  { key: '/ad-analytics', icon: <BarChartOutlined />, label: 'Ad Analytics' },
   { key: '/ad-settings', icon: <DollarOutlined />, label: 'Ad Settings' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ];

@@ -14,6 +14,8 @@ export interface DashboardStats {
   uploads_today: number;
   trashed_files: number;
   active_uploads: number;
+  total_notifications: number;
+  unread_notifications: number;
 }
 
 export interface AdminUser {
@@ -118,6 +120,15 @@ export interface AdminComment {
   created_at: string;
 }
 
+export interface AdAnalytics {
+  total_free_users: number;
+  total_paid_users: number;
+  free_user_percentage: number;
+  plan_distribution: { plan: string; count: number }[];
+  estimated_impressions: number;
+  revenue_estimate: number;
+}
+
 export interface AdSettings {
   ads_enabled: boolean;
   android_banner_ad_unit_id: string;
@@ -215,6 +226,10 @@ export const adminApi = {
   // Starred stats
   starredStats: () =>
     client.get<{ total_stars: number }>('/admin/starred-stats'),
+
+  // Ad analytics
+  getAdAnalytics: () =>
+    client.get<AdAnalytics>('/admin/ad-analytics'),
 
   // Ad settings
   getAdSettings: () =>
