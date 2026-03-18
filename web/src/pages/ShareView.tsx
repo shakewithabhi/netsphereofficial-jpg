@@ -1,16 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
-  Download,
   Lock,
   Eye,
   LogIn,
   UserPlus,
   Folder,
   ChevronRight,
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
   Play,
   Pause,
   Volume2,
@@ -20,6 +16,10 @@ import {
   Save,
   ArrowLeft,
   ExternalLink,
+  Clock,
+  Users,
+  Download,
+  CheckCircle,
 } from 'lucide-react';
 import { FileIcon } from '../components/FileIcon';
 import { formatBytes } from '../api/files';
@@ -32,7 +32,6 @@ import type {
 import {
   getShareInfo,
   getSharePreview,
-  getShareDownload,
   getShareFolderContents,
   saveToStorage,
 } from '../api/share';
@@ -55,10 +54,28 @@ function isMobile(): boolean {
   );
 }
 
+function isIOS(): boolean {
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 function formatTime(s: number): string {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function isLoggedIn(): boolean {
+  return !!localStorage.getItem('access_token');
+}
+
+function getDeepLink(code: string): string {
+  return `bytebox://share/${code}`;
+}
+
+function getStoreLink(): string {
+  return isIOS()
+    ? 'https://apps.apple.com/app/bytebox/id000000000'
+    : 'https://play.google.com/store/apps/details?id=com.byteboxapp';
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,7 +99,39 @@ function Logo({ isDark }: { isDark: boolean }) {
   );
 }
 
-/* ---------- Smart App Banner ---------- */
+/* ---------- Sticky Bottom App Banner (mobile) ---------- */
+
+function StickyBottomBanner({ code }: { code: string }) {
+  const deepLink = getDeepLink(code);
+  const storeLink = getStoreLink();
+
+  return (
+    <div className="fixed bottom-0 inset-x-0 z-50 bg-gradient-to-t from-slate-900 to-slate-800 border-t border-slate-700 px-4 py-3 animate-slideUp safe-bottom">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg">
+          <span className="text-white font-bold text-sm">B</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-white">Watch full video in ByteBox</p>
+          <p className="text-xs text-slate-400">Free - 10GB Storage</p>
+        </div>
+        <a
+          href={deepLink}
+          className="shrink-0 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-full transition-colors shadow-lg shadow-blue-600/30"
+          onClick={() => {
+            setTimeout(() => {
+              window.location.href = storeLink;
+            }, 1500);
+          }}
+        >
+          Open App
+        </a>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Top Smart Banner (mobile) ---------- */
 
 function SmartBanner({
   code,
@@ -91,10 +140,8 @@ function SmartBanner({
   code: string;
   onClose: () => void;
 }) {
-  const deepLink = `bytebox://share/${code}`;
-  const storeLink = /iPhone|iPad|iPod/i.test(navigator.userAgent)
-    ? 'https://apps.apple.com/app/bytebox/id000000000'
-    : 'https://play.google.com/store/apps/details?id=com.byteboxapp';
+  const deepLink = getDeepLink(code);
+  const storeLink = getStoreLink();
 
   return (
     <div className="fixed top-0 inset-x-0 z-50 bg-slate-800 border-b border-slate-700 px-4 py-2.5 flex items-center gap-3 animate-slideDown">
@@ -108,16 +155,13 @@ function SmartBanner({
         <span className="text-white font-bold text-xs">B</span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-white truncate">
-          ByteBox
-        </p>
+        <p className="text-sm font-semibold text-white truncate">ByteBox</p>
         <p className="text-xs text-slate-400">Get the ByteBox App</p>
       </div>
       <a
         href={deepLink}
         className="shrink-0 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-full transition-colors"
-        onClick={(e) => {
-          // Try deep link first, fall back to store
+        onClick={() => {
           setTimeout(() => {
             window.location.href = storeLink;
           }, 1500);
@@ -202,38 +246,66 @@ function PasswordGate({
   );
 }
 
-/* ---------- Preview Overlay ---------- */
+/* ---------- Mandatory Preview Overlay ---------- */
 
-function PreviewOverlay({ type, code }: { type: 'video' | 'audio'; code: string }) {
+function MandatoryPreviewOverlay({
+  type,
+  code,
+  loggedIn,
+}: {
+  type: 'video' | 'audio';
+  code: string;
+  loggedIn: boolean;
+}) {
+  const deepLink = getDeepLink(code);
+  const storeLink = getStoreLink();
+
   return (
-    <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-sm flex items-center justify-center animate-fadeIn">
+    <div className="absolute inset-0 z-20 bg-black/90 backdrop-blur-md flex items-center justify-center animate-fadeIn">
       <div className="text-center px-6 max-w-md">
-        <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
-          <Eye size={32} className="text-blue-400" />
+        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-600/30">
+          <Eye size={36} className="text-white" />
         </div>
-        <h3 className="text-xl font-bold text-white mb-2">
+        <h3 className="text-2xl font-bold text-white mb-3">
           Preview Ended
         </h3>
-        <p className="text-slate-400 text-sm mb-6">
+        <p className="text-slate-300 text-sm mb-8 leading-relaxed">
           Save to your ByteBox to {type === 'video' ? 'watch' : 'listen to'} the full{' '}
-          {type}.
+          {type}. It's free!
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            to="/register"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
-          >
-            <UserPlus size={16} />
-            Sign Up Free
-          </Link>
-          <Link
-            to={`/login?redirect=/s/${code}`}
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-semibold transition-colors border border-white/20"
-          >
-            <LogIn size={16} />
-            Login &amp; Save
-          </Link>
-        </div>
+
+        {/* Primary: Open in App */}
+        <a
+          href={deepLink}
+          onClick={() => {
+            setTimeout(() => {
+              window.location.href = storeLink;
+            }, 1500);
+          }}
+          className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-base font-bold transition-colors mb-3 shadow-lg shadow-blue-600/30"
+        >
+          <Smartphone size={20} />
+          Open in ByteBox App
+        </a>
+
+        {/* Secondary: Download App */}
+        <a
+          href={storeLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-sm font-semibold transition-colors border border-white/20 mb-4"
+        >
+          <Download size={16} />
+          Download ByteBox App
+        </a>
+
+        {/* Small text: Continue in Browser */}
+        <Link
+          to={`/login?redirect=/s/${code}`}
+          className="text-slate-400 hover:text-slate-300 text-xs underline underline-offset-2 transition-colors"
+        >
+          Continue in browser (login required)
+        </Link>
       </div>
     </div>
   );
@@ -319,29 +391,19 @@ function FolderBrowser({
       {!loading &&
         !error &&
         items.map((item, i) => (
-          <button
+          <div
             key={i}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b last:border-b-0 ${
+              isDark
+                ? 'border-slate-700/50 text-slate-200'
+                : 'border-slate-100 text-slate-700'
+            } ${item.is_folder ? (isDark ? 'hover:bg-slate-700/50 cursor-pointer' : 'hover:bg-slate-50 cursor-pointer') : ''}`}
             onClick={() => {
               if (item.is_folder) {
                 setPath(item.path);
-              } else {
-                // Download individual file
-                getShareDownload(code, password)
-                  .then((url) => {
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = item.name;
-                    a.target = '_blank';
-                    a.click();
-                  })
-                  .catch(() => {});
               }
+              // Non-folder items: no download for unauthenticated users
             }}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b last:border-b-0 ${
-              isDark
-                ? 'border-slate-700/50 hover:bg-slate-700/50 text-slate-200'
-                : 'border-slate-100 hover:bg-slate-50 text-slate-700'
-            }`}
           >
             {item.is_folder ? (
               <Folder size={20} className="text-blue-500 shrink-0" />
@@ -366,8 +428,35 @@ function FolderBrowser({
                 className={isDark ? 'text-slate-600' : 'text-slate-400'}
               />
             )}
-          </button>
+          </div>
         ))}
+    </div>
+  );
+}
+
+/* ---------- Expiry Warning ---------- */
+
+function ExpiryWarning({ expiresAt, isDark }: { expiresAt: string; isDark: boolean }) {
+  const expiry = new Date(expiresAt);
+  const now = new Date();
+  const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (daysLeft > 7) return null;
+
+  return (
+    <div
+      className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm mb-4 ${
+        daysLeft <= 1
+          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+      }`}
+    >
+      <Clock size={16} />
+      {daysLeft <= 0
+        ? 'This share link expires today!'
+        : daysLeft === 1
+          ? 'This share link expires tomorrow!'
+          : `This share link expires in ${daysLeft} days`}
     </div>
   );
 }
@@ -379,6 +468,7 @@ function FolderBrowser({
 export default function ShareView() {
   const { code } = useParams<{ code: string }>();
   const { isDark } = useTheme();
+  const loggedIn = isLoggedIn();
 
   // State
   const [shareInfo, setShareInfo] = useState<ShareInfo | null>(null);
@@ -404,14 +494,11 @@ export default function ShareView() {
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // Image zoom
+  // Image zoom (only for logged in)
   const [zoom, setZoom] = useState(1);
 
   // Mobile banner
-  const [showBanner, setShowBanner] = useState(isMobile());
-
-  // Download state
-  const [downloading, setDownloading] = useState(false);
+  const [showBanner] = useState(isMobile());
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -496,29 +583,48 @@ export default function ShareView() {
     };
   }, []);
 
-  /* ---------- Actions ---------- */
+  /* ---------- Enforce seek limits on video ---------- */
 
-  async function handleDownload() {
-    if (!code) return;
-    setDownloading(true);
-    try {
-      const url = await getShareDownload(code, password);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = shareInfo?.file_name || 'download';
-      a.target = '_blank';
-      a.click();
-    } catch {
-      setError('Download failed. Please try again.');
-    } finally {
-      setDownloading(false);
-    }
-  }
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !preview || preview.preview_duration_seconds <= 0) return;
+
+    const maxTime = preview.preview_duration_seconds;
+
+    const handleSeeking = () => {
+      if (video.currentTime > maxTime) {
+        video.currentTime = maxTime;
+        if (!previewEnded) {
+          setPreviewEnded(true);
+          video.pause();
+          if (timerRef.current) clearInterval(timerRef.current);
+        }
+      }
+    };
+
+    const handleTimeUpdate = () => {
+      if (video.currentTime >= maxTime && !previewEnded) {
+        video.pause();
+        video.currentTime = maxTime;
+        setPreviewEnded(true);
+        if (timerRef.current) clearInterval(timerRef.current);
+      }
+    };
+
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [preview, previewEnded]);
+
+  /* ---------- Actions ---------- */
 
   async function handleSave() {
     if (!code) return;
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!loggedIn) {
       window.location.href = `/login?redirect=/s/${code}`;
       return;
     }
@@ -570,7 +676,6 @@ export default function ShareView() {
           isDark ? 'bg-slate-900' : 'bg-slate-50'
         }`}
       >
-        {/* Header */}
         <header
           className={`flex items-center justify-between px-4 sm:px-6 py-4 border-b ${
             isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
@@ -631,11 +736,11 @@ export default function ShareView() {
     <div
       className={`min-h-screen flex flex-col ${
         isDark ? 'bg-slate-900' : 'bg-slate-50'
-      }`}
+      } ${isMobile() ? 'pb-20' : ''}`}
     >
-      {/* Mobile Smart Banner */}
+      {/* Mobile Top Smart Banner */}
       {showBanner && code && (
-        <SmartBanner code={code} onClose={() => setShowBanner(false)} />
+        <SmartBanner code={code} onClose={() => {}} />
       )}
 
       {/* Header */}
@@ -646,22 +751,34 @@ export default function ShareView() {
       >
         <Logo isDark={isDark} />
         <div className="flex items-center gap-2">
-          <Link
-            to="/login"
-            className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
-              isDark
-                ? 'text-slate-300 hover:text-white hover:bg-slate-800'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            Login
-          </Link>
-          <Link
-            to="/register"
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
-          >
-            Sign Up Free
-          </Link>
+          {!loggedIn && (
+            <>
+              <Link
+                to="/login"
+                className={`px-4 py-2 text-sm font-medium rounded-xl transition-colors ${
+                  isDark
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                Sign Up Free
+              </Link>
+            </>
+          )}
+          {loggedIn && (
+            <Link
+              to="/files"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              My Files
+            </Link>
+          )}
         </div>
       </header>
 
@@ -676,51 +793,11 @@ export default function ShareView() {
 
       {/* Main Content */}
       {shareInfo && !needsPassword && (
-        <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 animate-fadeIn">
-          {/* File Info Section */}
-          <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
-            <div
-              className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${
-                isDark ? 'bg-slate-800' : 'bg-slate-100'
-              }`}
-            >
-              {shareInfo.thumbnail_url ? (
-                <img
-                  src={shareInfo.thumbnail_url}
-                  alt=""
-                  className="w-full h-full object-cover rounded-2xl"
-                />
-              ) : (
-                <FileIcon mimeType={shareInfo.mime_type} size={32} />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1
-                className={`text-xl sm:text-2xl font-bold truncate ${
-                  isDark ? 'text-white' : 'text-slate-900'
-                }`}
-              >
-                {shareInfo.file_name}
-              </h1>
-              <div
-                className={`flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
-                }`}
-              >
-                <span>{formatBytes(shareInfo.file_size)}</span>
-                <span className="flex items-center gap-1">
-                  <Eye size={14} />
-                  Shared via ByteBox
-                </span>
-                {shareInfo.expires_at && (
-                  <span>
-                    Expires{' '}
-                    {new Date(shareInfo.expires_at).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+        <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 animate-fadeIn">
+          {/* Expiry Warning */}
+          {shareInfo.expires_at && (
+            <ExpiryWarning expiresAt={shareInfo.expires_at} isDark={isDark} />
+          )}
 
           {/* Preview Area */}
           <div
@@ -765,7 +842,6 @@ export default function ShareView() {
                   }}
                   onPause={() => setIsPlaying(false)}
                   onLoadedData={() => {
-                    // Auto-play muted
                     videoRef.current?.play().catch(() => {});
                   }}
                 />
@@ -842,9 +918,9 @@ export default function ShareView() {
                   </div>
                 )}
 
-                {/* Preview Ended Overlay */}
+                {/* MANDATORY Preview Ended Overlay -- cannot be dismissed */}
                 {previewEnded && code && (
-                  <PreviewOverlay type="video" code={code} />
+                  <MandatoryPreviewOverlay type="video" code={code} loggedIn={loggedIn} />
                 )}
               </div>
             )}
@@ -856,54 +932,72 @@ export default function ShareView() {
                   <img
                     src={preview.url}
                     alt={shareInfo.file_name}
-                    className="max-w-full max-h-full object-contain rounded-lg transition-transform"
-                    style={{ transform: `scale(${zoom})` }}
+                    className={`max-w-full max-h-full object-contain rounded-lg transition-transform ${
+                      !loggedIn ? 'blur-[2px] select-none pointer-events-none' : ''
+                    }`}
+                    style={loggedIn ? { transform: `scale(${zoom})` } : undefined}
+                    draggable={false}
+                    onContextMenu={(e) => {
+                      if (!loggedIn) e.preventDefault();
+                    }}
                   />
+                  {/* Watermark overlay for non-logged-in users */}
+                  {!loggedIn && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <p className="text-white/30 text-4xl font-bold rotate-[-30deg] select-none">
+                        ByteBox Preview
+                      </p>
+                    </div>
+                  )}
                 </div>
-                {/* Zoom controls */}
-                <div
-                  className={`flex items-center justify-center gap-2 px-4 py-3 border-t ${
-                    isDark ? 'border-slate-700' : 'border-slate-200'
-                  }`}
-                >
-                  <button
-                    onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
-                    className={`p-2 rounded-lg transition-colors ${
-                      isDark
-                        ? 'hover:bg-slate-700 text-slate-300'
-                        : 'hover:bg-slate-200 text-slate-600'
+                {/* Zoom controls -- only for logged in & saved */}
+                {loggedIn && saveSuccess && (
+                  <div
+                    className={`flex items-center justify-center gap-2 px-4 py-3 border-t ${
+                      isDark ? 'border-slate-700' : 'border-slate-200'
                     }`}
                   >
-                    <ZoomOut size={18} />
-                  </button>
-                  <span
-                    className={`text-xs w-14 text-center ${
-                      isDark ? 'text-slate-400' : 'text-slate-500'
+                    <button
+                      onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+                      className={`p-2 rounded-lg transition-colors ${
+                        isDark
+                          ? 'hover:bg-slate-700 text-slate-300'
+                          : 'hover:bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      -
+                    </button>
+                    <span
+                      className={`text-xs w-14 text-center ${
+                        isDark ? 'text-slate-400' : 'text-slate-500'
+                      }`}
+                    >
+                      {Math.round(zoom * 100)}%
+                    </span>
+                    <button
+                      onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+                      className={`p-2 rounded-lg transition-colors ${
+                        isDark
+                          ? 'hover:bg-slate-700 text-slate-300'
+                          : 'hover:bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                {/* Save prompt for images (non-saved) */}
+                {!saveSuccess && (
+                  <div
+                    className={`text-center px-4 py-3 border-t ${
+                      isDark ? 'border-slate-700' : 'border-slate-200'
                     }`}
                   >
-                    {Math.round(zoom * 100)}%
-                  </span>
-                  <button
-                    onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
-                    className={`p-2 rounded-lg transition-colors ${
-                      isDark
-                        ? 'hover:bg-slate-700 text-slate-300'
-                        : 'hover:bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    <ZoomIn size={18} />
-                  </button>
-                  <button
-                    onClick={() => setZoom(1)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      isDark
-                        ? 'hover:bg-slate-700 text-slate-300'
-                        : 'hover:bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    <RotateCw size={18} />
-                  </button>
-                </div>
+                    <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Save to view full quality image
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -957,7 +1051,7 @@ export default function ShareView() {
                 </div>
 
                 {previewEnded && code && (
-                  <PreviewOverlay type="audio" code={code} />
+                  <MandatoryPreviewOverlay type="audio" code={code} loggedIn={loggedIn} />
                 )}
               </div>
             )}
@@ -992,66 +1086,101 @@ export default function ShareView() {
                       isDark ? 'text-slate-500' : 'text-slate-400'
                     }`}
                   >
-                    Download to view this file
+                    Save to your storage to access this file
                   </p>
-                  <button
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors"
-                  >
-                    <Download size={16} />
-                    {downloading ? 'Preparing...' : 'Download File'}
-                  </button>
                 </div>
               )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            {/* Download */}
-            {!shareInfo.is_folder && (
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
-              >
-                <Download size={16} />
-                {downloading ? 'Preparing...' : 'Download'}
-              </button>
-            )}
-
-            {/* Save to My Storage */}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-sm border ${
-                saveSuccess
-                  ? 'bg-green-600 border-green-600 text-white'
-                  : isDark
-                    ? 'border-slate-600 text-slate-300 hover:bg-slate-800 hover:border-slate-500'
-                    : 'border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400'
+          {/* File Info Section */}
+          <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
+            <div
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                isDark ? 'bg-slate-800' : 'bg-slate-100'
               }`}
             >
-              <Save size={16} />
-              {saving
-                ? 'Saving...'
-                : saveSuccess
-                  ? 'Saved!'
-                  : 'Save to My Storage'}
-            </button>
-
-            {/* Open in App (mobile) */}
-            {isMobile() && code && (
-              <a
-                href={`bytebox://share/${code}`}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors shadow-sm border ${
-                  isDark
-                    ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
-                    : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+              {shareInfo.thumbnail_url ? (
+                <img
+                  src={shareInfo.thumbnail_url}
+                  alt=""
+                  className="w-full h-full object-cover rounded-2xl"
+                />
+              ) : (
+                <FileIcon mimeType={shareInfo.mime_type} size={28} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1
+                className={`text-lg sm:text-xl font-bold truncate ${
+                  isDark ? 'text-white' : 'text-slate-900'
                 }`}
               >
-                <Smartphone size={16} />
-                Open in App
+                {shareInfo.file_name}
+              </h1>
+              <div
+                className={`flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}
+              >
+                <span>{formatBytes(shareInfo.file_size)}</span>
+                <span>{shareInfo.mime_type.split('/')[1]?.toUpperCase() || 'File'}</span>
+                {shareInfo.download_count > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Users size={13} />
+                    {shareInfo.download_count} {shareInfo.download_count === 1 ? 'person has' : 'people have'} saved this file
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Primary CTA: Save to Your ByteBox */}
+          <div className="flex flex-col gap-3 mb-6">
+            {/* Save button -- PRIMARY */}
+            <button
+              onClick={handleSave}
+              disabled={saving || saveSuccess}
+              className={`w-full flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl text-base font-bold transition-all shadow-sm ${
+                saveSuccess
+                  ? 'bg-green-600 text-white shadow-green-600/20'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20 hover:shadow-blue-600/30'
+              } disabled:opacity-80`}
+            >
+              {saveSuccess ? (
+                <>
+                  <CheckCircle size={20} />
+                  Saved to Your ByteBox!
+                </>
+              ) : saving ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={20} />
+                  Save to Your ByteBox
+                </>
+              )}
+            </button>
+
+            {/* Open in App (outlined) */}
+            {code && (
+              <a
+                href={getDeepLink(code)}
+                onClick={() => {
+                  setTimeout(() => {
+                    window.location.href = getStoreLink();
+                  }, 1500);
+                }}
+                className={`w-full flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl text-sm font-semibold transition-colors border ${
+                  isDark
+                    ? 'border-slate-600 text-slate-300 hover:bg-slate-800 hover:border-slate-500'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-100 hover:border-slate-400'
+                }`}
+              >
+                <ExternalLink size={18} />
+                Open in ByteBox App
               </a>
             )}
           </div>
@@ -1066,41 +1195,101 @@ export default function ShareView() {
             <p className="text-red-500 text-sm mb-4">{error}</p>
           )}
 
-          {/* Sign up CTA card */}
+          {/* "Don't have ByteBox?" section with app store badges */}
           <div
-            className={`rounded-2xl p-6 border mb-8 ${
+            className={`rounded-2xl p-6 border mb-6 ${
               isDark
-                ? 'bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border-blue-800/50'
-                : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+                ? 'bg-slate-800/50 border-slate-700'
+                : 'bg-white border-slate-200 shadow-sm'
             }`}
           >
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex-1">
+            <h3
+              className={`font-bold text-base mb-3 text-center ${
+                isDark ? 'text-white' : 'text-slate-900'
+              }`}
+            >
+              Don't have ByteBox?
+            </h3>
+            <p
+              className={`text-sm text-center mb-5 ${
+                isDark ? 'text-slate-400' : 'text-slate-500'
+              }`}
+            >
+              Download the app to save files, stream videos, and get 10GB free storage.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <a
+                href="https://play.google.com/store/apps/details?id=com.byteboxapp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+                  <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.61 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z" />
+                </svg>
+                Google Play
+              </a>
+              <a
+                href="https://apps.apple.com/app/bytebox/id000000000"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold transition-colors"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+                  <path d="M18.71,19.5C17.88,20.74 17,21.95 15.66,21.97C14.32,22 13.89,21.18 12.37,21.18C10.84,21.18 10.37,21.95 9.1,22C7.79,22.05 6.8,20.68 5.96,19.47C4.25,16.97 2.94,12.45 4.7,9.39C5.57,7.87 7.13,6.91 8.82,6.88C10.1,6.86 11.32,7.75 12.11,7.75C12.89,7.75 14.37,6.68 15.92,6.84C16.57,6.87 18.39,7.1 19.56,8.82C19.47,8.88 17.39,10.1 17.41,12.63C17.44,15.65 20.06,16.66 20.09,16.67C20.06,16.74 19.67,18.11 18.71,19.5M13,3.5C13.73,2.67 14.94,2.04 15.94,2C16.07,3.17 15.6,4.35 14.9,5.19C14.21,6.04 13.07,6.7 11.95,6.61C11.8,5.46 12.36,4.26 13,3.5Z" />
+                </svg>
+                App Store
+              </a>
+            </div>
+          </div>
+
+          {/* Sign up CTA card (only for non-logged-in) */}
+          {!loggedIn && (
+            <div
+              className={`rounded-2xl p-6 border mb-6 ${
+                isDark
+                  ? 'bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border-blue-800/50'
+                  : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center">
                 <h3
-                  className={`font-bold text-lg ${
+                  className={`font-bold text-lg mb-2 ${
                     isDark ? 'text-white' : 'text-slate-900'
                   }`}
                 >
-                  Want to store and share your own files?
+                  Save files, watch full videos
                 </h3>
                 <p
-                  className={`text-sm mt-1 ${
+                  className={`text-sm mb-4 ${
                     isDark ? 'text-slate-400' : 'text-slate-500'
                   }`}
                 >
-                  Sign up for ByteBox and get free cloud storage with sharing,
-                  streaming, and more.
+                  Create a free ByteBox account to save this file and access it anywhere.
                 </p>
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                  <Link
+                    to="/register"
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                  >
+                    <UserPlus size={16} />
+                    Sign Up Free
+                  </Link>
+                  <Link
+                    to={`/login?redirect=/s/${code}`}
+                    className={`flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-colors border ${
+                      isDark
+                        ? 'border-slate-600 text-slate-300 hover:bg-slate-800'
+                        : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <LogIn size={16} />
+                    Login
+                  </Link>
+                </div>
               </div>
-              <Link
-                to="/register"
-                className="shrink-0 inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-colors"
-              >
-                <UserPlus size={16} />
-                Sign Up Free
-              </Link>
             </div>
-          </div>
+          )}
         </main>
       )}
 
@@ -1110,34 +1299,41 @@ export default function ShareView() {
           isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'
         }`}
       >
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="max-w-3xl mx-auto flex flex-col items-center gap-3">
           <p
-            className={`text-sm ${
-              isDark ? 'text-slate-500' : 'text-slate-400'
+            className={`text-sm font-medium ${
+              isDark ? 'text-slate-400' : 'text-slate-500'
             }`}
           >
-            Powered by{' '}
-            <a
-              href="https://byteboxapp.com"
-              className="text-blue-500 hover:text-blue-600 font-medium transition-colors"
-            >
-              ByteBox
-            </a>
+            Free &bull; 10GB Storage &bull; Available on Android & iOS
           </p>
           <div className="flex items-center gap-4">
+            <p
+              className={`text-xs ${
+                isDark ? 'text-slate-500' : 'text-slate-400'
+              }`}
+            >
+              Powered by{' '}
+              <a
+                href="https://byteboxapp.com"
+                className="text-blue-500 hover:text-blue-600 font-medium transition-colors"
+              >
+                ByteBox
+              </a>
+            </p>
             <Link
               to="/privacy"
-              className={`text-sm transition-colors ${
+              className={`text-xs transition-colors ${
                 isDark
                   ? 'text-slate-500 hover:text-slate-300'
                   : 'text-slate-400 hover:text-slate-600'
               }`}
             >
-              Privacy Policy
+              Privacy
             </Link>
             <Link
               to="/terms"
-              className={`text-sm transition-colors ${
+              className={`text-xs transition-colors ${
                 isDark
                   ? 'text-slate-500 hover:text-slate-300'
                   : 'text-slate-400 hover:text-slate-600'
@@ -1149,6 +1345,11 @@ export default function ShareView() {
         </div>
       </footer>
 
+      {/* Sticky Bottom App Banner (mobile) */}
+      {isMobile() && code && (
+        <StickyBottomBanner code={code} />
+      )}
+
       {/* Animations */}
       <style>{`
         @keyframes fadeIn {
@@ -1159,8 +1360,14 @@ export default function ShareView() {
           from { opacity: 0; transform: translateY(-100%); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(100%); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
         .animate-slideDown { animation: slideDown 0.3s ease-out; }
+        .animate-slideUp { animation: slideUp 0.3s ease-out; }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
       `}</style>
     </div>
   );

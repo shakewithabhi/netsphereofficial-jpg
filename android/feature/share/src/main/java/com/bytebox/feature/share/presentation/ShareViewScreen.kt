@@ -1,6 +1,7 @@
 package com.bytebox.feature.share.presentation
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,9 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
@@ -41,7 +41,11 @@ import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
@@ -74,16 +78,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -104,6 +113,7 @@ fun ShareViewScreen(
     onNavigateBack: () -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
+    onNavigateToFiles: (() -> Unit)? = null,
     viewModel: ShareViewViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -123,7 +133,9 @@ fun ShareViewScreen(
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
-            snackbarHostState.showSnackbar("File saved to your storage!")
+            snackbarHostState.showSnackbar("Video saved! Opening your files...")
+            delay(1500)
+            onNavigateToFiles?.invoke()
         }
     }
 
@@ -169,10 +181,11 @@ fun ShareViewScreen(
                     ShareContent(
                         code = code,
                         uiState = uiState,
-                        onDownload = { viewModel.downloadFile(code, context) },
                         onSaveToStorage = {
                             if (uiState.isLoggedIn) {
                                 viewModel.saveToStorage(code)
+                            } else {
+                                onNavigateToLogin()
                             }
                         },
                         onShare = {
@@ -272,7 +285,6 @@ private fun PasswordGate(
 private fun ShareContent(
     code: String,
     uiState: ShareViewUiState,
-    onDownload: () -> Unit,
     onSaveToStorage: () -> Unit,
     onShare: () -> Unit,
     onPreviewEnded: () -> Unit,
@@ -281,6 +293,7 @@ private fun ShareContent(
 ) {
     val shareInfo = uiState.shareInfo ?: return
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -295,14 +308,20 @@ private fun ShareContent(
                 previewDuration = uiState.previewDuration,
                 fileName = shareInfo.fileName,
                 isPreviewEnded = uiState.isPreviewEnded,
+                isLoggedIn = uiState.isLoggedIn,
                 onPreviewEnded = onPreviewEnded,
+                onSaveToStorage = onSaveToStorage,
                 onNavigateToLogin = onNavigateToLogin,
                 onNavigateToRegister = onNavigateToRegister,
             )
         }
-        // Image Preview
+        // Image Preview (lower quality / blurred for non-logged-in)
         else if (shareInfo.isImage && uiState.previewUrl != null) {
-            ImagePreviewSection(previewUrl = uiState.previewUrl)
+            ImagePreviewSection(
+                previewUrl = uiState.previewUrl,
+                isLoggedIn = uiState.isLoggedIn,
+                isSaved = uiState.isSaved,
+            )
         }
         // File icon fallback
         else {
@@ -321,6 +340,7 @@ private fun ShareContent(
         FileInfoSection(
             fileName = shareInfo.fileName,
             fileSize = shareInfo.fileSize,
+            downloadCount = uiState.downloadCount,
         )
 
         Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))
@@ -328,10 +348,8 @@ private fun ShareContent(
         // Action Buttons
         ActionButtons(
             isLoggedIn = uiState.isLoggedIn,
-            isDownloading = uiState.isDownloading,
             isSaving = uiState.isSaving,
             isSaved = uiState.isSaved,
-            onDownload = onDownload,
             onSaveToStorage = onSaveToStorage,
             onShare = onShare,
             onNavigateToLogin = onNavigateToLogin,
@@ -348,6 +366,15 @@ private fun ShareContent(
         }
 
         Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))
+
+        // Footer
+        Text(
+            "Free \u2022 10GB Storage \u2022 Available on Android & iOS",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(bottom = ByteBoxTheme.spacing.xl),
+        )
     }
 }
 
@@ -362,7 +389,9 @@ private fun VideoPreviewSection(
     previewDuration: Int,
     fileName: String,
     isPreviewEnded: Boolean,
+    isLoggedIn: Boolean,
     onPreviewEnded: () -> Unit,
+    onSaveToStorage: () -> Unit,
     onNavigateToLogin: () -> Unit,
     onNavigateToRegister: () -> Unit,
 ) {
@@ -387,12 +416,20 @@ private fun VideoPreviewSection(
     var totalDuration by remember { mutableLongStateOf(0L) }
     var showControls by remember { mutableStateOf(true) }
 
-    // Enforce preview time limit
+    // Enforce preview time limit and disable seeking past it
     LaunchedEffect(isPlaying, isPreviewEnded) {
         while (!isPreviewEnded) {
             currentPosition = exoPlayer.currentPosition
             totalDuration = exoPlayer.duration.coerceAtLeast(0L)
             isPlaying = exoPlayer.isPlaying
+
+            // Enforce seek limit: clamp to preview duration
+            if (previewDurationMs > 0 && exoPlayer.currentPosition > previewDurationMs) {
+                exoPlayer.seekTo(previewDurationMs)
+                exoPlayer.pause()
+                onPreviewEnded()
+                break
+            }
 
             if (previewDurationMs > 0 && currentPosition >= previewDurationMs) {
                 exoPlayer.pause()
@@ -427,7 +464,11 @@ private fun VideoPreviewSection(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() },
             ) {
-                showControls = !showControls
+                if (isPreviewEnded) {
+                    // Do nothing -- overlay is mandatory, cannot dismiss
+                } else {
+                    showControls = !showControls
+                }
             },
     ) {
         // Video surface
@@ -465,7 +506,7 @@ private fun VideoPreviewSection(
             }
         }
 
-        // Control overlay
+        // Control overlay (only when preview is active)
         AnimatedVisibility(
             visible = showControls && !isPreviewEnded,
             enter = fadeIn(),
@@ -495,7 +536,7 @@ private fun VideoPreviewSection(
                     )
                 }
 
-                // Bottom bar: seek + mute
+                // Bottom bar: seek (clamped to preview) + mute
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -507,7 +548,9 @@ private fun VideoPreviewSection(
                             currentPosition.toFloat() / effectiveMaxDuration.toFloat()
                         } else 0f,
                         onValueChange = { fraction ->
+                            // Clamp seeking to preview duration
                             val seekTo = (fraction * effectiveMaxDuration).toLong()
+                                .coerceAtMost(previewDurationMs)
                             exoPlayer.seekTo(seekTo)
                             currentPosition = seekTo
                         },
@@ -541,22 +584,41 @@ private fun VideoPreviewSection(
             }
         }
 
-        // Preview ended overlay
+        // MANDATORY preview ended overlay -- cannot be dismissed
         if (isPreviewEnded) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.8f)),
+                    .background(Color.Black.copy(alpha = 0.9f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(ByteBoxTheme.spacing.xl),
                 ) {
+                    // Eye icon
+                    Surface(
+                        modifier = Modifier.size(64.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Visibility,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                                tint = Color.White,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+
                     Text(
-                        "Preview ended",
+                        "Preview Ended",
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
+                        fontWeight = FontWeight.Bold,
                     )
                     Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
                     Text(
@@ -566,27 +628,42 @@ private fun VideoPreviewSection(
                         textAlign = TextAlign.Center,
                     )
                     Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xl))
-                    Button(
-                        onClick = onNavigateToRegister,
-                        modifier = Modifier.fillMaxWidth(0.7f),
-                        shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
-                    ) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
-                        Text("Sign Up Free")
-                    }
-                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
-                    OutlinedButton(
-                        onClick = onNavigateToLogin,
-                        modifier = Modifier.fillMaxWidth(0.7f),
-                        shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color.White,
-                        ),
-                    ) {
-                        Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
-                        Text("Login & Save")
+
+                    if (isLoggedIn) {
+                        // Logged in: Save to My Storage
+                        Button(
+                            onClick = onSaveToStorage,
+                            modifier = Modifier.fillMaxWidth(0.8f),
+                            shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                        ) {
+                            Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                            Text("Save to My Storage")
+                        }
+                    } else {
+                        // Not logged in: Create Account / Login
+                        Button(
+                            onClick = onNavigateToRegister,
+                            modifier = Modifier.fillMaxWidth(0.8f),
+                            shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                        ) {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                            Text("Create Account")
+                        }
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+                        OutlinedButton(
+                            onClick = onNavigateToLogin,
+                            modifier = Modifier.fillMaxWidth(0.8f),
+                            shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color.White,
+                            ),
+                        ) {
+                            Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                            Text("Login & Save")
+                        }
                     }
                 }
             }
@@ -606,28 +683,41 @@ private fun formatTime(ms: Long): String {
 // region Image Preview
 
 @Composable
-private fun ImagePreviewSection(previewUrl: String) {
+private fun ImagePreviewSection(
+    previewUrl: String,
+    isLoggedIn: Boolean,
+    isSaved: Boolean,
+) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+
+    // Only allow gestures if logged in and saved
+    val canInteract = isLoggedIn && isSaved
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(4f / 3f)
             .clip(RoundedCornerShape(0.dp))
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
-                        offsetX += pan.x
-                        offsetY += pan.y
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
+            .then(
+                if (canInteract) {
+                    Modifier.pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(1f, 5f)
+                            if (scale > 1f) {
+                                offsetX += pan.x
+                                offsetY += pan.y
+                            } else {
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                        }
                     }
+                } else {
+                    Modifier
                 }
-            },
+            ),
     ) {
         AsyncImage(
             model = previewUrl,
@@ -635,13 +725,41 @@ private fun ImagePreviewSection(previewUrl: String) {
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = scale,
-                    scaleY = scale,
-                    translationX = offsetX,
-                    translationY = offsetY,
+                .then(
+                    if (canInteract) {
+                        Modifier.graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY,
+                        )
+                    } else {
+                        // Lower quality: apply blur for non-saved users
+                        Modifier.blur(
+                            radiusX = 3.dp,
+                            radiusY = 3.dp,
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded,
+                        )
+                    }
                 ),
         )
+
+        // "Save to view full quality" overlay for non-saved users
+        if (!canInteract) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "Save to view full quality",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }
 
@@ -657,7 +775,6 @@ private fun FileIconSection(
     isVideo: Boolean,
 ) {
     if (isVideo && videoThumbnailUrl != null) {
-        // Show video thumbnail
         AsyncImage(
             model = videoThumbnailUrl,
             contentDescription = "Video thumbnail",
@@ -695,7 +812,11 @@ private fun FileIconSection(
 // region File Info
 
 @Composable
-private fun FileInfoSection(fileName: String, fileSize: Long) {
+private fun FileInfoSection(
+    fileName: String,
+    fileSize: Long,
+    downloadCount: Long,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.xl),
@@ -717,6 +838,24 @@ private fun FileInfoSection(fileName: String, fileSize: Long) {
             )
         }
 
+        if (downloadCount > 0) {
+            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.People,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "$downloadCount ${if (downloadCount == 1L) "person has" else "people have"} saved this file",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxs))
         Text(
             text = "Shared via ByteBox",
@@ -733,10 +872,8 @@ private fun FileInfoSection(fileName: String, fileSize: Long) {
 @Composable
 private fun ActionButtons(
     isLoggedIn: Boolean,
-    isDownloading: Boolean,
     isSaving: Boolean,
     isSaved: Boolean,
-    onDownload: () -> Unit,
     onSaveToStorage: () -> Unit,
     onShare: () -> Unit,
     onNavigateToLogin: () -> Unit,
@@ -748,34 +885,24 @@ private fun ActionButtons(
             .padding(horizontal = ByteBoxTheme.spacing.xl),
         verticalArrangement = Arrangement.spacedBy(ByteBoxTheme.spacing.sm),
     ) {
-        // Download button
+        // PRIMARY: Save to Your ByteBox
         ByteBoxButton(
-            text = "Download",
-            onClick = onDownload,
-            isLoading = isDownloading,
-            leadingIcon = Icons.Default.Download,
+            text = when {
+                isSaved -> "Saved to Your ByteBox!"
+                isSaving -> "Saving..."
+                else -> "Save to Your ByteBox"
+            },
+            onClick = onSaveToStorage,
+            isLoading = isSaving,
+            enabled = !isSaving && !isSaved,
+            leadingIcon = if (isSaved) Icons.Default.CheckCircle else Icons.Default.SaveAlt,
         )
 
-        // Save to My Storage button
-        if (isLoggedIn) {
-            ByteBoxOutlinedButton(
-                text = if (isSaved) "Saved to Storage" else "Save to My Storage",
-                onClick = onSaveToStorage,
-                enabled = !isSaving && !isSaved,
-                leadingIcon = if (isSaved) Icons.Default.Check else Icons.Default.SaveAlt,
-            )
-            if (isSaving) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = ByteBoxTheme.spacing.md),
-                )
-            }
-        } else {
-            ByteBoxOutlinedButton(
-                text = "Save to My Storage",
-                onClick = onNavigateToLogin,
-                leadingIcon = Icons.Default.SaveAlt,
+        if (isSaving) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = ByteBoxTheme.spacing.md),
             )
         }
 

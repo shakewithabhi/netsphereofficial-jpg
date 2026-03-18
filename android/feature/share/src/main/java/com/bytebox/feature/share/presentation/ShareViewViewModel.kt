@@ -34,8 +34,7 @@ data class ShareViewUiState(
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val saveError: String? = null,
-    val downloadUrl: String? = null,
-    val isDownloading: Boolean = false,
+    val downloadCount: Long = 0,
 )
 
 @HiltViewModel
@@ -61,12 +60,14 @@ class ShareViewViewModel @Inject constructor(
             when (val result = safeApiCall { shareApi.getShareInfo(code) }) {
                 is Result.Success -> {
                     val info = result.data
+                    val dlCount = try { info.downloadCount ?: 0L } catch (_: Exception) { 0L }
                     if (info.hasPassword) {
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
                                 shareInfo = info,
                                 needsPassword = true,
+                                downloadCount = dlCount,
                             )
                         }
                     } else {
@@ -75,6 +76,7 @@ class ShareViewViewModel @Inject constructor(
                                 isLoading = false,
                                 shareInfo = info,
                                 needsPassword = false,
+                                downloadCount = dlCount,
                             )
                         }
                         loadPreview(code, null)
@@ -135,28 +137,6 @@ class ShareViewViewModel @Inject constructor(
 
     fun onPreviewEnded() {
         _uiState.update { it.copy(isPreviewEnded = true) }
-    }
-
-    fun downloadFile(code: String, context: Context) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isDownloading = true) }
-            when (val result = safeApiCall { shareApi.getShareDownload(code, currentPassword) }) {
-                is Result.Success -> {
-                    _uiState.update { it.copy(isDownloading = false, downloadUrl = result.data.url) }
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(result.data.url))
-                    context.startActivity(intent)
-                }
-                is Result.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isDownloading = false,
-                            errorMessage = result.exception.message ?: "Download failed",
-                        )
-                    }
-                }
-                is Result.Loading -> {}
-            }
-        }
     }
 
     fun saveToStorage(code: String) {

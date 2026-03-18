@@ -15,6 +15,9 @@ export interface ShareInfo {
   thumbnail_url?: string;
   video_thumbnail_url?: string;
   expires_at?: string;
+  download_count: number;
+  video_duration_seconds?: number;
+  app_download_url: string;
 }
 
 export interface SharePreview {
@@ -29,6 +32,7 @@ export interface SharePreview {
   thumbnail_url?: string;
   hls_url?: string;
   video_thumbnail_url?: string;
+  video_duration_seconds?: number;
 }
 
 export interface ShareFolderItem {

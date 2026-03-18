@@ -72,32 +72,37 @@ type SaveToStorageRequest struct {
 }
 
 type PublicShareResponse struct {
-	ShareType         string `json:"share_type"`
-	FileName          string `json:"file_name,omitempty"`
-	FileSize          int64  `json:"file_size,omitempty"`
-	MimeType          string `json:"mime_type,omitempty"`
-	FolderName        string `json:"folder_name,omitempty"`
-	ItemCount         int    `json:"item_count,omitempty"`
-	HasPassword       bool   `json:"has_password"`
-	IsVideo           bool   `json:"is_video,omitempty"`
-	IsImage           bool   `json:"is_image,omitempty"`
-	PreviewAvailable  bool   `json:"preview_available"`
-	ThumbnailURL      string `json:"thumbnail_url,omitempty"`
-	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
+	ShareType             string     `json:"share_type"`
+	FileName              string     `json:"file_name,omitempty"`
+	FileSize              int64      `json:"file_size,omitempty"`
+	MimeType              string     `json:"mime_type,omitempty"`
+	FolderName            string     `json:"folder_name,omitempty"`
+	ItemCount             int        `json:"item_count,omitempty"`
+	HasPassword           bool       `json:"has_password"`
+	IsVideo               bool       `json:"is_video,omitempty"`
+	IsImage               bool       `json:"is_image,omitempty"`
+	PreviewAvailable      bool       `json:"preview_available"`
+	ThumbnailURL          string     `json:"thumbnail_url,omitempty"`
+	VideoThumbnailURL     string     `json:"video_thumbnail_url,omitempty"`
+	DownloadCount         int64      `json:"download_count"`
+	VideoDurationSeconds  int        `json:"video_duration_seconds,omitempty"`
+	AppDownloadURL        string     `json:"app_download_url"`
+	ExpiresAt             *time.Time `json:"expires_at,omitempty"`
 }
 
 type PreviewResponse struct {
-	URL               string `json:"url,omitempty"`
-	PreviewDuration   int    `json:"preview_duration_seconds"`
-	FileName          string `json:"file_name"`
-	FileSize          int64  `json:"file_size"`
-	MimeType          string `json:"mime_type"`
-	IsVideo           bool   `json:"is_video"`
-	IsImage           bool   `json:"is_image"`
-	RequiresLogin     bool   `json:"requires_login"`
-	ThumbnailURL      string `json:"thumbnail_url,omitempty"`
-	HLSURL            string `json:"hls_url,omitempty"`
-	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
+	URL                  string `json:"url,omitempty"`
+	PreviewDuration      int    `json:"preview_duration_seconds"`
+	FileName             string `json:"file_name"`
+	FileSize             int64  `json:"file_size"`
+	MimeType             string `json:"mime_type"`
+	IsVideo              bool   `json:"is_video"`
+	IsImage              bool   `json:"is_image"`
+	RequiresLogin        bool   `json:"requires_login"`
+	ThumbnailURL         string `json:"thumbnail_url,omitempty"`
+	HLSURL               string `json:"hls_url,omitempty"`
+	VideoThumbnailURL    string `json:"video_thumbnail_url,omitempty"`
+	VideoDurationSeconds int    `json:"video_duration_seconds,omitempty"`
 }
 
 type ShareDownloadResponse struct {

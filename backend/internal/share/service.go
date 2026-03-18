@@ -165,8 +165,11 @@ func (s *Service) GetPublicInfo(ctx context.Context, code string) (*PublicShareR
 	}
 
 	resp := &PublicShareResponse{
-		ShareType:   share.ShareType,
-		HasPassword: share.PasswordHash != "",
+		ShareType:      share.ShareType,
+		HasPassword:    share.PasswordHash != "",
+		DownloadCount:  int64(share.DownloadCount),
+		AppDownloadURL: "https://byteboxapp.com/download",
+		ExpiresAt:      share.ExpiresAt,
 	}
 
 	if share.ShareType == "file" {
@@ -345,17 +348,24 @@ func (s *Service) PreviewPublic(ctx context.Context, code, password string) (*Pr
 	}
 
 	if f.IsVideo {
-		// Short-lived presigned URL for video preview (30 seconds)
-		url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), f.StorageKey, 30*time.Second)
+		// Preview duration: 15 seconds for short videos (<5 min), 30 seconds for longer
+		previewDuration := 15
+		if f.VideoDurationSec >= 300 {
+			previewDuration = 30
+		}
+		// Short-lived presigned URL for video preview
+		presignExpiry := time.Duration(previewDuration+30) * time.Second // extra 30s buffer for loading
+		url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), f.StorageKey, presignExpiry)
 		if err != nil {
 			slog.Error("failed to generate preview URL", "error", err)
 			return nil, common.ErrInternal("failed to generate preview URL")
 		}
 		resp.URL = url
-		resp.PreviewDuration = 30
+		resp.PreviewDuration = previewDuration
+		resp.VideoDurationSeconds = f.VideoDurationSec
 		resp.HLSURL = f.HLSURL
 		resp.VideoThumbnailURL = f.VideoThumbnailURL
-		resp.RequiresLogin = false
+		resp.RequiresLogin = true
 	} else if strings.HasPrefix(f.MimeType, "image/") {
 		// Images get a 60-second presigned URL
 		url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), f.StorageKey, 60*time.Second)
@@ -452,6 +462,41 @@ func (s *Service) SaveToStorage(ctx context.Context, claims *auth.TokenClaims, c
 
 	resp := newFile.ToResponse()
 	return &resp, nil
+}
+
+// HasUserSavedFile checks whether the given user has previously saved the shared file to their storage.
+// It does this by looking for a file owned by the user that was copied from the share's source file
+// (matching name and size).
+func (s *Service) HasUserSavedFile(ctx context.Context, userID uuid.UUID, code string) (bool, error) {
+	share, err := s.repo.GetByCode(ctx, code)
+	if err != nil || share == nil {
+		return false, common.ErrNotFound("share not found")
+	}
+
+	if share.ShareType != "file" || share.FileID == nil {
+		// For folder shares, skip this check
+		return true, nil
+	}
+
+	// Get the source file to know its name and size
+	srcFile, err := s.fileRepo.GetByID(ctx, *share.FileID, share.UserID)
+	if err != nil || srcFile == nil {
+		return false, common.ErrNotFound("source file not found")
+	}
+
+	// Search the user's files for a matching name
+	results, err := s.fileRepo.Search(ctx, userID, srcFile.Name, 1)
+	if err != nil {
+		return false, nil // fail open on search error
+	}
+
+	for _, f := range results {
+		if f.Name == srcFile.Name && f.Size == srcFile.Size && f.TrashedAt == nil {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *Service) validateShare(share *Share) error {

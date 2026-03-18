@@ -153,11 +153,35 @@ func (h *Handler) GetPublicInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DownloadPublic(w http.ResponseWriter, r *http.Request) {
+	// Require authentication — anonymous downloads are not allowed
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSON(w, http.StatusUnauthorized, map[string]string{
+			"error":   "unauthorized",
+			"message": "Please login or create an account to download this file",
+		})
+		return
+	}
+
 	code := chi.URLParam(r, "code")
 
 	var req DownloadShareRequest
 	// Password is optional, so don't error on empty body
 	common.DecodeAndValidate(r, &req)
+
+	// Check if user has saved the file to their storage first
+	hasSaved, err := h.service.HasUserSavedFile(r.Context(), claims.UserID, code)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	if !hasSaved {
+		common.JSON(w, http.StatusForbidden, map[string]string{
+			"error":   "forbidden",
+			"message": "Please save this file to your storage before downloading",
+		})
+		return
+	}
 
 	// Parse optional file_id for folder shares
 	var fileID *uuid.UUID

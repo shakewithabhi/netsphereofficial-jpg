@@ -51,7 +51,11 @@ data class ShareInfoResponse(
     @Json(name = "is_folder") val isFolder: Boolean = false,
     @Json(name = "has_password") val hasPassword: Boolean = false,
     @Json(name = "preview_available") val previewAvailable: Boolean = false,
-    @Json(name = "video_thumbnail_url") val videoThumbnailUrl: String? = null
+    @Json(name = "video_thumbnail_url") val videoThumbnailUrl: String? = null,
+    @Json(name = "download_count") val downloadCount: Long? = 0L,
+    @Json(name = "video_duration_seconds") val videoDurationSeconds: Int? = null,
+    @Json(name = "app_download_url") val appDownloadUrl: String? = null,
+    @Json(name = "expires_at") val expiresAt: String? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -63,7 +67,8 @@ data class SharePreviewResponse(
     @Json(name = "mime_type") val mimeType: String,
     @Json(name = "is_video") val isVideo: Boolean = false,
     @Json(name = "is_image") val isImage: Boolean = false,
-    @Json(name = "requires_login") val requiresLogin: Boolean = true
+    @Json(name = "requires_login") val requiresLogin: Boolean = true,
+    @Json(name = "video_duration_seconds") val videoDurationSeconds: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

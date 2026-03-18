@@ -39,6 +39,7 @@ type File struct {
 	StreamStatus      string // "", "processing", "ready", "failed"
 	HLSURL            string
 	VideoThumbnailURL string
+	VideoDurationSec  int
 	TrashedAt         *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
