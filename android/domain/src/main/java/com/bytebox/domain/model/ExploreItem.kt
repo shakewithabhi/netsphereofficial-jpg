@@ -24,3 +24,42 @@ data class ExploreItem(
             else -> FileCategory.OTHER
         }
 }
+
+data class Post(
+    val id: String,
+    val userId: String,
+    val userName: String,
+    val caption: String,
+    val category: String,
+    val tags: List<String>,
+    val viewCount: Long,
+    val likeCount: Long,
+    val commentCount: Long,
+    val isLiked: Boolean,
+    val isSubscribed: Boolean,
+    val subscriberCount: Long,
+    val videoUrl: String?,
+    val thumbnailUrl: String?,
+    val hlsUrl: String?,
+    val fileName: String,
+    val mimeType: String,
+    val fileSize: Long,
+    val durationSeconds: Int,
+    val createdAt: String,
+)
+
+data class PostComment(
+    val id: String,
+    val userId: String,
+    val userName: String,
+    val content: String,
+    val createdAt: String,
+)
+
+data class CreatorProfile(
+    val userId: String,
+    val name: String,
+    val postCount: Long,
+    val subscriberCount: Long,
+    val isSubscribed: Boolean,
+)

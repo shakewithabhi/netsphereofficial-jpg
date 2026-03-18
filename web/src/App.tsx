@@ -6,6 +6,7 @@ import Files from './pages/Files';
 import Trash from './pages/Trash';
 import Favorites from './pages/Favorites';
 import Settings from './pages/Settings';
+import Explore from './pages/Explore';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import ShareView from './pages/ShareView';
@@ -93,6 +94,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Files />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/explore"
+          element={
+            <ProtectedRoute>
+              <Explore />
             </ProtectedRoute>
           }
         />

@@ -7,6 +7,7 @@ import {
   Trash2,
   Settings,
   LogOut,
+  Compass,
   Upload,
   Search,
   X,
@@ -60,6 +61,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
 
   const navItems = [
     { to: '/', label: 'Home', icon: Home },
+    { to: '/explore', label: 'Explore', icon: Compass },
     { to: '/favorites', label: 'Favorites', icon: Star },
     { to: '/trash', label: 'Trash', icon: Trash2 },
     { to: '/settings', label: 'Settings', icon: Settings },

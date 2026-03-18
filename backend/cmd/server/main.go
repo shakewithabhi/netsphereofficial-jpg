@@ -20,6 +20,7 @@ import (
 	"github.com/bytebox/backend/internal/auth"
 	"github.com/bytebox/backend/internal/common"
 	"github.com/bytebox/backend/internal/billing"
+	"github.com/bytebox/backend/internal/explore"
 	"github.com/bytebox/backend/internal/file"
 	"github.com/bytebox/backend/internal/folder"
 	"github.com/bytebox/backend/internal/media"
@@ -168,6 +169,11 @@ func main() {
 	adminRepo := admin.NewRepository(db)
 	adminHandler := admin.NewHandler(adminRepo, quotaService, rdb, store)
 
+	// Explore module
+	exploreRepo := explore.NewRepository(db)
+	exploreService := explore.NewService(exploreRepo, store)
+	exploreHandler := explore.NewHandler(exploreService)
+
 	// Rate limiter
 	rateLimiter := middleware.NewRateLimiter(rdb)
 
@@ -263,6 +269,12 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(rateLimiter.Limit(20, time.Minute, middleware.ByIP))
 			r.Mount("/billing", billingHandler.Routes())
+		})
+
+		// Explore routes: mixed rate limits (handler uses own auth groups)
+		r.Group(func(r chi.Router) {
+			r.Use(rateLimiter.Limit(60, time.Minute, middleware.ByIP))
+			r.Mount("/explore", exploreHandler.Routes(authMiddleware))
 		})
 
 		// Admin routes: 200 req/min

@@ -15,6 +15,11 @@ struct MainTabView: View {
                         Label("Home", systemImage: "house.fill")
                     }
 
+                ExploreView()
+                    .tabItem {
+                        Label("Explore", systemImage: "play.rectangle.fill")
+                    }
+
                 FavoritesView()
                     .tabItem {
                         Label("Favorites", systemImage: "star.fill")

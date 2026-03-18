@@ -28,6 +28,9 @@ sealed class Screen(val route: String) {
     data object Favorites : Screen("favorites")
     data object Notifications : Screen("notifications")
     data object Explore : Screen("explore")
+    data object Watch : Screen("watch/{postId}") {
+        fun createRoute(postId: String) = "watch/$postId"
+    }
     data object ShareView : Screen("share_view/{code}") {
         fun createRoute(code: String) = "share_view/$code"
     }

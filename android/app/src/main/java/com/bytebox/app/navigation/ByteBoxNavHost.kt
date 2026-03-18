@@ -54,6 +54,7 @@ import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
 import com.bytebox.feature.share.presentation.ShareViewScreen
 import com.bytebox.feature.explore.presentation.ExploreScreen
+import com.bytebox.feature.explore.presentation.WatchScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
 import com.bytebox.feature.files.presentation.notifications.NotificationsScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
@@ -393,8 +394,25 @@ fun ByteBoxNavHost(
 
             composable(Screen.Explore.route) {
                 ExploreScreen(
-                    onItemClick = { code ->
-                        navController.navigate(Screen.ShareView.createRoute(code))
+                    onPostClick = { postId ->
+                        navController.navigate(Screen.Watch.createRoute(postId))
+                    },
+                    onCreatePost = { /* handled via sheet inside screen or navigate */ },
+                )
+            }
+
+            composable(
+                route = Screen.Watch.route,
+                arguments = listOf(
+                    navArgument("postId") { type = NavType.StringType },
+                ),
+            ) { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId") ?: return@composable
+                WatchScreen(
+                    postId = postId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onPostClick = { newPostId ->
+                        navController.navigate(Screen.Watch.createRoute(newPostId))
                     },
                 )
             }

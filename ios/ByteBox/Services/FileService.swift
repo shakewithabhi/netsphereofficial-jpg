@@ -190,4 +190,135 @@ final class FileService {
             body: ["token": token, "platform": platform]
         )
     }
+
+    // MARK: - Explore Feed
+
+    func getExploreFeed(sort: String = "latest", category: String? = nil, tag: String? = nil, limit: Int = 20) async throws -> [Post] {
+        var queryItems = [
+            URLQueryItem(name: "sort", value: sort),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        if let category = category { queryItems.append(URLQueryItem(name: "category", value: category)) }
+        if let tag = tag { queryItems.append(URLQueryItem(name: "tag", value: tag)) }
+        let response: PostsListResponse = try await api.request("GET", path: "/explore/feed", queryItems: queryItems)
+        return response.posts
+    }
+
+    func getTrendingFeed(limit: Int = 10) async throws -> [Post] {
+        let response: PostsListResponse = try await api.request(
+            "GET", path: "/explore/trending",
+            queryItems: [URLQueryItem(name: "limit", value: "\(limit)")]
+        )
+        return response.posts
+    }
+
+    func getForYouFeed(limit: Int = 20) async throws -> [Post] {
+        let response: PostsListResponse = try await api.request(
+            "GET", path: "/explore/for-you",
+            queryItems: [URLQueryItem(name: "limit", value: "\(limit)")]
+        )
+        return response.posts
+    }
+
+    func getSubscriptionFeed(limit: Int = 20) async throws -> [Post] {
+        let response: PostsListResponse = try await api.request(
+            "GET", path: "/explore/subscriptions",
+            queryItems: [URLQueryItem(name: "limit", value: "\(limit)")]
+        )
+        return response.posts
+    }
+
+    func searchExplorePosts(query: String, limit: Int = 20) async throws -> [Post] {
+        let response: PostsListResponse = try await api.request(
+            "GET", path: "/explore/search",
+            queryItems: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "limit", value: "\(limit)")
+            ]
+        )
+        return response.posts
+    }
+
+    // MARK: - Explore Post CRUD
+
+    func createExplorePost(fileId: String, caption: String, category: String, tags: [String]) async throws -> Post {
+        return try await api.request("POST", path: "/explore/posts", body: [
+            "file_id": fileId,
+            "caption": caption,
+            "category": category,
+            "tags": tags
+        ] as [String: Any])
+    }
+
+    func getExplorePost(postId: String) async throws -> Post {
+        return try await api.request("GET", path: "/explore/posts/\(postId)")
+    }
+
+    func deleteExplorePost(postId: String) async throws {
+        let _: EmptyResponse = try await api.request("DELETE", path: "/explore/posts/\(postId)")
+    }
+
+    // MARK: - Explore Engagement
+
+    func likePost(postId: String) async throws {
+        let _: EmptyResponse = try await api.request("POST", path: "/explore/posts/\(postId)/like")
+    }
+
+    func unlikePost(postId: String) async throws {
+        let _: EmptyResponse = try await api.request("DELETE", path: "/explore/posts/\(postId)/like")
+    }
+
+    func recordPostView(postId: String, durationSeconds: Int) async throws {
+        let _: EmptyResponse = try await api.request(
+            "POST", path: "/explore/posts/\(postId)/view",
+            body: ["duration_seconds": durationSeconds]
+        )
+    }
+
+    func getRelatedPosts(postId: String) async throws -> [Post] {
+        let response: PostsListResponse = try await api.request("GET", path: "/explore/posts/\(postId)/related")
+        return response.posts
+    }
+
+    // MARK: - Explore Comments
+
+    func getPostComments(postId: String) async throws -> [PostComment] {
+        let response: PostCommentsListResponse = try await api.request("GET", path: "/explore/posts/\(postId)/comments")
+        return response.comments
+    }
+
+    func addPostComment(postId: String, content: String) async throws -> PostComment {
+        return try await api.request("POST", path: "/explore/posts/\(postId)/comments", body: ["content": content])
+    }
+
+    func deletePostComment(postId: String, commentId: String) async throws {
+        let _: EmptyResponse = try await api.request("DELETE", path: "/explore/posts/\(postId)/comments/\(commentId)")
+    }
+
+    // MARK: - Explore Subscriptions
+
+    func subscribeToCreator(userId: String) async throws {
+        let _: EmptyResponse = try await api.request("POST", path: "/explore/subscribe/\(userId)")
+    }
+
+    func unsubscribeFromCreator(userId: String) async throws {
+        let _: EmptyResponse = try await api.request("DELETE", path: "/explore/subscribe/\(userId)")
+    }
+
+    func getCreatorProfile(userId: String) async throws -> CreatorProfile {
+        return try await api.request("GET", path: "/explore/creators/\(userId)")
+    }
+
+    // MARK: - Explore History & Reporting
+
+    func getWatchHistory() async throws -> [Post] {
+        let response: PostsListResponse = try await api.request("GET", path: "/explore/history")
+        return response.posts
+    }
+
+    func reportPost(postId: String, reason: String, details: String? = nil) async throws {
+        var body: [String: Any] = ["reason": reason]
+        if let details = details { body["details"] = details }
+        let _: EmptyResponse = try await api.request("POST", path: "/explore/posts/\(postId)/report", body: body)
+    }
 }
