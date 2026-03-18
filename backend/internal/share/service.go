@@ -3,9 +3,11 @@ package share
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -295,6 +297,78 @@ func (s *Service) DownloadPublic(ctx context.Context, code, password string, fil
 		resp.IsVideo = true
 		resp.HLSURL = f.HLSURL
 		resp.VideoThumbnailURL = f.VideoThumbnailURL
+	}
+
+	return resp, nil
+}
+
+func (s *Service) GetExploreItems(ctx context.Context, limit int, cursor *string, category *string) (*ExploreListResponse, error) {
+	var cursorTime *time.Time
+	var cursorID *string
+
+	if cursor != nil && *cursor != "" {
+		// Decode cursor: "RFC3339Nano|shareID"
+		decoded, err := base64.URLEncoding.DecodeString(*cursor)
+		if err == nil {
+			parts := strings.SplitN(string(decoded), "|", 2)
+			if len(parts) == 2 {
+				t, err := time.Parse(time.RFC3339Nano, parts[0])
+				if err == nil {
+					cursorTime = &t
+					cursorID = &parts[1]
+				}
+			}
+		}
+	}
+
+	var mimePrefix *string
+	if category != nil && *category != "" {
+		p := *category + "/"
+		mimePrefix = &p
+	}
+
+	rows, err := s.repo.GetExploreItems(ctx, limit+1, cursorTime, cursorID, mimePrefix)
+	if err != nil {
+		slog.Error("failed to get explore items", "error", err)
+		return nil, common.ErrInternal("failed to load explore items")
+	}
+
+	hasMore := len(rows) > limit
+	if hasMore {
+		rows = rows[:limit]
+	}
+
+	items := make([]ExploreItem, 0, len(rows))
+	for _, row := range rows {
+		thumbnailURL := ""
+		if row.IsVideo && row.VideoThumbnailURL != "" {
+			thumbnailURL = row.VideoThumbnailURL
+		} else if row.ThumbnailKey != "" {
+			url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), row.ThumbnailKey, 24*time.Hour)
+			if err == nil {
+				thumbnailURL = url
+			}
+		}
+
+		items = append(items, ExploreItem{
+			ID:            row.ShareID,
+			Code:          row.Code,
+			FileName:      row.FileName,
+			FileSize:      row.FileSize,
+			MimeType:      row.MimeType,
+			ThumbnailURL:  thumbnailURL,
+			OwnerName:     row.OwnerName,
+			DownloadCount: row.DownloadCount,
+			CreatedAt:     row.CreatedAt,
+		})
+	}
+
+	resp := &ExploreListResponse{Items: items}
+	if hasMore && len(rows) > 0 {
+		last := rows[len(rows)-1]
+		raw := last.CreatedAt.UTC().Format(time.RFC3339Nano) + "|" + last.ShareID
+		encoded := base64.URLEncoding.EncodeToString([]byte(raw))
+		resp.NextCursor = &encoded
 	}
 
 	return resp, nil

@@ -1,19 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="100dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
 
-    <path
-        android:pathData="M18,4 L82,4 Q96,4 96,18 L96,82 Q96,96 82,96 L18,96 Q4,96 4,82 L4,18 Q4,4 18,4 Z"
-        android:fillColor="#FFF3E0" />
-    <!-- Orange play circle -->
-    <path
-        android:pathData="M50,50 m-28,0 a28,28 0 1,0 56,0 a28,28 0 1,0 -56,0"
-        android:fillColor="#FF5722" />
-    <!-- White play arrow -->
-    <path
-        android:pathData="M43,37 L43,63 L69,50 Z"
-        android:fillColor="#FFFFFF" />
+    <!-- Gradient background: orange → red -->
+    <path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="4" android:startY="4"
+                android:endX="96" android:endY="96"
+                android:startColor="#FF9500"
+                android:endColor="#FF2D55"/>
+        </aapt:attr>
+    </path>
+
+    <group>
+        <clip-path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z"/>
+
+        <!-- Film strip top perforations -->
+        <path android:pathData="M12,18 L12,28 L22,28 L22,18 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+        <path android:pathData="M32,18 L32,28 L42,28 L42,18 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+        <path android:pathData="M52,18 L52,28 L62,28 L62,18 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+        <path android:pathData="M72,18 L72,28 L82,28 L82,18 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+
+        <!-- Film strip bottom perforations -->
+        <path android:pathData="M12,72 L12,82 L22,82 L22,72 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+        <path android:pathData="M32,72 L32,82 L42,82 L42,72 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+        <path android:pathData="M52,72 L52,82 L62,82 L62,72 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+        <path android:pathData="M72,72 L72,82 L82,82 L82,72 Z" android:fillColor="#FFFFFF" android:fillAlpha="0.35"/>
+
+        <!-- Play button triangle -->
+        <path android:pathData="M38,34 L38,66 L70,50 Z" android:fillColor="#FFFFFF"/>
+    </group>
 </vector>

@@ -1,40 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="100dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
 
-    <path
-        android:pathData="M18,4 L82,4 Q96,4 96,18 L96,82 Q96,96 82,96 L18,96 Q4,96 4,82 L4,18 Q4,4 18,4 Z"
-        android:fillColor="#ECEFF1" />
-    <!-- Generic file shape with fold -->
-    <path
-        android:pathData="M26,10 L68,10 L80,22 L80,90 Q80,94 76,94 L28,94 Q24,94 24,90 L24,10 Z"
-        android:fillColor="#FFFFFF" />
-    <!-- Fold -->
-    <path
-        android:pathData="M68,10 L80,22 L68,22 Z"
-        android:fillColor="#CFD8DC" />
-    <!-- Lines -->
-    <path
-        android:pathData="M32,36 L72,36"
-        android:strokeColor="#B0BEC5"
-        android:strokeWidth="3"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M32,46 L72,46"
-        android:strokeColor="#B0BEC5"
-        android:strokeWidth="3"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M32,56 L72,56"
-        android:strokeColor="#B0BEC5"
-        android:strokeWidth="3"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M32,66 L54,66"
-        android:strokeColor="#B0BEC5"
-        android:strokeWidth="3"
-        android:strokeLineCap="round" />
+    <!-- Gradient background: slate → dark slate -->
+    <path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="4" android:startY="4"
+                android:endX="96" android:endY="96"
+                android:startColor="#636366"
+                android:endColor="#3A3A3C"/>
+        </aapt:attr>
+    </path>
+
+    <group>
+        <clip-path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z"/>
+
+        <!-- Generic file body -->
+        <path android:pathData="M24,14 L64,14 L76,26 L76,86 Q76,90 72,90 L28,90 Q24,90 24,86 L24,18 Q24,14 24,14 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.90"/>
+        <!-- Fold corner -->
+        <path android:pathData="M64,14 L76,26 L64,26 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.5"/>
+        <!-- Lines -->
+        <path android:pathData="M32,38 L68,38"
+            android:strokeColor="#636366" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M32,49 L68,49"
+            android:strokeColor="#636366" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M32,60 L68,60"
+            android:strokeColor="#636366" android:strokeWidth="3" android:strokeLineCap="round"/>
+        <path android:pathData="M32,71 L52,71"
+            android:strokeColor="#636366" android:strokeWidth="3" android:strokeLineCap="round"/>
+    </group>
 </vector>

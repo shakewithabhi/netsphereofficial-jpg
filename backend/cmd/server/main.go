@@ -189,6 +189,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(rateLimiter.Limit(30, time.Minute, middleware.ByIP))
 			r.Mount("/s", shareHandler.PublicRoutes())
+			r.Mount("/explore", shareHandler.ExploreRoutes())
 		})
 
 		// Protected routes: 100 req/min by user

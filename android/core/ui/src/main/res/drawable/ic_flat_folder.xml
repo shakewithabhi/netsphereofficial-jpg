@@ -1,24 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="100dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
 
-    <!-- Folder depth shadow -->
-    <path
-        android:pathData="M14,42 L88,42 L88,84 Q88,92 80,92 L22,92 Q14,92 14,84 Z"
-        android:fillColor="#FFB300" />
-    <!-- Folder tab (lighter) -->
-    <path
-        android:pathData="M10,28 L10,40 L52,40 L60,28 Q60,22 54,22 L16,22 Q10,22 10,28 Z"
-        android:fillColor="#FFE082" />
-    <!-- Folder body -->
-    <path
-        android:pathData="M10,40 L90,40 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 Z"
-        android:fillColor="#FFC107" />
-    <!-- Inner lighter highlight -->
-    <path
-        android:pathData="M18,48 L82,48 L82,80 Q82,84 78,84 L22,84 Q18,84 18,80 Z"
-        android:fillColor="#FFD54F" />
+    <!-- Gradient background: amber → deep orange -->
+    <path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="4" android:startY="4"
+                android:endX="96" android:endY="96"
+                android:startColor="#FFB300"
+                android:endColor="#FF8C00"/>
+        </aapt:attr>
+    </path>
+
+    <group>
+        <clip-path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z"/>
+
+        <!-- Folder tab -->
+        <path android:pathData="M14,38 Q14,30 22,30 L42,30 Q46,30 48,34 L52,38 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.95"/>
+        <!-- Folder body -->
+        <path android:pathData="M14,38 L86,38 Q86,38 86,42 L86,76 Q86,82 80,82 L20,82 Q14,82 14,76 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.95"/>
+        <!-- Inner shine -->
+        <path android:pathData="M22,46 L78,46 L78,74 Q78,76 76,76 L24,76 Q22,76 22,74 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.2"/>
+    </group>
 </vector>

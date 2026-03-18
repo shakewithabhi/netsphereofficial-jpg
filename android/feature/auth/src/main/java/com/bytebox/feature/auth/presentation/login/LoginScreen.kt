@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
@@ -107,11 +108,11 @@ fun LoginScreen(
             modifier = Modifier.widthIn(max = 400.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Logo icon
+            // Logo icon — rounded square
             Box(
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(CircleShape)
+                    .clip(RoundedCornerShape(20.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {

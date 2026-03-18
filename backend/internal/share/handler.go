@@ -3,6 +3,7 @@ package share
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -129,6 +130,12 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	common.JSON(w, http.StatusOK, map[string]string{"message": "share deleted"})
 }
 
+func (h *Handler) ExploreRoutes() chi.Router {
+	r := chi.NewRouter()
+	r.Get("/", h.Explore)
+	return r
+}
+
 // Public handlers (no auth)
 
 func (h *Handler) GetPublicInfo(w http.ResponseWriter, r *http.Request) {
@@ -187,6 +194,36 @@ func (h *Handler) GetPublicFolderContents(w http.ResponseWriter, r *http.Request
 	}
 
 	resp, err := h.service.GetPublicFolderContents(r.Context(), code, password)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) Explore(w http.ResponseWriter, r *http.Request) {
+	limitStr := r.URL.Query().Get("limit")
+	limit := 20
+	if limitStr != "" {
+		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+
+	cursor := r.URL.Query().Get("cursor")
+	var cursorPtr *string
+	if cursor != "" {
+		cursorPtr = &cursor
+	}
+
+	category := r.URL.Query().Get("category")
+	var categoryPtr *string
+	if category != "" {
+		categoryPtr = &category
+	}
+
+	resp, err := h.service.GetExploreItems(r.Context(), limit, cursorPtr, categoryPtr)
 	if err != nil {
 		common.JSONError(w, err)
 		return
