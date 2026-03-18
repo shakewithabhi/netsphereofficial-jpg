@@ -38,7 +38,6 @@ import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.common.toLocalDateTime
 import com.bytebox.core.common.toRelativeTime
 import com.bytebox.core.ui.components.FileTypeIcon
-import com.bytebox.core.ui.components.toColor
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.domain.model.FileItem
 
@@ -69,13 +68,13 @@ fun FileListItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Leading: Colored icon container or thumbnail
-        Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             if (file.thumbnailUrl != null && file.category == FileCategory.IMAGE) {
                 AsyncImage(
                     model = file.thumbnailUrl,
                     contentDescription = file.name,
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .clip(RoundedCornerShape(ByteBoxTheme.radius.sm)),
                     contentScale = ContentScale.Crop,
                 )

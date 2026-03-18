@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
@@ -52,6 +53,7 @@ import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
 import com.bytebox.feature.share.presentation.ShareViewScreen
+import com.bytebox.feature.explore.presentation.ExploreScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
 import com.bytebox.feature.files.presentation.notifications.NotificationsScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
@@ -79,11 +81,11 @@ fun ByteBoxNavHost(
 
     var unreadNotificationCount by remember { mutableIntStateOf(0) }
 
-    // 5-tab navigation: Home, Files, Favorites, Shares, Profile
+    // 5-tab navigation: Home, Files, Explore, Shares, Profile
     val bottomNavItems = listOf(
         BottomNavItem("Home", { Icon(Icons.Default.Home, "Home") }, Screen.Dashboard.route),
         BottomNavItem("Files", { Icon(Icons.Default.Folder, "Files") }, Screen.Files.route),
-        BottomNavItem("Favorites", { Icon(Icons.Default.Star, "Favorites") }, Screen.Favorites.route),
+        BottomNavItem("Explore", { Icon(Icons.Default.Explore, "Explore") }, Screen.Explore.route),
         BottomNavItem("Shares", { Icon(Icons.Default.Link, "Shares") }, Screen.Shares.route),
         BottomNavItem("Profile", { Icon(Icons.Default.Person, "Profile") }, Screen.Profile.route),
     )
@@ -211,6 +213,12 @@ fun ByteBoxNavHost(
                         navController.navigate(Screen.Notifications.route)
                     },
                     notificationCount = unreadNotificationCount,
+                    onFavoritesClick = {
+                        navController.navigate(Screen.Favorites.route)
+                    },
+                    onSharesClick = {
+                        navController.navigate(Screen.Shares.route)
+                    },
                 )
             }
 
@@ -379,6 +387,14 @@ fun ByteBoxNavHost(
                     onNavigateBack = { navController.popBackStack() },
                     onFileClick = { fileId, mimeType ->
                         navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
+                    },
+                )
+            }
+
+            composable(Screen.Explore.route) {
+                ExploreScreen(
+                    onItemClick = { code ->
+                        navController.navigate(Screen.ShareView.createRoute(code))
                     },
                 )
             }

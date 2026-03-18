@@ -26,7 +26,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/api/v1/\"")
+            buildConfigField("String", "BASE_URL", "\"http://192.168.1.4:8080/api/v1/\"")
             buildConfigField("String", "TEST_EMAIL", "\"test@byteboxapp.com\"")
             buildConfigField("String", "TEST_PASSWORD", "\"Test@1234\"")
             buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${project.findProperty("GOOGLE_CLIENT_ID") ?: ""}\"")
@@ -73,6 +73,7 @@ dependencies {
     implementation(project(":feature:share"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:trash"))
+    implementation(project(":feature:explore"))
 
     // Compose
     implementation(platform(libs.compose.bom))

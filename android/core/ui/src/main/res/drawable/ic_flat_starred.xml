@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Shadow card -->
+    <group
+        android:pivotX="50"
+        android:pivotY="50"
+        android:rotation="-14">
+        <path
+            android:pathData="M16,6 L84,6 Q94,6 94,16 L94,84 Q94,94 84,94 L16,94 Q6,94 6,84 L6,16 Q6,6 16,6 Z"
+            android:fillColor="#FFE082" />
+    </group>
+
+    <!-- Front card -->
+    <path
+        android:pathData="M18,10 L82,10 Q90,10 90,18 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 L10,18 Q10,10 18,10 Z"
+        android:fillColor="#FFFDE7" />
+
+    <!-- 5-pointed star centered at 50,50 -->
+    <path
+        android:pathData="M50,20 L58,40 L79,41 L63,54 L68,74 L50,63 L32,74 L37,54 L21,41 L42,40 Z"
+        android:fillColor="#FFC107" />
+</vector>

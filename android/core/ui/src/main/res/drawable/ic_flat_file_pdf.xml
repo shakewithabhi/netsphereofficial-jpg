@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <path
+        android:pathData="M18,4 L82,4 Q96,4 96,18 L96,82 Q96,96 82,96 L18,96 Q4,96 4,82 L4,18 Q4,4 18,4 Z"
+        android:fillColor="#FFEBEE" />
+    <!-- Document body -->
+    <path
+        android:pathData="M24,12 L66,12 L78,24 L78,88 Q78,92 74,92 L30,92 Q26,92 26,88 L26,12 Z"
+        android:fillColor="#FFFFFF" />
+    <!-- Fold corner -->
+    <path
+        android:pathData="M66,12 L78,24 L66,24 Z"
+        android:fillColor="#EF9A9A" />
+    <!-- Red band at bottom -->
+    <path
+        android:pathData="M26,70 L78,70 L78,88 Q78,92 74,92 L30,92 Q26,92 26,88 Z"
+        android:fillColor="#F44336" />
+    <!-- White lines in red band -->
+    <path
+        android:pathData="M34,78 L68,78"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34,85 L52,85"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round" />
+    <!-- Document content lines -->
+    <path
+        android:pathData="M34,34 L68,34"
+        android:strokeColor="#EF9A9A"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34,43 L68,43"
+        android:strokeColor="#EF9A9A"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34,52 L68,52"
+        android:strokeColor="#EF9A9A"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M34,61 L56,61"
+        android:strokeColor="#EF9A9A"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round" />
+</vector>

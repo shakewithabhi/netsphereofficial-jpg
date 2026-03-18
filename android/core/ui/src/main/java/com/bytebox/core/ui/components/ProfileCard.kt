@@ -29,8 +29,6 @@ fun ProfileCard(
     displayName: String,
     email: String,
     plan: String,
-    storageUsed: Long,
-    storageLimit: Long,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -79,10 +77,6 @@ fun ProfileCard(
                     PlanBadge(plan = plan)
                 }
             }
-
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
-
-            StorageIndicator(used = storageUsed, total = storageLimit)
         }
     }
 }

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <group>
+        <clip-path
+            android:pathData="M18,4 L82,4 Q96,4 96,18 L96,82 Q96,96 82,96 L18,96 Q4,96 4,82 L4,18 Q4,4 18,4 Z" />
+        <path
+            android:pathData="M4,4 L96,4 L96,96 L4,96 Z"
+            android:fillColor="#FFFFFF" />
+        <!-- Sky -->
+        <path
+            android:pathData="M4,4 L96,4 L96,56 L4,56 Z"
+            android:fillColor="#E8F5E9" />
+        <!-- Dark mountain -->
+        <path
+            android:pathData="M16,96 L16,58 L58,20 L96,48 L96,96 Z"
+            android:fillColor="#388E3C" />
+        <!-- Light mountain -->
+        <path
+            android:pathData="M4,96 L4,64 L28,42 L56,64 L56,96 Z"
+            android:fillColor="#66BB6A" />
+        <!-- Sun -->
+        <path
+            android:pathData="M24,32 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0"
+            android:fillColor="#FFC107" />
+    </group>
+</vector>

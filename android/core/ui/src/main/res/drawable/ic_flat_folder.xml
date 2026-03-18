@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Folder depth shadow -->
+    <path
+        android:pathData="M14,42 L88,42 L88,84 Q88,92 80,92 L22,92 Q14,92 14,84 Z"
+        android:fillColor="#FFB300" />
+    <!-- Folder tab (lighter) -->
+    <path
+        android:pathData="M10,28 L10,40 L52,40 L60,28 Q60,22 54,22 L16,22 Q10,22 10,28 Z"
+        android:fillColor="#FFE082" />
+    <!-- Folder body -->
+    <path
+        android:pathData="M10,40 L90,40 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 Z"
+        android:fillColor="#FFC107" />
+    <!-- Inner lighter highlight -->
+    <path
+        android:pathData="M18,48 L82,48 L82,80 Q82,84 78,84 L22,84 Q18,84 18,80 Z"
+        android:fillColor="#FFD54F" />
+</vector>

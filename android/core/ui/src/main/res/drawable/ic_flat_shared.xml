@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Shadow card -->
+    <group
+        android:pivotX="50"
+        android:pivotY="50"
+        android:rotation="-14">
+        <path
+            android:pathData="M16,6 L84,6 Q94,6 94,16 L94,84 Q94,94 84,94 L16,94 Q6,94 6,84 L6,16 Q6,6 16,6 Z"
+            android:fillColor="#80CBC4" />
+    </group>
+
+    <!-- Front card -->
+    <path
+        android:pathData="M18,10 L82,10 Q90,10 90,18 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 L10,18 Q10,10 18,10 Z"
+        android:fillColor="#E0F2F1" />
+
+    <!-- Connector lines -->
+    <path
+        android:pathData="M50,30 L24,64"
+        android:strokeColor="#00897B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M50,30 L76,64"
+        android:strokeColor="#00897B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+
+    <!-- Top node -->
+    <path
+        android:pathData="M50,22 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
+        android:fillColor="#00897B" />
+    <!-- Bottom-left node -->
+    <path
+        android:pathData="M24,74 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
+        android:fillColor="#00897B" />
+    <!-- Bottom-right node -->
+    <path
+        android:pathData="M76,74 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
+        android:fillColor="#00897B" />
+</vector>

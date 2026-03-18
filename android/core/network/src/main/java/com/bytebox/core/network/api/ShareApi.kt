@@ -49,4 +49,11 @@ interface ShareApi {
         @Body request: SaveToStorageRequest,
         @Header("X-Share-Password") password: String? = null
     ): Response<FileDto>
+
+    @GET("explore")
+    suspend fun getExploreItems(
+        @Query("cursor") cursor: String? = null,
+        @Query("limit") limit: Int = 20,
+        @Query("category") category: String? = null,
+    ): Response<ExploreResponse>
 }

@@ -1,30 +1,64 @@
 package com.bytebox.feature.dashboard.presentation
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.res.painterResource
+import com.bytebox.core.ui.R as CoreR
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bytebox.core.common.FileCategory
 import com.bytebox.core.common.toLocalDateTime
 import com.bytebox.core.common.toRelativeTime
-import com.bytebox.core.ui.components.ColoredFolderCard
-import com.bytebox.core.ui.components.DashboardGreetingHeader
 import com.bytebox.core.ui.components.EmptyState
 import com.bytebox.core.ui.components.ErrorState
 import com.bytebox.core.ui.components.FileListShimmer
@@ -36,6 +70,24 @@ import com.bytebox.core.ui.components.UploadFAB
 import com.bytebox.core.common.AdManager
 import com.bytebox.core.ui.theme.ByteBoxTheme
 
+private data class FilterGroup(val label: String, val categories: Set<FileCategory>?)
+
+private val filterGroups = listOf(
+    FilterGroup("All", null),
+    FilterGroup("Images", setOf(FileCategory.IMAGE)),
+    FilterGroup("Videos", setOf(FileCategory.VIDEO)),
+    FilterGroup(
+        "Docs",
+        setOf(
+            FileCategory.DOCUMENT,
+            FileCategory.PDF,
+            FileCategory.TEXT_DOCUMENT,
+            FileCategory.OFFICE_DOCUMENT,
+        ),
+    ),
+    FilterGroup("Audio", setOf(FileCategory.AUDIO)),
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
@@ -45,57 +97,75 @@ fun DashboardScreen(
     onSeeAllFolders: () -> Unit,
     onNotificationClick: () -> Unit = {},
     notificationCount: Int = 0,
-    viewModel: DashboardViewModel = hiltViewModel()
+    onFavoritesClick: () -> Unit = {},
+    onSharesClick: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
+    viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedFilter by remember { mutableStateOf<Set<FileCategory>?>(null) }
 
     LifecycleResumeEffect(Unit) {
         viewModel.loadDashboard()
         onPauseOrDispose {}
     }
 
+    val displayFiles = remember(uiState.recentFiles, selectedTab, selectedFilter) {
+        if (selectedTab == 1) emptyList()
+        else if (selectedFilter == null) uiState.recentFiles
+        else uiState.recentFiles.filter { it.category in selectedFilter!! }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        floatingActionButton = {
-            UploadFAB(onClick = onUploadClick)
-        },
+        floatingActionButton = { UploadFAB(onClick = onUploadClick) },
     ) { padding ->
         when {
-            uiState.isLoading -> {
-                FileListShimmer(modifier = Modifier.padding(padding))
-            }
-            uiState.errorMessage != null && uiState.user == null -> {
-                ErrorState(
-                    message = uiState.errorMessage!!,
-                    onRetry = viewModel::loadDashboard,
-                )
-            }
+            uiState.isLoading -> FileListShimmer(modifier = Modifier.padding(padding))
+            uiState.errorMessage != null && uiState.user == null -> ErrorState(
+                message = uiState.errorMessage!!,
+                onRetry = viewModel::loadDashboard,
+            )
             else -> {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding),
+                    contentPadding = PaddingValues(bottom = 88.dp),
                 ) {
-                    // Greeting header
+                    // ── Header ────────────────────────────────────────────────
                     item {
-                        DashboardGreetingHeader(
-                            displayName = uiState.user?.displayName ?: "User",
-                            notificationCount = notificationCount,
-                            onNotificationClick = onNotificationClick,
-                        )
-                    }
-
-                    // Storage indicator
-                    uiState.user?.let { user ->
-                        item {
-                            StorageIndicator(
-                                used = user.storageUsed,
-                                total = user.storageLimit,
-                                modifier = Modifier.padding(
-                                    horizontal = ByteBoxTheme.spacing.lg,
-                                    vertical = ByteBoxTheme.spacing.xs,
-                                ),
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "ByteBox",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onBackground,
                             )
+                            androidx.compose.material3.BadgedBox(
+                                badge = {
+                                    if (notificationCount > 0) {
+                                        androidx.compose.material3.Badge {
+                                            Text("$notificationCount")
+                                        }
+                                    }
+                                }
+                            ) {
+                                IconButton(onClick = onNotificationClick) {
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = "Notifications",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -109,72 +179,261 @@ fun DashboardScreen(
                         )
                     }
 
+                    // ── Search bar ────────────────────────────────────────────
                     item {
-                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
-                    }
-
-                    // My Folders section
-                    if (uiState.folders.isNotEmpty()) {
-                        item {
-                            SectionHeader(
-                                title = "My Folders",
-                                actionText = "See All",
-                                onAction = onSeeAllFolders,
-                            )
-                        }
-
-                        item {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = ByteBoxTheme.spacing.md),
-                                horizontalArrangement = Arrangement.spacedBy(ByteBoxTheme.spacing.sm),
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .clickable(onClick = onSearchClick),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                itemsIndexed(uiState.folders) { index, folder ->
-                                    ColoredFolderCard(
-                                        name = folder.name,
-                                        index = index,
-                                        onClick = { onFolderClick(folder.id) },
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Search files…",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
-
-                        item {
-                            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
-                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // Recent uploads section
-                    if (uiState.recentFiles.isNotEmpty()) {
-                        item {
-                            SectionHeader(title = "Recent Uploads")
-                        }
+                    // ── Quick access grid ─────────────────────────────────────
+                    item {
+                        QuickAccessGrid(
+                            onFolderClick = onSeeAllFolders,
+                            onFavoritesClick = onFavoritesClick,
+                            onSharesClick = onSharesClick,
+                            onCategoryFilter = { cats -> selectedFilter = cats },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
-                        items(uiState.recentFiles, key = { it.id }) { file ->
+                    // ── Upgrade banner ────────────────────────────────────────
+                    item {
+                        UpgradeBannerCard(modifier = Modifier.padding(horizontal = 16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    // ── Tabs ──────────────────────────────────────────────────
+                    item {
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = MaterialTheme.colorScheme.background,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            divider = {},
+                        ) {
+                            listOf("Recent", "Starred").forEachIndexed { index, label ->
+                                Tab(
+                                    selected = selectedTab == index,
+                                    onClick = { selectedTab = index },
+                                    text = {
+                                        Text(
+                                            text = label,
+                                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // ── Filter chips ──────────────────────────────────────────
+                    item {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(filterGroups) { group ->
+                                FilterChip(
+                                    selected = selectedFilter == group.categories,
+                                    onClick = { selectedFilter = group.categories },
+                                    label = { Text(group.label) },
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // ── Files list ────────────────────────────────────────────
+                    if (displayFiles.isNotEmpty()) {
+                        items(displayFiles, key = { it.id }) { file ->
                             RecentFileRow(
                                 fileName = file.name,
                                 fileSize = file.size,
                                 category = file.category,
                                 timeAgo = try {
                                     file.createdAt.toLocalDateTime().toRelativeTime()
-                                } catch (_: Exception) {
-                                    ""
-                                },
+                                } catch (_: Exception) { "" },
                                 onClick = { onFileClick(file.id, file.mimeType) },
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp)
+                                    .padding(bottom = ByteBoxTheme.spacing.xs),
                             )
                         }
-                    }
-
-                    // Empty state
-                    if (uiState.folders.isEmpty() && uiState.recentFiles.isEmpty()) {
+                    } else {
                         item {
                             EmptyState(
-                                icon = Icons.Default.FolderOpen,
-                                title = "Welcome to ByteBox",
-                                subtitle = "Upload files or create folders to get started",
+                                icon = if (selectedTab == 1) Icons.Default.Star else Icons.Default.FolderOpen,
+                                title = if (selectedTab == 1) "No starred files" else "No files yet",
+                                subtitle = if (selectedTab == 1) "Star files to see them here" else "Upload files to get started",
                             )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── Private composables ───────────────────────────────────────────────────────
+
+private data class QuickTile(
+    val label: String,
+    val iconRes: Int,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun QuickAccessGrid(
+    onFolderClick: () -> Unit,
+    onFavoritesClick: () -> Unit,
+    onSharesClick: () -> Unit,
+    onCategoryFilter: (Set<FileCategory>?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val tiles = listOf(
+        QuickTile("Photos", CoreR.drawable.ic_flat_photos) {
+            onCategoryFilter(setOf(FileCategory.IMAGE))
+        },
+        QuickTile("Videos", CoreR.drawable.ic_flat_videos) {
+            onCategoryFilter(setOf(FileCategory.VIDEO))
+        },
+        QuickTile("Docs", CoreR.drawable.ic_flat_docs) {
+            onCategoryFilter(
+                setOf(
+                    FileCategory.DOCUMENT,
+                    FileCategory.PDF,
+                    FileCategory.TEXT_DOCUMENT,
+                    FileCategory.OFFICE_DOCUMENT,
+                ),
+            )
+        },
+        QuickTile("Audio", CoreR.drawable.ic_flat_audio) {
+            onCategoryFilter(setOf(FileCategory.AUDIO))
+        },
+        QuickTile("Folders", CoreR.drawable.ic_flat_folder) { onFolderClick() },
+        QuickTile("Starred", CoreR.drawable.ic_flat_starred) { onFavoritesClick() },
+        QuickTile("Shared", CoreR.drawable.ic_flat_shared) { onSharesClick() },
+        QuickTile("More", CoreR.drawable.ic_flat_more) { },
+    )
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        tiles.chunked(4).forEach { rowTiles ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                rowTiles.forEach { tile ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(onClick = tile.onClick)
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            painter = painterResource(tile.iconRes),
+                            contentDescription = tile.label,
+                            modifier = Modifier.size(52.dp),
+                            tint = Color.Unspecified,
+                        )
+                        Text(
+                            text = tile.label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpgradeBannerCard(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.primary,
+            ) {
+                Text(
+                    text = "Pro",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = "Upgrade to Pro — get 1 TB storage",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = {},
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
+            ) {
+                Text("Upgrade", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }

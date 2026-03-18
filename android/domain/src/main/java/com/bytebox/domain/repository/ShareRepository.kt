@@ -1,6 +1,7 @@
 package com.bytebox.domain.repository
 
 import com.bytebox.core.common.Result
+import com.bytebox.domain.model.ExploreItem
 import com.bytebox.domain.model.ShareLink
 
 interface ShareRepository {
@@ -15,4 +16,9 @@ interface ShareRepository {
     suspend fun getMyShares(cursor: String? = null): Result<List<ShareLink>>
     suspend fun deleteShare(id: String): Result<Unit>
     suspend fun getShareByCode(code: String): Result<ShareLink>
+
+    suspend fun getExploreItems(
+        cursor: String? = null,
+        category: String? = null,
+    ): Result<Pair<List<ExploreItem>, String?>>
 }
