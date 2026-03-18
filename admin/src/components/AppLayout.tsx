@@ -2,7 +2,7 @@ import { Layout, Menu, Typography, Button, Space } from 'antd';
 import {
   DashboardOutlined, TeamOutlined, CloudOutlined, LogoutOutlined,
   CloudServerOutlined, AuditOutlined, CheckCircleOutlined,
-  SettingOutlined, FolderOutlined,
+  SettingOutlined, FolderOutlined, CommentOutlined, DollarOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -16,7 +16,9 @@ const menuItems = [
   { key: '/files', icon: <FolderOutlined />, label: 'Files' },
   { key: '/storage', icon: <CloudOutlined />, label: 'Storage' },
   { key: '/pending-approvals', icon: <CheckCircleOutlined />, label: 'Approvals' },
+  { key: '/comments', icon: <CommentOutlined />, label: 'Comments' },
   { key: '/audit-logs', icon: <AuditOutlined />, label: 'Audit Logs' },
+  { key: '/ad-settings', icon: <DollarOutlined />, label: 'Ad Settings' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ];
 

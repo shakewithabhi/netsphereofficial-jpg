@@ -1,5 +1,6 @@
 package com.bytebox.feature.settings.presentation
 
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Policy
@@ -27,19 +29,27 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bytebox.core.common.AdManager
 import com.bytebox.core.ui.components.SectionHeader
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.core.ui.theme.cardShadow
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,9 +59,14 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val showAds by AdManager.showAds.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -226,6 +241,54 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.clickable { },
                 )
+            }
+
+            // Watch Ad for Extra Storage (free-tier only)
+            if (showAds) {
+                Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+
+                SectionHeader(title = "Bonus Storage")
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = ByteBoxTheme.spacing.md)
+                        .cardShadow(shape = RoundedCornerShape(ByteBoxTheme.radius.lg)),
+                    shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                    color = MaterialTheme.colorScheme.surface,
+                ) {
+                    ListItem(
+                        headlineContent = { Text("Watch Ad for Extra Storage") },
+                        supportingContent = { Text("Watch a short video to earn 50 MB of bonus storage") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.CardGiftcard,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            val activity = context as? Activity
+                            if (activity != null && AdManager.isRewardedReady()) {
+                                AdManager.showRewarded(
+                                    activity = activity,
+                                    onRewarded = { rewardItem ->
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                "You earned ${rewardItem.amount} ${rewardItem.type} of bonus storage!"
+                                            )
+                                        }
+                                    },
+                                    onDismissed = {},
+                                )
+                            } else {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Ad not ready yet. Please try again shortly.")
+                                }
+                            }
+                        },
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))

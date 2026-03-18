@@ -46,6 +46,17 @@ func (h *Handler) Routes() chi.Router {
 	r.Put("/settings", h.UpdateSettings)
 	r.Get("/signup-trends", h.SignupTrends)
 
+	// Comments moderation
+	r.Get("/comments", h.ListComments)
+	r.Delete("/comments/{id}", h.DeleteAdminComment)
+
+	// Starred files
+	r.Get("/starred-stats", h.StarredStats)
+
+	// Ad settings
+	r.Get("/ad-settings", h.GetAdSettings)
+	r.Put("/ad-settings", h.UpdateAdSettings)
+
 	return r
 }
 
@@ -413,4 +424,130 @@ func (h *Handler) SignupTrends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	common.JSON(w, http.StatusOK, stats)
+}
+
+func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+	search := r.URL.Query().Get("search")
+
+	comments, total, err := h.repo.ListComments(r.Context(), limit, offset, search)
+	if err != nil {
+		slog.Error("failed to list comments", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to list comments"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{
+		"comments": comments,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+	})
+}
+
+func (h *Handler) DeleteAdminComment(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid comment id"))
+		return
+	}
+
+	if err := h.repo.DeleteComment(r.Context(), id); err != nil {
+		slog.Error("failed to delete comment", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to delete comment"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "comment deleted"})
+}
+
+func (h *Handler) StarredStats(w http.ResponseWriter, r *http.Request) {
+	totalStars, err := h.repo.GetStarredCount(r.Context())
+	if err != nil {
+		slog.Error("failed to get starred count", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get starred stats"))
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+
+	mostStarred, err := h.repo.GetMostStarredFiles(r.Context(), limit)
+	if err != nil {
+		slog.Error("failed to get most starred files", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get starred stats"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{
+		"total_stars":  totalStars,
+		"most_starred": mostStarred,
+	})
+}
+
+func (h *Handler) GetAdSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.repo.GetAdSettings(r.Context())
+	if err != nil {
+		slog.Error("failed to get ad settings", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get ad settings"))
+		return
+	}
+	common.JSON(w, http.StatusOK, settings)
+}
+
+func (h *Handler) UpdateAdSettings(w http.ResponseWriter, r *http.Request) {
+	var req UpdateAdSettingsRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	current, err := h.repo.GetAdSettings(r.Context())
+	if err != nil {
+		slog.Error("failed to get current ad settings", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to update ad settings"))
+		return
+	}
+
+	if req.AdsEnabled != nil {
+		current.AdsEnabled = *req.AdsEnabled
+	}
+	if req.BannerAdUnitID != nil {
+		current.BannerAdUnitID = *req.BannerAdUnitID
+	}
+	if req.InterstitialAdID != nil {
+		current.InterstitialAdID = *req.InterstitialAdID
+	}
+	if req.RewardedAdID != nil {
+		current.RewardedAdID = *req.RewardedAdID
+	}
+	if req.AdFrequency != nil {
+		current.AdFrequency = *req.AdFrequency
+	}
+	if req.WebAdClient != nil {
+		current.WebAdClient = *req.WebAdClient
+	}
+	if req.WebBannerSlot != nil {
+		current.WebBannerSlot = *req.WebBannerSlot
+	}
+	if req.WebSidebarSlot != nil {
+		current.WebSidebarSlot = *req.WebSidebarSlot
+	}
+
+	if err := h.repo.UpdateAdSettings(r.Context(), current); err != nil {
+		slog.Error("failed to update ad settings", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to update ad settings"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, current)
 }

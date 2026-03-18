@@ -17,6 +17,8 @@ type DashboardStats struct {
 	NewUsersToday   int64 `json:"new_users_today"`
 	TrashedFiles    int64 `json:"trashed_files"`
 	ActiveUploads   int64 `json:"active_uploads"`
+	TotalComments   int64 `json:"total_comments"`
+	TotalStars      int64 `json:"total_stars"`
 }
 
 // User management
@@ -131,4 +133,50 @@ type AuditLogEntry struct {
 	Metadata     any        `json:"metadata"`
 	IPAddress    *string    `json:"ip_address"`
 	CreatedAt    time.Time  `json:"created_at"`
+}
+
+// Comment moderation
+
+type AdminComment struct {
+	ID        uuid.UUID `json:"id"`
+	FileID    uuid.UUID `json:"file_id"`
+	FileName  string    `json:"file_name"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserEmail string    `json:"user_email"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// Ad settings
+
+type AdSettings struct {
+	AdsEnabled       bool   `json:"ads_enabled"`
+	BannerAdUnitID   string `json:"banner_ad_unit_id"`
+	InterstitialAdID string `json:"interstitial_ad_unit_id"`
+	RewardedAdID     string `json:"rewarded_ad_unit_id"`
+	AdFrequency      int    `json:"ad_frequency"`
+	WebAdClient      string `json:"web_ad_client"`
+	WebBannerSlot    string `json:"web_banner_slot"`
+	WebSidebarSlot   string `json:"web_sidebar_slot"`
+}
+
+type UpdateAdSettingsRequest struct {
+	AdsEnabled       *bool   `json:"ads_enabled"`
+	BannerAdUnitID   *string `json:"banner_ad_unit_id"`
+	InterstitialAdID *string `json:"interstitial_ad_unit_id"`
+	RewardedAdID     *string `json:"rewarded_ad_unit_id"`
+	AdFrequency      *int    `json:"ad_frequency"`
+	WebAdClient      *string `json:"web_ad_client"`
+	WebBannerSlot    *string `json:"web_banner_slot"`
+	WebSidebarSlot   *string `json:"web_sidebar_slot"`
+}
+
+// Starred files stats
+
+type MostStarredFile struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	MimeType   string    `json:"mime_type"`
+	OwnerEmail string    `json:"owner_email"`
+	StarCount  int64     `json:"star_count"`
 }

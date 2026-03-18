@@ -2,7 +2,9 @@ package com.bytebox.feature.dashboard.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bytebox.core.common.AdManager
 import com.bytebox.core.common.Result
+import com.bytebox.core.datastore.UserPreferences
 import com.bytebox.domain.model.FileItem
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.User
@@ -28,6 +30,7 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val fileRepository: FileRepository,
+    private val userPreferences: UserPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -43,7 +46,12 @@ class DashboardViewModel @Inject constructor(
 
             // Load profile
             when (val result = authRepository.getProfile()) {
-                is Result.Success -> _uiState.update { it.copy(user = result.data) }
+                is Result.Success -> {
+                    _uiState.update { it.copy(user = result.data) }
+                    // Cache user plan and update ad visibility
+                    userPreferences.setUserPlan(result.data.plan)
+                    AdManager.setShouldShowAds(result.data.plan == "free")
+                }
                 is Result.Error -> _uiState.update { it.copy(errorMessage = result.exception.message) }
                 is Result.Loading -> {}
             }

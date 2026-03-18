@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import { UploadModal } from './UploadModal';
+import { SidebarAd } from './AdBanner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -120,6 +121,11 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
             {formatBytes(storageUsed)} of {formatBytes(storageLimit)} used
           </p>
         </div>
+
+        {/* Sidebar ad for free-tier users */}
+        {(!user?.plan || user.plan === 'free') && (
+          <SidebarAd />
+        )}
 
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">

@@ -24,4 +24,7 @@ android {
 dependencies {
     implementation(libs.coroutines.core)
     implementation(libs.moshi)
+
+    // AdMob
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
 }

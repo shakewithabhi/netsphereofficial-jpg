@@ -6,6 +6,7 @@ export interface User {
   display_name: string;
   storage_used: number;
   storage_limit: number;
+  plan?: string;
   created_at: string;
 }
 

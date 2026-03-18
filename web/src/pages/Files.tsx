@@ -1,4 +1,4 @@
-import {
+import React, {
   useState,
   useEffect,
   useCallback,
@@ -46,6 +46,8 @@ import { FileIcon } from '../components/FileIcon';
 import { ShareDialog } from '../components/ShareDialog';
 import { UploadModal } from '../components/UploadModal';
 import { CommentsDialog } from '../components/CommentsDialog';
+import { HeaderAd, InFeedAd } from '../components/AdBanner';
+import { useAuth } from '../store/auth';
 
 interface BreadcrumbItem {
   label: string;
@@ -54,6 +56,7 @@ interface BreadcrumbItem {
 }
 
 export default function Files() {
+  const { user } = useAuth();
   const { folderId } = useParams<{ folderId?: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -291,6 +294,9 @@ export default function Files() {
           </div>
         </div>
 
+        {/* Header banner ad for free-tier users */}
+        {(!user?.plan || user.plan === 'free') && <HeaderAd />}
+
         {error && (
           <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">
             <span className="flex-1">{error}</span>
@@ -381,17 +387,25 @@ export default function Files() {
               />
             ))}
 
-            {/* Files */}
-            {files.map((file) => (
-              <FileCard
-                key={file.id}
-                file={file}
-                viewMode={viewMode}
-                onContextMenu={(e) => openContextMenu(e, 'file', file)}
-                onMenuClick={(e) => openContextMenu(e, 'file', file)}
-                onDownload={() => handleDownload(file.id)}
-                onToggleStar={() => handleToggleStar(file)}
-              />
+            {/* Files with in-feed ads every 8 items for free users */}
+            {files.map((file, index) => (
+              <React.Fragment key={file.id}>
+                <FileCard
+                  file={file}
+                  viewMode={viewMode}
+                  onContextMenu={(e) => openContextMenu(e, 'file', file)}
+                  onMenuClick={(e) => openContextMenu(e, 'file', file)}
+                  onDownload={() => handleDownload(file.id)}
+                  onToggleStar={() => handleToggleStar(file)}
+                />
+                {(!user?.plan || user.plan === 'free') &&
+                  (index + 1) % 8 === 0 &&
+                  index < files.length - 1 && (
+                    <div className={viewMode === 'grid' ? 'col-span-full' : ''}>
+                      <InFeedAd />
+                    </div>
+                  )}
+              </React.Fragment>
             ))}
           </div>
         )}

@@ -102,6 +102,9 @@ dependencies {
     // Logging
     implementation(libs.timber)
 
+    // AdMob
+    implementation("com.google.android.gms:play-services-ads:23.6.0")
+
     // Testing
     testImplementation(libs.junit)
 }

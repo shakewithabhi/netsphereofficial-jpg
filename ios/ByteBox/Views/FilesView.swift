@@ -20,10 +20,18 @@ struct FilesView: View {
         GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 12)
     ]
 
+    @EnvironmentObject var adManager: AdManager
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottomTrailing) {
                 VStack(spacing: 0) {
+                    // Banner ad between toolbar and file content for free users
+                    if adManager.showAds {
+                        BannerAdView(adUnitID: AdManager.bannerFiles)
+                            .frame(height: 50)
+                    }
+
                     // Breadcrumbs
                     if !viewModel.folderStack.isEmpty {
                         breadcrumbBar
@@ -415,4 +423,5 @@ struct DocumentPickerView: UIViewControllerRepresentable {
 #Preview {
     FilesView()
         .environmentObject(AuthManager())
+        .environmentObject(AdManager.shared)
 }

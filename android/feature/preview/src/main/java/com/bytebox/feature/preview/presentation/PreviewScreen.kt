@@ -1,6 +1,7 @@
 package com.bytebox.feature.preview.presentation
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
@@ -50,6 +51,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import com.bytebox.core.common.AdManager
 import com.bytebox.core.common.FileCategory
 import com.bytebox.core.common.toLocalDateTime
 import com.bytebox.core.common.toReadableFileSize
@@ -77,6 +79,7 @@ fun PreviewScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showVersionSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     LaunchedEffect(fileId) {
         viewModel.setFileInfo("", mimeType)
@@ -104,7 +107,23 @@ fun PreviewScreen(
                     IconButton(onClick = { showVersionSheet = true }) {
                         Icon(Icons.Default.History, contentDescription = "Version History")
                     }
-                    IconButton(onClick = { onDownload(fileId) }) {
+                    IconButton(onClick = {
+                        val prefs = context.getSharedPreferences("ad_prefs", Context.MODE_PRIVATE)
+                        val count = prefs.getInt("download_count", 0) + 1
+                        prefs.edit().putInt("download_count", count).apply()
+                        if (count % 3 == 0) {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                AdManager.showInterstitial(activity) {
+                                    onDownload(fileId)
+                                }
+                            } else {
+                                onDownload(fileId)
+                            }
+                        } else {
+                            onDownload(fileId)
+                        }
+                    }) {
                         Icon(Icons.Default.Download, contentDescription = "Download")
                     }
                     IconButton(onClick = { onShare(fileId) }) {

@@ -73,6 +73,11 @@ class UserPreferences @Inject constructor(
             prefs[LAST_AUTO_UPLOAD_TIMESTAMP_KEY] ?: 0L
         }
 
+    val userPlan: Flow<String>
+        get() = dataStore.data.map { prefs ->
+            prefs[USER_PLAN_KEY] ?: "free"
+        }
+
     suspend fun setViewMode(mode: ViewMode) {
         dataStore.edit { it[VIEW_MODE_KEY] = mode.name.lowercase() }
     }
@@ -108,6 +113,10 @@ class UserPreferences @Inject constructor(
         dataStore.edit { it[LAST_AUTO_UPLOAD_TIMESTAMP_KEY] = timestamp }
     }
 
+    suspend fun setUserPlan(plan: String) {
+        dataStore.edit { it[USER_PLAN_KEY] = plan }
+    }
+
     companion object {
         private val VIEW_MODE_KEY = stringPreferencesKey("view_mode")
         private val SORT_BY_KEY = stringPreferencesKey("sort_by")
@@ -117,6 +126,7 @@ class UserPreferences @Inject constructor(
         private val AUTO_UPLOAD_ENABLED_KEY = booleanPreferencesKey("auto_upload_enabled")
         private val AUTO_UPLOAD_FOLDER_ID_KEY = stringPreferencesKey("auto_upload_folder_id")
         private val LAST_AUTO_UPLOAD_TIMESTAMP_KEY = longPreferencesKey("last_auto_upload_timestamp")
+        private val USER_PLAN_KEY = stringPreferencesKey("user_plan")
     }
 }
 

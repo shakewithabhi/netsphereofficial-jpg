@@ -11,11 +11,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import com.bytebox.app.navigation.ByteBoxNavHost
+import com.bytebox.core.common.AdManager
 import com.bytebox.core.datastore.ThemeMode
 import com.bytebox.core.datastore.UserPreferences
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -26,6 +30,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Initialize AdMob
+        AdManager.initialize(this)
+        AdManager.loadInterstitial(this)
+        AdManager.loadRewarded(this)
+
+        // Observe user plan to toggle ads (only show for free-tier users)
+        lifecycleScope.launch {
+            userPreferences.userPlan.collectLatest { plan ->
+                AdManager.setShouldShowAds(plan == "free")
+            }
+        }
 
         val shareCode = extractShareCode(intent)
 

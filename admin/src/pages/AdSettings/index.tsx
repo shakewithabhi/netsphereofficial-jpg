@@ -1,0 +1,117 @@
+import { useEffect, useState } from 'react';
+import { Card, Form, Input, InputNumber, Switch, Button, Typography, message, Spin, Space, Row, Col } from 'antd';
+import { SaveOutlined, DollarOutlined } from '@ant-design/icons';
+import { adminApi, type AdSettings } from '../../api/admin';
+
+const { Title, Text } = Typography;
+
+export default function AdSettingsPage() {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const unwrap = (res: any) => res.data?.data ?? res.data;
+    adminApi.getAdSettings()
+      .then((res) => {
+        const settings = unwrap(res);
+        form.setFieldsValue(settings);
+      })
+      .catch(() => {
+        message.error('Failed to load ad settings');
+      })
+      .finally(() => setLoading(false));
+  }, [form]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const values = form.getFieldsValue();
+      const payload: AdSettings = {
+        ads_enabled: values.ads_enabled ?? false,
+        android_banner_ad_unit_id: values.android_banner_ad_unit_id ?? '',
+        android_interstitial_ad_unit_id: values.android_interstitial_ad_unit_id ?? '',
+        android_rewarded_ad_unit_id: values.android_rewarded_ad_unit_id ?? '',
+        web_adsense_client_id: values.web_adsense_client_id ?? '',
+        web_banner_slot_id: values.web_banner_slot_id ?? '',
+        web_sidebar_slot_id: values.web_sidebar_slot_id ?? '',
+        ad_frequency: values.ad_frequency ?? 5,
+      };
+      await adminApi.updateAdSettings(payload);
+      message.success('Ad settings saved');
+    } catch {
+      message.error('Failed to save ad settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
+
+  return (
+    <div>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Title level={4} style={{ margin: 0 }}><DollarOutlined /> Ad Settings</Title>
+        <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+          Save Changes
+        </Button>
+      </Space>
+
+      <Form form={form} layout="vertical">
+        <Row gutter={[24, 0]}>
+          <Col xs={24} lg={12}>
+            <Card title="General" style={{ marginBottom: 16 }}>
+              <Form.Item
+                label="Ads Enabled"
+                name="ads_enabled"
+                valuePropName="checked"
+                extra="When enabled, ads will be shown to users across the platform."
+              >
+                <Switch />
+              </Form.Item>
+              <Form.Item
+                label="Ad Frequency"
+                name="ad_frequency"
+                extra="Show interstitial ad every N downloads."
+              >
+                <InputNumber min={1} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Card>
+
+            <Card title="Android Ad Units" style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                Configure AdMob ad unit IDs for the Android app.
+              </Text>
+              <Form.Item label="Banner Ad Unit ID" name="android_banner_ad_unit_id">
+                <Input placeholder="ca-app-pub-xxxxx/yyyyy" />
+              </Form.Item>
+              <Form.Item label="Interstitial Ad Unit ID" name="android_interstitial_ad_unit_id">
+                <Input placeholder="ca-app-pub-xxxxx/yyyyy" />
+              </Form.Item>
+              <Form.Item label="Rewarded Ad Unit ID" name="android_rewarded_ad_unit_id">
+                <Input placeholder="ca-app-pub-xxxxx/yyyyy" />
+              </Form.Item>
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={12}>
+            <Card title="Web Ad Settings" style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                Configure Google AdSense settings for the web app.
+              </Text>
+              <Form.Item label="AdSense Client ID" name="web_adsense_client_id">
+                <Input placeholder="ca-pub-xxxxx" />
+              </Form.Item>
+              <Form.Item label="Banner Slot ID" name="web_banner_slot_id">
+                <Input placeholder="1234567890" />
+              </Form.Item>
+              <Form.Item label="Sidebar Slot ID" name="web_sidebar_slot_id">
+                <Input placeholder="1234567890" />
+              </Form.Item>
+            </Card>
+          </Col>
+        </Row>
+      </Form>
+    </div>
+  );
+}

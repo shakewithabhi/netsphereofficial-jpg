@@ -2,8 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var adManager: AdManager
     @State private var cameraBackupEnabled = false
     @State private var showLogoutConfirmation = false
+    @State private var showRewardedAlert = false
+    @State private var rewardMessage = ""
 
     private let brandBlue = Color(red: 0.231, green: 0.510, blue: 0.965)
 
@@ -57,6 +60,37 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.vertical, 4)
+                }
+
+                // Rewarded Ad Section (free users only)
+                if adManager.showAds {
+                    Section("Earn Extra Storage") {
+                        Button {
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let rootVC = windowScene.keyWindow?.rootViewController {
+                                adManager.showRewarded(from: rootVC) {
+                                    rewardMessage = "You earned 100 MB of extra storage!"
+                                    showRewardedAlert = true
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "gift.fill")
+                                    .foregroundStyle(.orange)
+                                Text("Watch Ad for Extra Storage")
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if adManager.isRewardedReady {
+                                    Image(systemName: "play.circle.fill")
+                                        .foregroundStyle(brandBlue)
+                                } else {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                }
+                            }
+                        }
+                        .disabled(!adManager.isRewardedReady)
+                    }
                 }
 
                 // Backup Section
@@ -128,6 +162,11 @@ struct SettingsView: View {
             } message: {
                 Text("You will need to sign in again to access your files.")
             }
+            .alert("Reward Earned!", isPresented: $showRewardedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(rewardMessage)
+            }
             .refreshable {
                 await authManager.fetchProfile()
             }
@@ -152,4 +191,5 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
         .environmentObject(AuthManager())
+        .environmentObject(AdManager.shared)
 }

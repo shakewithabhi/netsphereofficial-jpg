@@ -11,6 +11,8 @@ import AuditLogsPage from './pages/AuditLogs';
 import PendingApprovalsPage from './pages/PendingApprovals';
 import SettingsPage from './pages/Settings';
 import FilesPage from './pages/Files';
+import CommentsPage from './pages/Comments';
+import AdSettingsPage from './pages/AdSettings';
 
 export default function App() {
   return (
@@ -32,6 +34,8 @@ export default function App() {
             <Route path="/storage" element={<StoragePage />} />
             <Route path="/audit-logs" element={<AuditLogsPage />} />
             <Route path="/pending-approvals" element={<PendingApprovalsPage />} />
+            <Route path="/comments" element={<CommentsPage />} />
+            <Route path="/ad-settings" element={<AdSettingsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

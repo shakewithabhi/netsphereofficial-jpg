@@ -87,6 +87,8 @@ import com.bytebox.core.common.toReadableFileSize
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytebox.core.datastore.ViewMode
+import com.bytebox.core.common.AdManager
+import com.bytebox.core.ui.components.BannerAd
 import com.bytebox.core.ui.components.ConfirmationDialog
 import com.bytebox.core.ui.components.EmptyState
 import com.bytebox.core.ui.components.ErrorState
@@ -339,19 +341,32 @@ fun FileListScreen(
                             item {
                                 SectionHeader(title = "Files")
                             }
-                            items(uiState.files, key = { it.id }) { file ->
-                                FileListItem(
-                                    file = file,
-                                    isSelected = uiState.selectedItems.contains(file.id),
-                                    onClick = {
-                                        if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
-                                        else onFileClick(file.id, file.mimeType)
-                                    },
-                                    onLongClick = { viewModel.toggleSelection(file.id) },
-                                    onMoreClick = { contextMenuFileId = file.id },
-                                    onStarClick = { viewModel.toggleStar(file.id, file.isStarred) },
-                                    isPinned = uiState.pinnedFileIds.contains(file.id),
-                                )
+                            uiState.files.forEachIndexed { index, file ->
+                                item(key = file.id) {
+                                    FileListItem(
+                                        file = file,
+                                        isSelected = uiState.selectedItems.contains(file.id),
+                                        onClick = {
+                                            if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
+                                            else onFileClick(file.id, file.mimeType)
+                                        },
+                                        onLongClick = { viewModel.toggleSelection(file.id) },
+                                        onMoreClick = { contextMenuFileId = file.id },
+                                        onStarClick = { viewModel.toggleStar(file.id, file.isStarred) },
+                                        isPinned = uiState.pinnedFileIds.contains(file.id),
+                                    )
+                                }
+                                // Insert a banner ad after every 5 files
+                                if ((index + 1) % 5 == 0) {
+                                    item(key = "ad_after_file_$index") {
+                                        BannerAd(
+                                            adUnitId = AdManager.BANNER_FILES,
+                                            modifier = Modifier.padding(
+                                                horizontal = ByteBoxTheme.spacing.md,
+                                            ),
+                                        )
+                                    }
+                                }
                             }
                         }
                         if (uiState.isLoadingMore) {
@@ -369,6 +384,11 @@ fun FileListScreen(
                     }
                 }
                 else -> {
+                    // Banner ad above the grid for free-tier users
+                    BannerAd(
+                        adUnitId = AdManager.BANNER_FILES,
+                        modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.md),
+                    )
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 160.dp),
                         contentPadding = PaddingValues(ByteBoxTheme.spacing.xs),

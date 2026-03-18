@@ -108,6 +108,27 @@ export interface DailySignupStat {
   count: number;
 }
 
+export interface AdminComment {
+  id: string;
+  content: string;
+  file_id: string;
+  file_name: string;
+  user_id: string;
+  user_email: string;
+  created_at: string;
+}
+
+export interface AdSettings {
+  ads_enabled: boolean;
+  android_banner_ad_unit_id: string;
+  android_interstitial_ad_unit_id: string;
+  android_rewarded_ad_unit_id: string;
+  web_adsense_client_id: string;
+  web_banner_slot_id: string;
+  web_sidebar_slot_id: string;
+  ad_frequency: number;
+}
+
 export const adminApi = {
   // Dashboard
   dashboard: () =>
@@ -183,4 +204,22 @@ export const adminApi = {
   // Signup Trends
   signupTrends: (days?: number) =>
     client.get<DailySignupStat[]>('/admin/signup-trends', { params: { days } }),
+
+  // Comments
+  listComments: (params: { limit?: number; offset?: number; search?: string }) =>
+    client.get<{ comments: AdminComment[]; total: number }>('/admin/comments', { params }),
+
+  deleteComment: (id: string) =>
+    client.delete<{ message: string }>(`/admin/comments/${id}`),
+
+  // Starred stats
+  starredStats: () =>
+    client.get<{ total_stars: number }>('/admin/starred-stats'),
+
+  // Ad settings
+  getAdSettings: () =>
+    client.get<AdSettings>('/admin/ad-settings'),
+
+  updateAdSettings: (settings: AdSettings) =>
+    client.put<AdSettings>('/admin/ad-settings', settings),
 };

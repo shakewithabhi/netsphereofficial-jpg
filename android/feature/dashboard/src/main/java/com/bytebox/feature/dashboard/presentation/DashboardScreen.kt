@@ -31,7 +31,9 @@ import com.bytebox.core.ui.components.FileListShimmer
 import com.bytebox.core.ui.components.RecentFileRow
 import com.bytebox.core.ui.components.SectionHeader
 import com.bytebox.core.ui.components.StorageIndicator
+import com.bytebox.core.ui.components.BannerAd
 import com.bytebox.core.ui.components.UploadFAB
+import com.bytebox.core.common.AdManager
 import com.bytebox.core.ui.theme.ByteBoxTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +93,16 @@ fun DashboardScreen(
                                 ),
                             )
                         }
+                    }
+
+                    // Banner Ad (free-tier only)
+                    item {
+                        BannerAd(
+                            adUnitId = AdManager.BANNER_HOME,
+                            modifier = Modifier.padding(
+                                horizontal = ByteBoxTheme.spacing.md,
+                            ),
+                        )
                     }
 
                     item {

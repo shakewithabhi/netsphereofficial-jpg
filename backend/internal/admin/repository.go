@@ -34,6 +34,8 @@ func (r *Repository) GetDashboardStats(ctx context.Context) (*DashboardStats, er
 		{`SELECT COUNT(*) FROM users WHERE created_at >= CURRENT_DATE`, &stats.NewUsersToday},
 		{`SELECT COUNT(*) FROM files WHERE trashed_at IS NOT NULL`, &stats.TrashedFiles},
 		{`SELECT COUNT(*) FROM upload_sessions WHERE status = 'active'`, &stats.ActiveUploads},
+		{`SELECT COUNT(*) FROM file_comments`, &stats.TotalComments},
+		{`SELECT COUNT(*) FROM file_stars`, &stats.TotalStars},
 	}
 
 	for _, q := range queries {
@@ -601,6 +603,165 @@ func (r *Repository) UpdateSettings(ctx context.Context, settings *PlatformSetti
 			ON CONFLICT (key) DO UPDATE SET value = $2`, key, value)
 		if err != nil {
 			return fmt.Errorf("update setting %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
+func (r *Repository) ListComments(ctx context.Context, limit, offset int, search string) ([]AdminComment, int64, error) {
+	var total int64
+	var countArgs []any
+	countQuery := `SELECT COUNT(*) FROM file_comments fc JOIN files f ON fc.file_id = f.id JOIN users u ON fc.user_id = u.id WHERE 1=1`
+
+	if search != "" {
+		countQuery += ` AND (fc.content ILIKE $1 OR u.email ILIKE $1)`
+		countArgs = append(countArgs, "%"+search+"%")
+	}
+
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count comments: %w", err)
+	}
+
+	query := `
+		SELECT fc.id, fc.file_id, f.name, fc.user_id, u.email, fc.content, fc.created_at
+		FROM file_comments fc
+		JOIN files f ON fc.file_id = f.id
+		JOIN users u ON fc.user_id = u.id
+		WHERE 1=1`
+	var args []any
+	argIdx := 1
+
+	if search != "" {
+		query += fmt.Sprintf(` AND (fc.content ILIKE $%d OR u.email ILIKE $%d)`, argIdx, argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` ORDER BY fc.created_at DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list comments: %w", err)
+	}
+	defer rows.Close()
+
+	var comments []AdminComment
+	for rows.Next() {
+		var c AdminComment
+		if err := rows.Scan(&c.ID, &c.FileID, &c.FileName, &c.UserID, &c.UserEmail, &c.Content, &c.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan comment: %w", err)
+		}
+		comments = append(comments, c)
+	}
+
+	return comments, total, nil
+}
+
+func (r *Repository) DeleteComment(ctx context.Context, commentID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM file_comments WHERE id = $1`, commentID)
+	if err != nil {
+		return fmt.Errorf("delete comment: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetCommentsCount(ctx context.Context) (int64, error) {
+	var count int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM file_comments`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("comments count: %w", err)
+	}
+	return count, nil
+}
+
+func (r *Repository) GetStarredCount(ctx context.Context) (int64, error) {
+	var count int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM file_stars`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("starred count: %w", err)
+	}
+	return count, nil
+}
+
+func (r *Repository) GetMostStarredFiles(ctx context.Context, limit int) ([]MostStarredFile, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT f.id, f.name, f.mime_type, u.email, COUNT(fs.user_id) as star_count
+		FROM files f
+		JOIN file_stars fs ON f.id = fs.file_id
+		JOIN users u ON f.user_id = u.id
+		GROUP BY f.id, f.name, f.mime_type, u.email
+		ORDER BY star_count DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("most starred files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []MostStarredFile
+	for rows.Next() {
+		var f MostStarredFile
+		if err := rows.Scan(&f.ID, &f.Name, &f.MimeType, &f.OwnerEmail, &f.StarCount); err != nil {
+			return nil, fmt.Errorf("scan starred file: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, nil
+}
+
+func (r *Repository) GetAdSettings(ctx context.Context) (*AdSettings, error) {
+	settings := &AdSettings{}
+
+	rows, err := r.db.Query(ctx, `SELECT key, value FROM platform_settings WHERE key LIKE 'ad_%'`)
+	if err != nil {
+		return settings, nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			continue
+		}
+		switch key {
+		case "ad_ads_enabled":
+			settings.AdsEnabled = value == "true"
+		case "ad_banner_ad_unit_id":
+			settings.BannerAdUnitID = value
+		case "ad_interstitial_ad_unit_id":
+			settings.InterstitialAdID = value
+		case "ad_rewarded_ad_unit_id":
+			settings.RewardedAdID = value
+		case "ad_frequency":
+			fmt.Sscanf(value, "%d", &settings.AdFrequency)
+		case "ad_web_ad_client":
+			settings.WebAdClient = value
+		case "ad_web_banner_slot":
+			settings.WebBannerSlot = value
+		case "ad_web_sidebar_slot":
+			settings.WebSidebarSlot = value
+		}
+	}
+
+	return settings, nil
+}
+
+func (r *Repository) UpdateAdSettings(ctx context.Context, settings *AdSettings) error {
+	pairs := map[string]string{
+		"ad_ads_enabled":            fmt.Sprintf("%v", settings.AdsEnabled),
+		"ad_banner_ad_unit_id":      settings.BannerAdUnitID,
+		"ad_interstitial_ad_unit_id": settings.InterstitialAdID,
+		"ad_rewarded_ad_unit_id":    settings.RewardedAdID,
+		"ad_frequency":              fmt.Sprintf("%d", settings.AdFrequency),
+		"ad_web_ad_client":          settings.WebAdClient,
+		"ad_web_banner_slot":        settings.WebBannerSlot,
+		"ad_web_sidebar_slot":       settings.WebSidebarSlot,
+	}
+
+	for key, value := range pairs {
+		_, err := r.db.Exec(ctx, `
+			INSERT INTO platform_settings (key, value) VALUES ($1, $2)
+			ON CONFLICT (key) DO UPDATE SET value = $2`, key, value)
+		if err != nil {
+			return fmt.Errorf("update ad setting %s: %w", key, err)
 		}
 	}
 	return nil

@@ -6,6 +6,7 @@ struct User: Codable, Identifiable {
     let displayName: String?
     let storageUsed: Int64?
     let storageLimit: Int64?
+    let plan: String?
     let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -14,6 +15,7 @@ struct User: Codable, Identifiable {
         case displayName = "display_name"
         case storageUsed = "storage_used"
         case storageLimit = "storage_limit"
+        case plan
         case createdAt = "created_at"
     }
 
