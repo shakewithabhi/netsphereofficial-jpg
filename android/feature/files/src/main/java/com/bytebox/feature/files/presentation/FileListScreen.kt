@@ -917,8 +917,7 @@ fun FileListScreen(
                     com.bytebox.core.ui.components.ByteBoxTextField(
                         value = remoteUploadUrl,
                         onValueChange = { remoteUploadUrl = it },
-                        label = "URL",
-                        placeholder = "https://example.com/file.zip",
+                        label = "URL (e.g. https://example.com/file.zip)",
                         enabled = !uiState.isRemoteUploading,
                     )
                     Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
@@ -926,8 +925,7 @@ fun FileListScreen(
                     com.bytebox.core.ui.components.ByteBoxTextField(
                         value = remoteUploadFileName,
                         onValueChange = { remoteUploadFileName = it },
-                        label = "File name (optional)",
-                        placeholder = "Auto-detect from URL",
+                        label = "File name (optional, auto-detect from URL)",
                         enabled = !uiState.isRemoteUploading,
                     )
 

@@ -272,10 +272,10 @@ fun SettingsScreen(
                             if (activity != null && AdManager.isRewardedReady()) {
                                 AdManager.showRewarded(
                                     activity = activity,
-                                    onRewarded = { rewardItem ->
+                                    onRewarded = { _ ->
                                         scope.launch {
                                             snackbarHostState.showSnackbar(
-                                                "You earned ${rewardItem.amount} ${rewardItem.type} of bonus storage!"
+                                                "You earned bonus storage!"
                                             )
                                         }
                                     },

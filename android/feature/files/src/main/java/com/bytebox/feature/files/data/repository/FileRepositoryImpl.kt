@@ -1,5 +1,6 @@
 package com.bytebox.feature.files.data.repository
 
+import com.bytebox.core.common.AppException
 import com.bytebox.core.common.Result
 import com.bytebox.core.common.map
 import android.content.Context
@@ -183,7 +184,7 @@ class FileRepositoryImpl @Inject constructor(
             val downloadUrl = (urlResult as Result.Success).data
 
             val cachedFile = fileDao.getFileById(fileId)
-                ?: return Result.Error(Exception("File not found in cache"))
+                ?: return Result.Error(AppException.NotFound("File not found in cache"))
 
             val pinnedDir = File(context.filesDir, "pinned")
             if (!pinnedDir.exists()) pinnedDir.mkdirs()
@@ -206,7 +207,7 @@ class FileRepositoryImpl @Inject constructor(
             )
             Result.Success(Unit)
         } catch (e: Exception) {
-            Result.Error(e)
+            Result.Error(AppException.Unknown(e.message ?: "Pin failed", e))
         }
     }
 
@@ -220,7 +221,7 @@ class FileRepositoryImpl @Inject constructor(
             }
             Result.Success(Unit)
         } catch (e: Exception) {
-            Result.Error(e)
+            Result.Error(AppException.Unknown(e.message ?: "Unpin failed", e))
         }
     }
 
