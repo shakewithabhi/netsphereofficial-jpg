@@ -1,55 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="100dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
 
-    <!-- Shadow card -->
-    <group
-        android:pivotX="50"
-        android:pivotY="50"
-        android:rotation="-14">
-        <path
-            android:pathData="M16,6 L84,6 Q94,6 94,16 L94,84 Q94,94 84,94 L16,94 Q6,94 6,84 L6,16 Q6,6 16,6 Z"
-            android:fillColor="#90CAF9" />
-    </group>
+    <!-- Gradient background: blue → deep blue -->
+    <path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="4" android:startY="4"
+                android:endX="96" android:endY="96"
+                android:startColor="#1677FF"
+                android:endColor="#0051D4"/>
+        </aapt:attr>
+    </path>
 
-    <!-- Front card -->
     <group>
-        <clip-path
-            android:pathData="M18,10 L82,10 Q90,10 90,18 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 L10,18 Q10,10 18,10 Z" />
-        <path
-            android:pathData="M10,10 L90,10 L90,90 L10,90 Z"
-            android:fillColor="#E3F2FD" />
-        <!-- Document body with fold corner -->
-        <path
-            android:pathData="M28,16 L66,16 L78,28 L78,86 Q78,90 74,90 L32,90 Q28,90 28,86 Z"
-            android:fillColor="#FFFFFF" />
-        <!-- Fold triangle -->
-        <path
-            android:pathData="M66,16 L78,28 L66,28 Z"
-            android:fillColor="#90CAF9" />
+        <clip-path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z"/>
+
+        <!-- Document body -->
+        <path android:pathData="M26,16 L64,16 L76,28 L76,84 Q76,88 72,88 L28,88 Q24,88 24,84 L24,20 Q24,16 26,16 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.92"/>
+        <!-- Fold corner -->
+        <path android:pathData="M64,16 L76,28 L64,28 Z"
+            android:fillColor="#FFFFFF" android:fillAlpha="0.5"/>
         <!-- Text lines -->
-        <path
-            android:pathData="M36,40 L70,40"
-            android:strokeColor="#1E88E5"
-            android:strokeWidth="3"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M36,50 L70,50"
-            android:strokeColor="#1E88E5"
-            android:strokeWidth="3"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M36,60 L70,60"
-            android:strokeColor="#1E88E5"
-            android:strokeWidth="3"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M36,70 L58,70"
-            android:strokeColor="#1E88E5"
-            android:strokeWidth="3"
-            android:strokeLineCap="round" />
+        <path android:pathData="M32,40 L68,40"
+            android:strokeColor="#1677FF" android:strokeWidth="3.5" android:strokeLineCap="round"/>
+        <path android:pathData="M32,51 L68,51"
+            android:strokeColor="#1677FF" android:strokeWidth="3.5" android:strokeLineCap="round"/>
+        <path android:pathData="M32,62 L68,62"
+            android:strokeColor="#1677FF" android:strokeWidth="3.5" android:strokeLineCap="round"/>
+        <path android:pathData="M32,73 L52,73"
+            android:strokeColor="#1677FF" android:strokeWidth="3.5" android:strokeLineCap="round"/>
     </group>
 </vector>

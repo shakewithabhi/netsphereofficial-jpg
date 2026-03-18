@@ -117,3 +117,36 @@ type PublicFolderContentsResponse struct {
 	FolderName string              `json:"folder_name"`
 	Files      []file.FileResponse `json:"files"`
 }
+
+// Explore types
+
+type ExploreItem struct {
+	ID            string    `json:"id"`
+	Code          string    `json:"code"`
+	FileName      string    `json:"file_name"`
+	FileSize      int64     `json:"file_size"`
+	MimeType      string    `json:"mime_type"`
+	ThumbnailURL  string    `json:"thumbnail_url,omitempty"`
+	OwnerName     string    `json:"owner_name"`
+	DownloadCount int       `json:"download_count"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type ExploreListResponse struct {
+	Items      []ExploreItem `json:"items"`
+	NextCursor *string       `json:"next_cursor"`
+}
+
+type exploreRow struct {
+	ShareID           string
+	Code              string
+	FileName          string
+	FileSize          int64
+	MimeType          string
+	ThumbnailKey      string
+	VideoThumbnailURL string
+	IsVideo           bool
+	OwnerName         string
+	DownloadCount     int
+	CreatedAt         time.Time
+}

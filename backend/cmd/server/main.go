@@ -214,6 +214,7 @@ func main() {
 			r.Use(authMiddleware.OptionalAuthenticate)
 			r.Use(rateLimiter.Limit(30, time.Minute, middleware.ByIP))
 			r.Mount("/s", shareHandler.PublicRoutes())
+			r.Mount("/explore", shareHandler.ExploreRoutes())
 		})
 
 		// Share preview: 60 req/min by IP (separate limit from download)

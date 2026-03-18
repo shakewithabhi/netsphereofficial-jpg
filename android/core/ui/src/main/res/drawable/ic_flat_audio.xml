@@ -1,46 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="100dp"
     android:viewportWidth="100"
     android:viewportHeight="100">
 
-    <!-- Shadow card -->
-    <group
-        android:pivotX="50"
-        android:pivotY="50"
-        android:rotation="-14">
-        <path
-            android:pathData="M16,6 L84,6 Q94,6 94,16 L94,84 Q94,94 84,94 L16,94 Q6,94 6,84 L6,16 Q6,6 16,6 Z"
-            android:fillColor="#CE93D8" />
-    </group>
+    <!-- Gradient background: purple → indigo -->
+    <path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear"
+                android:startX="4" android:startY="4"
+                android:endX="96" android:endY="96"
+                android:startColor="#AF52DE"
+                android:endColor="#5856D6"/>
+        </aapt:attr>
+    </path>
 
-    <!-- Front card -->
     <group>
-        <clip-path
-            android:pathData="M18,10 L82,10 Q90,10 90,18 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 L10,18 Q10,10 18,10 Z" />
-        <path
-            android:pathData="M10,10 L90,10 L90,90 L10,90 Z"
-            android:fillColor="#F3E5F5" />
+        <clip-path android:pathData="M20,4 L80,4 Q96,4 96,20 L96,80 Q96,96 80,96 L20,96 Q4,96 4,80 L4,20 Q4,4 20,4 Z"/>
+
         <!-- Note head 1 (left) -->
-        <path
-            android:pathData="M34,70 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
-            android:fillColor="#9C27B0" />
+        <path android:pathData="M32,74 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"
+            android:fillColor="#FFFFFF"/>
         <!-- Note head 2 (right) -->
-        <path
-            android:pathData="M60,63 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0"
-            android:fillColor="#9C27B0" />
+        <path android:pathData="M62,66 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"
+            android:fillColor="#FFFFFF"/>
         <!-- Stem 1 -->
-        <path
-            android:pathData="M43,22 L47,22 L47,70 L43,70 Z"
-            android:fillColor="#9C27B0" />
+        <path android:pathData="M43,20 L48,20 L48,74 L43,74 Z" android:fillColor="#FFFFFF"/>
         <!-- Stem 2 -->
-        <path
-            android:pathData="M69,16 L73,16 L73,63 L69,63 Z"
-            android:fillColor="#9C27B0" />
-        <!-- Beam connecting stems -->
-        <path
-            android:pathData="M43,22 L73,16 L73,26 L43,32 Z"
-            android:fillColor="#9C27B0" />
+        <path android:pathData="M73,14 L78,14 L78,66 L73,66 Z" android:fillColor="#FFFFFF"/>
+        <!-- Beam -->
+        <path android:pathData="M43,20 L78,14 L78,26 L43,32 Z" android:fillColor="#FFFFFF"/>
     </group>
 </vector>

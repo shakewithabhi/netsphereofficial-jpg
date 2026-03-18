@@ -183,6 +183,61 @@ func (r *Repository) GetFolderContents(ctx context.Context, folderID uuid.UUID) 
 	return files, nil
 }
 
+// GetExploreItems returns publicly shared files for the explore feed.
+// Cursor is encoded as "createdAt_RFC3339Nano|shareID" to support stable keyset pagination.
+func (r *Repository) GetExploreItems(ctx context.Context, limit int, cursorTime *time.Time, cursorID *string, mimePrefix *string) ([]exploreRow, error) {
+	args := []any{}
+	idx := 1
+
+	query := `
+		SELECT s.id, s.code, f.name, f.size, f.mime_type,
+		       COALESCE(f.thumbnail_key, ''), COALESCE(f.video_thumbnail_url, ''),
+		       f.is_video, COALESCE(u.display_name, ''), s.download_count, s.created_at
+		FROM shares s
+		JOIN files f ON f.id = s.file_id
+		JOIN users u ON u.id = s.user_id
+		WHERE s.is_active = true
+		  AND s.password_hash = ''
+		  AND s.share_type = 'file'
+		  AND (s.expires_at IS NULL OR s.expires_at > NOW())
+		  AND f.trashed_at IS NULL`
+
+	if mimePrefix != nil {
+		query += fmt.Sprintf(" AND f.mime_type LIKE $%d", idx)
+		args = append(args, *mimePrefix+"%")
+		idx++
+	}
+
+	if cursorTime != nil && cursorID != nil {
+		query += fmt.Sprintf(" AND (s.created_at, s.id::text) < ($%d, $%d)", idx, idx+1)
+		args = append(args, *cursorTime, *cursorID)
+		idx += 2
+	}
+
+	query += fmt.Sprintf(" ORDER BY s.created_at DESC, s.id DESC LIMIT $%d", idx)
+	args = append(args, limit)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get explore items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []exploreRow
+	for rows.Next() {
+		var item exploreRow
+		if err := rows.Scan(
+			&item.ShareID, &item.Code, &item.FileName, &item.FileSize, &item.MimeType,
+			&item.ThumbnailKey, &item.VideoThumbnailURL, &item.IsVideo,
+			&item.OwnerName, &item.DownloadCount, &item.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan explore row: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 // CountFolderFiles returns the number of non-trashed files in a folder.
 func (r *Repository) CountFolderFiles(ctx context.Context, folderID uuid.UUID) (int, error) {
 	query := `SELECT COUNT(*) FROM files WHERE folder_id = $1 AND trashed_at IS NULL`

@@ -6,18 +6,21 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bytebox.core.ui.theme.elevatedShadow
 
 @Composable
@@ -37,24 +40,32 @@ fun UploadFAB(
         label = "pulse_scale",
     )
 
-    FloatingActionButton(
+    val shape = RoundedCornerShape(16.dp)
+    ExtendedFloatingActionButton(
         onClick = onClick,
         modifier = modifier
-            .size(60.dp)
             .scale(pulseScale)
-            .elevatedShadow(shape = CircleShape),
-        shape = CircleShape,
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+            .elevatedShadow(shape = shape),
+        shape = shape,
+        containerColor = Color(0xFF2563EB),
+        contentColor = Color.White,
         elevation = FloatingActionButtonDefaults.elevation(
             defaultElevation = 0.dp,
             pressedElevation = 0.dp,
         ),
-    ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = "Upload",
-            modifier = Modifier.size(28.dp),
-        )
-    }
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+        },
+        text = {
+            Text(
+                text = "Upload",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        },
+    )
 }

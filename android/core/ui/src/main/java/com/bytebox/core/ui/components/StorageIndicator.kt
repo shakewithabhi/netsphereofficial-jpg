@@ -26,11 +26,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.theme.ByteBoxTheme
-import com.bytebox.core.ui.theme.Green500
-import com.bytebox.core.ui.theme.Amber500
-import com.bytebox.core.ui.theme.Red500
-import com.bytebox.core.ui.theme.Blue500
-import com.bytebox.core.ui.theme.Blue400
+import com.bytebox.core.ui.theme.Mint400
+import com.bytebox.core.ui.theme.WarmAmber400
+import com.bytebox.core.ui.theme.SoftRed400
+import com.bytebox.core.ui.theme.Lavender500
+import com.bytebox.core.ui.theme.Lavender400
 
 @Composable
 fun StorageIndicator(
@@ -52,9 +52,9 @@ fun StorageIndicator(
     )
 
     val progressBrush = when {
-        targetProgress > 0.9f -> Brush.horizontalGradient(listOf(Red500, Red500))
-        targetProgress > 0.75f -> Brush.horizontalGradient(listOf(Amber500, Amber500))
-        else -> Brush.horizontalGradient(listOf(Blue500, Blue400))
+        targetProgress > 0.9f -> Brush.horizontalGradient(listOf(SoftRed400, SoftRed400))
+        targetProgress > 0.75f -> Brush.horizontalGradient(listOf(WarmAmber400, WarmAmber400))
+        else -> Brush.horizontalGradient(listOf(Lavender500, Lavender400))
     }
 
     val percentText = "${(targetProgress * 100).toInt()}%"

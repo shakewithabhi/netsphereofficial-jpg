@@ -122,6 +122,10 @@ val FileArchiveColor = WarmAmber400     // Warm Amber
 val FileCodeColor    = Color(0xFF06B6D4) // Cyan
 val FileOtherColor   = Mauve400         // Mauve
 
+// ── Terabox brand blue ────────────────────────────────────────────────────────
+val TeraBoxBlue     = Color(0xFF1677FF)
+val TeraBoxBlueTint = Color(0xFFE3EEFF)
+
 // ── Apple / iOS neutral palette ───────────────────────────────────────────────
 val AppleBlack     = Color(0xFF000000)
 val AppleGray1     = Color(0xFF8E8E93)   // iOS secondary label

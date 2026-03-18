@@ -159,7 +159,7 @@ fun ExploreScreen(
                         Text(
                             text = "Explore",
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 24.sp,
+                            fontSize = 22.sp,
                         )
                     },
                     actions = {
@@ -167,6 +167,7 @@ fun ExploreScreen(
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(24.dp),
                             )
                         }
@@ -174,6 +175,7 @@ fun ExploreScreen(
                             Icon(
                                 Icons.Default.Notifications,
                                 contentDescription = "Notifications",
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(24.dp),
                             )
                         }
@@ -202,7 +204,8 @@ fun ExploreScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 )
             }
