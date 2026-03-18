@@ -20,6 +20,19 @@ type Config struct {
 	Stripe      StripeConfig
 	Meilisearch MeilisearchConfig
 	Scanner     ScannerConfig
+	FCM         FCMConfig
+	SMTP        SMTPConfig
+}
+
+type FCMConfig struct {
+	ServerKey string
+}
+
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	From     string
+	Password string
 }
 
 type CFStreamConfig struct {
@@ -200,6 +213,15 @@ func Load() (*Config, error) {
 			AccountID:         getEnv("CF_STREAM_ACCOUNT_ID", ""),
 			CustomerSubdomain: getEnv("CF_STREAM_CUSTOMER_SUBDOMAIN", ""),
 			WebhookSecret:     getEnv("CF_STREAM_WEBHOOK_SECRET", ""),
+		},
+		FCM: FCMConfig{
+			ServerKey: getEnv("FCM_SERVER_KEY", ""),
+		},
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", ""),
+			Port:     getEnvInt("SMTP_PORT", 587),
+			From:     getEnv("SMTP_FROM", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
 		},
 	}
 

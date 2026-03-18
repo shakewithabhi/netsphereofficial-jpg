@@ -12,11 +12,12 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo   *Repository
+	pusher PushSender
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, pusher PushSender) *Service {
+	return &Service{repo: repo, pusher: pusher}
 }
 
 func (s *Service) Notify(ctx context.Context, userID uuid.UUID, notifType, title, message string, data map[string]interface{}) error {
@@ -35,6 +36,18 @@ func (s *Service) Notify(ctx context.Context, userID uuid.UUID, notifType, title
 	if err := s.repo.Create(ctx, n); err != nil {
 		slog.Error("failed to create notification", "error", err, "user_id", userID, "type", notifType)
 		return err
+	}
+
+	// Send push notification via FCM if a pusher is configured
+	if s.pusher != nil {
+		tokens, err := s.repo.GetUserPushTokens(ctx, userID)
+		if err != nil {
+			slog.Error("failed to get push tokens", "error", err, "user_id", userID)
+		} else if len(tokens) > 0 {
+			if err := s.pusher.SendPush(ctx, tokens, title, message, data); err != nil {
+				slog.Error("failed to send push notification", "error", err, "user_id", userID)
+			}
+		}
 	}
 
 	return nil

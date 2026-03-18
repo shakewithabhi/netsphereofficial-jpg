@@ -94,6 +94,8 @@ func main() {
 	jwtManager := auth.NewJWTManager(cfg.Auth)
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, jwtManager, auditLogger, rdb, cfg.App, cfg.Auth, cfg.Google.ClientID)
+	emailSender := auth.NewEmailSender(cfg.SMTP, cfg.App.BaseURL)
+	authService.SetEmailSender(emailSender)
 	authMiddleware := auth.NewMiddleware(jwtManager)
 	authHandler := auth.NewHandler(authService, authMiddleware)
 
@@ -150,7 +152,8 @@ func main() {
 
 	// Notification module
 	notifRepo := notification.NewRepository(db)
-	notifService := notification.NewService(notifRepo)
+	fcmSender := notification.NewFCMSender(cfg.FCM.ServerKey)
+	notifService := notification.NewService(notifRepo, fcmSender)
 	notifHandler := notification.NewHandler(notifService)
 
 	// Inject notification service into file service

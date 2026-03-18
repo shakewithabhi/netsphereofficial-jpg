@@ -5,6 +5,7 @@ import com.bytebox.domain.model.FileItem
 import com.bytebox.domain.model.FileVersion
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.FolderContents
+import com.bytebox.domain.model.NotificationItem
 
 interface FileRepository {
     suspend fun getFolderContents(
@@ -35,4 +36,9 @@ interface FileRepository {
     suspend fun pinFile(fileId: String): Result<Unit>
     suspend fun unpinFile(fileId: String): Result<Unit>
     suspend fun isFilePinned(fileId: String): Boolean
+    suspend fun getNotifications(limit: Int = 20): Result<List<NotificationItem>>
+    suspend fun getUnreadNotificationCount(): Result<Int>
+    suspend fun markNotificationRead(id: String): Result<Unit>
+    suspend fun markAllNotificationsRead(): Result<Unit>
+    suspend fun registerPushToken(token: String): Result<Unit>
 }

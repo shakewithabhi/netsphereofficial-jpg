@@ -468,6 +468,52 @@ func (r *Repository) CountUnusedRecoveryCodes(ctx context.Context, userID uuid.U
 	return count, nil
 }
 
+// Email verification operations
+
+func (r *Repository) SetVerificationToken(ctx context.Context, userID uuid.UUID, token string) error {
+	query := `UPDATE users SET verification_token = $1, verification_sent_at = NOW() WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, token, userID)
+	if err != nil {
+		return fmt.Errorf("set verification token: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetUserByVerificationToken(ctx context.Context, token string) (*User, error) {
+	query := `
+		SELECT id, email, password_hash, COALESCE(display_name, ''), COALESCE(avatar_key, ''),
+		       storage_used, storage_limit, plan, is_active, is_admin,
+		       email_verified, totp_secret_encrypted, totp_enabled, totp_verified_at,
+		       failed_login_attempts, locked_until, password_changed_at,
+		       last_login_at, created_at, updated_at
+		FROM users WHERE verification_token = $1`
+
+	user := &User{}
+	err := r.db.QueryRow(ctx, query, token).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.DisplayName, &user.AvatarKey,
+		&user.StorageUsed, &user.StorageLimit, &user.Plan, &user.IsActive, &user.IsAdmin,
+		&user.EmailVerified, &user.TOTPSecretEncrypted, &user.TOTPEnabled, &user.TOTPVerifiedAt,
+		&user.FailedLoginAttempts, &user.LockedUntil, &user.PasswordChangedAt,
+		&user.LastLoginAt, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get user by verification token: %w", err)
+	}
+	return user, nil
+}
+
+func (r *Repository) VerifyEmail(ctx context.Context, userID uuid.UUID) error {
+	query := `UPDATE users SET email_verified = true, verification_token = NULL WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("verify email: %w", err)
+	}
+	return nil
+}
+
 // Approval status operations
 
 func (r *Repository) SetApprovalStatus(ctx context.Context, userID uuid.UUID, status string) error {

@@ -44,6 +44,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -76,6 +77,7 @@ import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
+import com.bytebox.feature.files.presentation.notifications.NotificationsScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
 import kotlinx.coroutines.launch
@@ -99,6 +101,8 @@ fun ByteBoxNavHost(
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    var unreadNotificationCount by remember { mutableIntStateOf(0) }
 
     // 5-tab navigation: Home, Files, Favorites, Shares, Profile
     val bottomNavItems = listOf(
@@ -228,6 +232,10 @@ fun ByteBoxNavHost(
                     onSeeAllFolders = {
                         navController.navigate(Screen.Files.route)
                     },
+                    onNotificationClick = {
+                        navController.navigate(Screen.Notifications.route)
+                    },
+                    notificationCount = unreadNotificationCount,
                 )
             }
 
@@ -380,6 +388,14 @@ fun ByteBoxNavHost(
             composable(Screen.Trash.route) {
                 TrashScreen(
                     onNavigateBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Screen.Notifications.route) {
+                NotificationsScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
                 )
             }
 

@@ -73,6 +73,9 @@ type AuthResponse struct {
 	// 2FA challenge fields (present when 2FA is enabled and not yet verified)
 	RequiresTwoFactor bool   `json:"requires_two_factor,omitempty"`
 	TempToken         string `json:"temp_token,omitempty"`
+
+	// Warning for unverified email (login still succeeds)
+	Warning string `json:"warning,omitempty"`
 }
 
 type UserResponse struct {
@@ -156,6 +159,16 @@ type SessionResponse struct {
 	UserAgent  string    `json:"user_agent,omitempty"`
 	ExpiresAt  time.Time `json:"expires_at"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+// Email verification request types
+
+type VerifyEmailRequest struct {
+	Token string `json:"token" validate:"required"`
+}
+
+type ResendVerificationRequest struct {
+	Email string `json:"email" validate:"required,email"`
 }
 
 // Password reset request types

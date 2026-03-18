@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import type { User } from '../api/auth';
+import type { User, AuthResponse } from '../api/auth';
 import { login as apiLogin, register as apiRegister, getProfile } from '../api/auth';
 
 interface AuthContextValue {
@@ -7,6 +7,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWith2FA: (data: AuthResponse) => void;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -40,6 +41,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }
 
+  function loginWith2FA(data: AuthResponse) {
+    if (data.access_token && data.refresh_token && data.user) {
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      setUser(data.user);
+    }
+  }
+
   async function register(email: string, password: string, displayName: string) {
     const data = await apiRegister(email, password, displayName);
     localStorage.setItem('access_token', data.access_token);
@@ -66,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWith2FA,
         register,
         logout,
         refreshUser,

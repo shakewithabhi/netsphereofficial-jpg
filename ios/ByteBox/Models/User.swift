@@ -7,6 +7,7 @@ struct User: Codable, Identifiable {
     let storageUsed: Int64?
     let storageLimit: Int64?
     let plan: String?
+    let twoFactorEnabled: Bool?
     let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -16,6 +17,7 @@ struct User: Codable, Identifiable {
         case storageUsed = "storage_used"
         case storageLimit = "storage_limit"
         case plan
+        case twoFactorEnabled = "two_factor_enabled"
         case createdAt = "created_at"
     }
 
@@ -40,11 +42,15 @@ struct User: Codable, Identifiable {
 }
 
 struct AuthTokens: Codable {
-    let accessToken: String
+    let accessToken: String?
     let refreshToken: String?
+    let tempToken: String?
+    let requires2FA: Bool?
 
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
+        case tempToken = "temp_token"
+        case requires2FA = "requires_2fa"
     }
 }

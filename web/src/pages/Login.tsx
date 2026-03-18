@@ -3,15 +3,18 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HardDrive, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../store/auth';
+import { TwoFactorVerify } from '../components/TwoFactorVerify';
+import type { AuthResponse } from '../api/auth';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWith2FA } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [tempToken, setTempToken] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -25,13 +28,26 @@ export default function Login() {
       await login(email, password);
       navigate('/');
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Invalid email or password.';
-      setError(msg);
+      const response = (err as { response?: { data?: { data?: { temp_token?: string; requires_2fa?: boolean }; message?: string } } })?.response;
+      if (response?.data?.data?.requires_2fa && response?.data?.data?.temp_token) {
+        setTempToken(response.data.data.temp_token);
+      } else {
+        const msg = response?.data?.message ?? 'Invalid email or password.';
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  function handle2FASuccess(data: AuthResponse) {
+    loginWith2FA(data);
+    navigate('/');
+  }
+
+  function handle2FACancel() {
+    setTempToken(null);
+    setError('');
   }
 
   return (
@@ -122,6 +138,13 @@ export default function Login() {
           </Link>
         </div>
       </div>
+      {tempToken && (
+        <TwoFactorVerify
+          tempToken={tempToken}
+          onSuccess={handle2FASuccess}
+          onCancel={handle2FACancel}
+        />
+      )}
     </div>
   );
 }

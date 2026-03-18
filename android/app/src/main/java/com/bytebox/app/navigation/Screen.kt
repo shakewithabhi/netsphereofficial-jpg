@@ -26,6 +26,7 @@ sealed class Screen(val route: String) {
     data object StorageAnalytics : Screen("storage_analytics")
     data object Trash : Screen("trash")
     data object Favorites : Screen("favorites")
+    data object Notifications : Screen("notifications")
     data object ShareView : Screen("share_view/{code}") {
         fun createRoute(code: String) = "share_view/$code"
     }

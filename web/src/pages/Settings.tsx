@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
-import { User, Check, X, HardDrive, FileText } from 'lucide-react';
+import { User, Check, X, HardDrive, FileText, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import client from '../api/client';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { RewardedAdButton } from '../components/RewardedAd';
+import { TwoFactorSetup } from '../components/TwoFactorSetup';
 
 export default function Settings() {
   const { user, refreshUser } = useAuth();
@@ -42,6 +43,21 @@ export default function Settings() {
       setSaving(false);
     }
   }
+
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+
+  useEffect(() => {
+    // Check 2FA status from user profile or a dedicated endpoint
+    async function check2FAStatus() {
+      try {
+        const res = await client.get('/auth/2fa/status');
+        setTwoFAEnabled(res.data.data?.enabled ?? false);
+      } catch {
+        // If endpoint doesn't exist yet, default to false
+      }
+    }
+    check2FAStatus();
+  }, []);
 
   const storageUsed = user?.storage_used ?? 0;
   const storageLimit = user?.storage_limit ?? 1073741824;
@@ -182,6 +198,27 @@ export default function Settings() {
                   <RewardedAdButton />
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Two-Factor Authentication section */}
+          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+              <Shield size={16} className="text-slate-500 dark:text-slate-400" />
+              <h2 className="font-semibold text-slate-800 dark:text-slate-200">Two-Factor Authentication</h2>
+            </div>
+            <div className="p-6">
+              <TwoFactorSetup
+                isEnabled={twoFAEnabled}
+                onStatusChange={async () => {
+                  try {
+                    const res = await client.get('/auth/2fa/status');
+                    setTwoFAEnabled(res.data.data?.enabled ?? false);
+                  } catch {
+                    setTwoFAEnabled((v) => !v);
+                  }
+                }}
+              />
             </div>
           </div>
 

@@ -136,4 +136,45 @@ final class FileService {
             path: "/files/\(fileId)/comments/\(commentId)"
         )
     }
+
+    // MARK: - Notifications
+
+    func getNotifications(limit: Int = 20) async throws -> [AppNotification] {
+        let response: NotificationsListResponse = try await api.request(
+            "GET",
+            path: "/notifications",
+            queryItems: [URLQueryItem(name: "limit", value: "\(limit)")]
+        )
+        return response.notifications
+    }
+
+    func getUnreadCount() async throws -> Int {
+        let response: UnreadCountResponse = try await api.request(
+            "GET",
+            path: "/notifications/unread-count"
+        )
+        return response.count
+    }
+
+    func markNotificationRead(_ id: String) async throws {
+        let _: EmptyResponse = try await api.request(
+            "POST",
+            path: "/notifications/\(id)/read"
+        )
+    }
+
+    func markAllNotificationsRead() async throws {
+        let _: EmptyResponse = try await api.request(
+            "POST",
+            path: "/notifications/read-all"
+        )
+    }
+
+    func registerPushToken(_ token: String, platform: String) async throws {
+        let _: EmptyResponse = try await api.request(
+            "POST",
+            path: "/notifications/push-token",
+            body: ["token": token, "platform": platform]
+        )
+    }
 }

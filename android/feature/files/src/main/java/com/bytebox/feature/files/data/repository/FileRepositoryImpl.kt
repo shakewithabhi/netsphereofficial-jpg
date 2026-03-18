@@ -14,12 +14,15 @@ import com.bytebox.core.network.dto.CreateFolderRequest
 import com.bytebox.core.network.dto.FileDto
 import com.bytebox.core.network.dto.FileVersionDto
 import com.bytebox.core.network.dto.FolderDto
+import com.bytebox.core.network.dto.NotificationDto
+import com.bytebox.core.network.dto.RegisterTokenRequest
 import com.bytebox.core.network.dto.RenameFolderRequest
 import com.bytebox.core.network.safeApiCall
 import com.bytebox.domain.model.FileItem
 import com.bytebox.domain.model.FileVersion
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.FolderContents
+import com.bytebox.domain.model.NotificationItem
 import com.bytebox.domain.repository.FileRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -223,6 +226,33 @@ class FileRepositoryImpl @Inject constructor(
     override suspend fun isFilePinned(fileId: String): Boolean {
         return pinnedFileDao.isFilePinned(fileId)
     }
+
+    override suspend fun getNotifications(limit: Int): Result<List<NotificationItem>> {
+        return safeApiCall { fileApi.getNotifications(limit) }.map { response ->
+            response.notifications.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun getUnreadNotificationCount(): Result<Int> {
+        return safeApiCall { fileApi.getUnreadNotificationCount() }.map { it.count }
+    }
+
+    override suspend fun markNotificationRead(id: String): Result<Unit> {
+        return safeApiCall { fileApi.markNotificationRead(id) }
+    }
+
+    override suspend fun markAllNotificationsRead(): Result<Unit> {
+        return safeApiCall { fileApi.markAllNotificationsRead() }
+    }
+
+    override suspend fun registerPushToken(token: String): Result<Unit> {
+        return safeApiCall { fileApi.registerPushToken(RegisterTokenRequest(token)) }
+    }
+
+    private fun NotificationDto.toDomain() = NotificationItem(
+        id = id, type = type, title = title, message = message,
+        isRead = isRead, createdAt = createdAt
+    )
 
     private fun FileVersionDto.toDomain() = FileVersion(
         id = id, fileId = fileId, versionNumber = versionNumber,

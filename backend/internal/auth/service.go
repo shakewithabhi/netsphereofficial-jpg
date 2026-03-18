@@ -39,11 +39,13 @@ type Service struct {
 	jwt               *JWTManager
 	audit             *common.AuditLogger
 	rdb               *redis.Client
+	email             *EmailSender
 	bcryptCost        int
 	quotaSize         int64
 	googleClientID    string
 	totpEncryptionKey string
 	requireApproval   bool
+	baseURL           string
 }
 
 func NewService(repo *Repository, jwt *JWTManager, audit *common.AuditLogger, rdb *redis.Client, cfg config.AppConfig, authCfg config.AuthConfig, googleClientID string) *Service {
@@ -57,7 +59,13 @@ func NewService(repo *Repository, jwt *JWTManager, audit *common.AuditLogger, rd
 		googleClientID:    googleClientID,
 		totpEncryptionKey: authCfg.TOTPEncryptionKey,
 		requireApproval:   cfg.RequireApproval,
+		baseURL:           cfg.BaseURL,
 	}
+}
+
+// SetEmailSender sets the email sender for verification and password reset emails.
+func (s *Service) SetEmailSender(email *EmailSender) {
+	s.email = email
 }
 
 // validatePasswordStrength enforces strict password complexity.
@@ -149,9 +157,17 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (*AuthRespo
 		return nil, common.ErrForbidden("registration submitted, awaiting admin approval")
 	}
 
+	// Generate and send email verification token
+	s.sendVerificationToken(ctx, user.ID, user.Email)
+
 	s.audit.Log(ctx, &user.ID, common.AuditUserRegister, "user", &user.ID, nil, "")
 
-	return s.generateAuthResponse(ctx, user, "", "", "", "")
+	resp, err := s.generateAuthResponse(ctx, user, "", "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	resp.Warning = "please verify your email address"
+	return resp, nil
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest, ip, userAgent, deviceName, deviceType string) (*AuthResponse, error) {
@@ -243,7 +259,17 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, ip, userAgent, de
 
 	s.audit.Log(ctx, &user.ID, common.AuditUserLogin, "user", &user.ID, map[string]any{"ip": ip, "device": deviceName}, ip)
 
-	return s.generateAuthResponse(ctx, user, ip, userAgent, deviceName, deviceType)
+	resp, err := s.generateAuthResponse(ctx, user, ip, userAgent, deviceName, deviceType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Warn (but don't block) unverified users
+	if !user.EmailVerified {
+		resp.Warning = "please verify your email address"
+	}
+
+	return resp, nil
 }
 
 func (s *Service) Refresh(ctx context.Context, req RefreshRequest, ip, userAgent, deviceName, deviceType string) (*AuthResponse, error) {
@@ -659,6 +685,71 @@ func (s *Service) ResetPassword(ctx context.Context, req ResetPasswordRequest) e
 	s.audit.Log(ctx, &userID, common.AuditPasswordReset, "user", &userID, nil, "")
 
 	return nil
+}
+
+// sendVerificationToken generates a verification token, stores it, and sends the verification email.
+func (s *Service) sendVerificationToken(ctx context.Context, userID uuid.UUID, email string) {
+	token := uuid.New().String()
+	if err := s.repo.SetVerificationToken(ctx, userID, token); err != nil {
+		slog.Error("failed to set verification token", "error", err, "user_id", userID)
+		return
+	}
+
+	if s.email != nil {
+		if err := s.email.SendVerificationEmail(email, token); err != nil {
+			slog.Error("failed to send verification email", "error", err, "email", email)
+		}
+	} else {
+		slog.Info("email sender not configured, verification token generated", "user_id", userID, "email", email)
+	}
+}
+
+// VerifyEmail verifies a user's email using the provided token.
+func (s *Service) VerifyEmail(ctx context.Context, req VerifyEmailRequest) (map[string]any, error) {
+	user, err := s.repo.GetUserByVerificationToken(ctx, req.Token)
+	if err != nil {
+		slog.Error("failed to look up verification token", "error", err)
+		return nil, common.ErrInternal("failed to verify email")
+	}
+	if user == nil {
+		return nil, common.ErrBadRequest("invalid or expired verification token")
+	}
+
+	if user.EmailVerified {
+		return map[string]any{"message": "email already verified"}, nil
+	}
+
+	if err := s.repo.VerifyEmail(ctx, user.ID); err != nil {
+		slog.Error("failed to verify email", "error", err, "user_id", user.ID)
+		return nil, common.ErrInternal("failed to verify email")
+	}
+
+	slog.Info("email verified", "user_id", user.ID, "email", user.Email)
+
+	return map[string]any{"message": "email verified successfully"}, nil
+}
+
+// ResendVerification generates a new verification token and resends the verification email.
+func (s *Service) ResendVerification(ctx context.Context, req ResendVerificationRequest) (map[string]any, error) {
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+
+	user, err := s.repo.GetUserByEmail(ctx, email)
+	if err != nil {
+		slog.Error("failed to get user for resend verification", "error", err)
+		// Always return success to prevent enumeration
+		return map[string]any{"message": "if that email exists, a verification link has been sent"}, nil
+	}
+	if user == nil {
+		return map[string]any{"message": "if that email exists, a verification link has been sent"}, nil
+	}
+
+	if user.EmailVerified {
+		return map[string]any{"message": "email is already verified"}, nil
+	}
+
+	s.sendVerificationToken(ctx, user.ID, user.Email)
+
+	return map[string]any{"message": "if that email exists, a verification link has been sent"}, nil
 }
 
 func (s *Service) GoogleLogin(ctx context.Context, req GoogleLoginRequest, ip, userAgent, deviceName, deviceType string) (*AuthResponse, error) {

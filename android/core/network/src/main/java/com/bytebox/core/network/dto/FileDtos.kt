@@ -76,3 +76,29 @@ data class FileVersionDto(
 data class FileVersionsResponse(
     val versions: List<FileVersionDto>
 )
+
+@JsonClass(generateAdapter = true)
+data class NotificationDto(
+    val id: String,
+    val type: String,
+    val title: String,
+    val message: String,
+    @Json(name = "is_read") val isRead: Boolean,
+    @Json(name = "created_at") val createdAt: String
+)
+
+@JsonClass(generateAdapter = true)
+data class NotificationsResponse(
+    val notifications: List<NotificationDto>
+)
+
+@JsonClass(generateAdapter = true)
+data class UnreadCountResponse(
+    val count: Int
+)
+
+@JsonClass(generateAdapter = true)
+data class RegisterTokenRequest(
+    val token: String,
+    val platform: String = "android"
+)

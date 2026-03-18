@@ -33,6 +33,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/2fa/verify-login", h.VerifyTwoFactorLogin)
 	r.Post("/forgot-password", h.ForgotPassword)
 	r.Post("/reset-password", h.ResetPassword)
+	r.Post("/verify-email", h.VerifyEmail)
+	r.Post("/resend-verification", h.ResendVerification)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
@@ -333,6 +335,38 @@ func (h *Handler) VerifyTwoFactorLogin(w http.ResponseWriter, r *http.Request) {
 		r.Header.Get("X-Device-Name"),
 		r.Header.Get("X-Device-Type"),
 	)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req VerifyEmailRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.VerifyEmail(r.Context(), req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req ResendVerificationRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.ResendVerification(r.Context(), req)
 	if err != nil {
 		common.JSONError(w, err)
 		return

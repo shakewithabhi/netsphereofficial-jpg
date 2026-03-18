@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import { UploadModal } from './UploadModal';
+import { NotificationBell } from './NotificationBell';
 import { SidebarAd } from './AdBanner';
 import { useTheme } from '../hooks/useTheme';
 
@@ -207,6 +208,8 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
               )}
             </div>
           </form>
+
+          <NotificationBell />
 
           <button
             onClick={toggleTheme}

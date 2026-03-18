@@ -3,6 +3,7 @@ import SwiftUI
 struct MainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var adManager: AdManager
+    @StateObject private var notificationsViewModel = NotificationsViewModel()
 
     private let brandBlue = Color(red: 0.231, green: 0.510, blue: 0.965)
 
@@ -18,6 +19,12 @@ struct MainTabView: View {
                     .tabItem {
                         Label("Favorites", systemImage: "star.fill")
                     }
+
+                NotificationsView()
+                    .tabItem {
+                        Label("Notifications", systemImage: "bell.fill")
+                    }
+                    .badge(notificationsViewModel.unreadCount)
 
                 TrashView()
                     .tabItem {
@@ -37,6 +44,9 @@ struct MainTabView: View {
                     .frame(height: 50)
                     .background(Color(.systemBackground))
             }
+        }
+        .task {
+            await notificationsViewModel.loadUnreadCount()
         }
     }
 }

@@ -133,6 +133,12 @@ struct LoginView: View {
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $authManager.requires2FA) {
+                if let tempToken = authManager.tempToken {
+                    TwoFactorVerifyView(tempToken: tempToken)
+                        .environmentObject(authManager)
+                }
+            }
         }
     }
 }

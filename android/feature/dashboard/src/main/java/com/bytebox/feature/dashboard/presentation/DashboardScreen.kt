@@ -43,6 +43,8 @@ fun DashboardScreen(
     onFileClick: (fileId: String, mimeType: String) -> Unit,
     onUploadClick: () -> Unit,
     onSeeAllFolders: () -> Unit,
+    onNotificationClick: () -> Unit = {},
+    notificationCount: Int = 0,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -78,6 +80,8 @@ fun DashboardScreen(
                     item {
                         DashboardGreetingHeader(
                             displayName = uiState.user?.displayName ?: "User",
+                            notificationCount = notificationCount,
+                            onNotificationClick = onNotificationClick,
                         )
                     }
 

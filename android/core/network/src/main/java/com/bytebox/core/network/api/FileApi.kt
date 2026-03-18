@@ -107,4 +107,19 @@ interface FileApi {
         @Path("id") fileId: String,
         @Path("version") version: Int
     ): Response<Unit>
+
+    @GET("notifications")
+    suspend fun getNotifications(@Query("limit") limit: Int = 20): Response<NotificationsResponse>
+
+    @GET("notifications/count")
+    suspend fun getUnreadNotificationCount(): Response<UnreadCountResponse>
+
+    @POST("notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: String): Response<Unit>
+
+    @POST("notifications/read-all")
+    suspend fun markAllNotificationsRead(): Response<Unit>
+
+    @POST("notifications/token")
+    suspend fun registerPushToken(@Body request: RegisterTokenRequest): Response<Unit>
 }

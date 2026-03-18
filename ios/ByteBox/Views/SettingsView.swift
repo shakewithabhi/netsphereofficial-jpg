@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showLogoutConfirmation = false
     @State private var showRewardedAlert = false
     @State private var rewardMessage = ""
+    @State private var showTwoFactorSetup = false
 
     private let brandBlue = Color(red: 0.231, green: 0.510, blue: 0.965)
 
@@ -93,6 +94,33 @@ struct SettingsView: View {
                     }
                 }
 
+                // Security Section
+                Section("Security") {
+                    Button {
+                        showTwoFactorSetup = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock.shield.fill")
+                                .foregroundStyle(brandBlue)
+                            Text("Two-Factor Authentication")
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if authManager.currentUser?.twoFactorEnabled == true {
+                                Text("On")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.green)
+                            } else {
+                                Text("Off")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 // Backup Section
                 Section("Backup") {
                     Toggle(isOn: $cameraBackupEnabled) {
@@ -169,6 +197,10 @@ struct SettingsView: View {
             }
             .refreshable {
                 await authManager.fetchProfile()
+            }
+            .sheet(isPresented: $showTwoFactorSetup) {
+                TwoFactorSetupView()
+                    .environmentObject(authManager)
             }
         }
     }

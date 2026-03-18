@@ -1068,6 +1068,110 @@ function FolderCard({
   );
 }
 
+// Thumbnail cache to avoid refetching URLs
+const thumbnailCache = new Map<string, string>();
+
+function FileThumbnail({
+  file,
+  size,
+  className = '',
+}: {
+  file: FileItem;
+  size: 'small' | 'large';
+  className?: string;
+}) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(
+    thumbnailCache.get(file.id) ?? null
+  );
+  const [error, setError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const isImage = file.mime_type.startsWith('image/');
+
+  useEffect(() => {
+    if (!isImage || thumbnailCache.has(file.id)) return;
+
+    let cancelled = false;
+
+    // Use IntersectionObserver for lazy loading
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          getDownloadUrl(file.id)
+            .then((url) => {
+              if (!cancelled) {
+                thumbnailCache.set(file.id, url);
+                setThumbUrl(url);
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setError(true);
+            });
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [file.id, isImage]);
+
+  if (!isImage || error) {
+    return (
+      <FileIcon
+        mimeType={file.mime_type}
+        size={size === 'large' ? 40 : 20}
+        className={className}
+      />
+    );
+  }
+
+  if (size === 'small') {
+    return (
+      <div ref={imgRef as React.RefObject<HTMLDivElement>} className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+        {thumbUrl && !error ? (
+          <img
+            src={thumbUrl}
+            alt={file.name}
+            loading="lazy"
+            onError={() => setError(true)}
+            onLoad={() => setLoaded(true)}
+            className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          />
+        ) : (
+          <div className="w-full h-full bg-slate-100 dark:bg-slate-700 animate-pulse" />
+        )}
+      </div>
+    );
+  }
+
+  // Large thumbnail for grid view
+  return (
+    <div ref={imgRef as React.RefObject<HTMLDivElement>} className="w-full h-24 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 mb-2 flex items-center justify-center">
+      {thumbUrl && !error ? (
+        <img
+          src={thumbUrl}
+          alt={file.name}
+          loading="lazy"
+          onError={() => setError(true)}
+          onLoad={() => setLoaded(true)}
+          className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        />
+      ) : (
+        <div className="w-full h-full bg-slate-100 dark:bg-slate-700 animate-pulse" />
+      )}
+    </div>
+  );
+}
+
 function FileCard({
   file,
   viewMode,
@@ -1095,6 +1199,8 @@ function FileCard({
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
 }) {
+  const isImage = file.mime_type.startsWith('image/');
+
   if (viewMode === 'list') {
     return (
       <div
@@ -1132,7 +1238,11 @@ function FileCard({
             <Star size={16} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </button>
-        <FileIcon mimeType={file.mime_type} size={20} />
+        {isImage ? (
+          <FileThumbnail file={file} size="small" />
+        ) : (
+          <FileIcon mimeType={file.mime_type} size={20} />
+        )}
         <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{file.name}</span>
         <span className="text-xs text-slate-400 shrink-0">{formatBytes(file.size)}</span>
         <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
@@ -1164,7 +1274,7 @@ function FileCard({
       {(selectionMode || isSelected) ? (
         <button
           onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-          className="absolute top-2 left-2 p-0.5"
+          className="absolute top-2 left-2 p-0.5 z-10"
         >
           {isSelected ? (
             <CheckSquare size={14} className="text-blue-600" />
@@ -1175,7 +1285,7 @@ function FileCard({
       ) : (
         <button
           onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
-          className="absolute top-2 left-2 p-0.5 transition-colors"
+          className="absolute top-2 left-2 p-0.5 transition-colors z-10"
           title={file.is_starred ? 'Unstar' : 'Star'}
         >
           {file.is_starred ? (
@@ -1187,11 +1297,15 @@ function FileCard({
       )}
       <button
         onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all z-10"
       >
         <MoreVertical size={14} />
       </button>
-      <FileIcon mimeType={file.mime_type} size={40} className="mb-2" />
+      {isImage ? (
+        <FileThumbnail file={file} size="large" />
+      ) : (
+        <FileIcon mimeType={file.mime_type} size={40} className="mb-2" />
+      )}
       <p className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center truncate w-full leading-tight">
         {file.name}
       </p>
