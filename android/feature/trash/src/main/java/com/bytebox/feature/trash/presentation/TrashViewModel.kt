@@ -18,7 +18,9 @@ data class TrashUiState(
     val files: List<FileItem> = emptyList(),
     val folders: List<Folder> = emptyList(),
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val previewUrl: String? = null,
+    val previewFileName: String? = null
 )
 
 @HiltViewModel
@@ -73,5 +75,25 @@ class TrashViewModel @Inject constructor(
             fileRepository.permanentDeleteFile(fileId)
             loadTrash()
         }
+    }
+
+    fun loadPreview(fileId: String, fileName: String) {
+        viewModelScope.launch {
+            when (val result = fileRepository.getDownloadUrl(fileId)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(previewUrl = result.data, previewFileName = fileName)
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(errorMessage = "Failed to load preview") }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun dismissPreview() {
+        _uiState.update { it.copy(previewUrl = null, previewFileName = null) }
     }
 }

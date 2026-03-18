@@ -1,16 +1,26 @@
 package com.bytebox.feature.trash.presentation
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.RestoreFromTrash
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,10 +34,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.bytebox.core.common.FileCategory
+import com.bytebox.core.common.toLocalDateTime
 import com.bytebox.core.common.toReadableFileSize
+import com.bytebox.core.common.toRelativeTime
 import com.bytebox.core.ui.components.ConfirmationDialog
 import com.bytebox.core.ui.components.EmptyState
 import com.bytebox.core.ui.components.ErrorState
@@ -114,6 +134,7 @@ fun TrashScreen(
                             file = file,
                             onRestore = { viewModel.restoreFile(file.id) },
                             onDelete = { deleteConfirmFileId = file.id },
+                            onPreview = { viewModel.loadPreview(file.id, file.name) },
                         )
                     }
                 }
@@ -134,14 +155,53 @@ fun TrashScreen(
             onDismiss = { deleteConfirmFileId = null },
         )
     }
+
+    // Full image preview dialog
+    uiState.previewUrl?.let { url ->
+        Dialog(
+            onDismissRequest = viewModel::dismissPreview,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = viewModel::dismissPreview),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = uiState.previewFileName ?: "Preview",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(ByteBoxTheme.spacing.md),
+                    contentScale = ContentScale.Fit,
+                )
+                IconButton(
+                    onClick = viewModel::dismissPreview,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(ByteBoxTheme.spacing.md),
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close preview",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
 private fun TrashFileItem(
     file: FileItem,
     onRestore: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onPreview: () -> Unit
 ) {
+    val isImage = file.mimeType.startsWith("image/")
+
     ListItem(
         headlineContent = {
             Text(
@@ -151,17 +211,48 @@ private fun TrashFileItem(
             )
         },
         supportingContent = {
-            Text(
-                file.size.toReadableFileSize(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column {
+                Text(
+                    file.size.toReadableFileSize(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                file.trashedAt?.let { trashedAt ->
+                    Text(
+                        "Trashed ${trashedAt.toLocalDateTime().toRelativeTime()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         },
         leadingContent = {
-            FileTypeIcon(category = file.category)
+            Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                if (isImage && file.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = file.thumbnailUrl,
+                        contentDescription = file.name,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(ByteBoxTheme.radius.sm)),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    FileTypeIcon(category = file.category)
+                }
+            }
         },
         trailingContent = {
             Row {
+                if (isImage) {
+                    IconButton(onClick = onPreview) {
+                        Icon(
+                            Icons.Default.Visibility,
+                            contentDescription = "Preview",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
                 IconButton(onClick = onRestore) {
                     Icon(Icons.Default.RestoreFromTrash, contentDescription = "Restore file")
                 }

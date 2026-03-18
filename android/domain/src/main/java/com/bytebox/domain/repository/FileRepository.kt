@@ -22,6 +22,9 @@ interface FileRepository {
     suspend fun permanentDeleteFile(id: String): Result<Unit>
     suspend fun trashFolder(id: String): Result<Unit>
     suspend fun restoreFolder(id: String): Result<Unit>
+    suspend fun starFile(id: String): Result<Unit>
+    suspend fun unstarFile(id: String): Result<Unit>
+    suspend fun getStarredFiles(cursor: String? = null): Result<FolderContents>
     suspend fun getTrashContents(cursor: String? = null): Result<FolderContents>
     suspend fun getDownloadUrl(fileId: String): Result<String>
     suspend fun searchFiles(query: String, cursor: String? = null): Result<FolderContents>
@@ -29,4 +32,7 @@ interface FileRepository {
     suspend fun listVersions(fileId: String): Result<List<FileVersion>>
     suspend fun restoreVersion(fileId: String, versionNumber: Int): Result<Unit>
     suspend fun deleteVersion(fileId: String, versionNumber: Int): Result<Unit>
+    suspend fun pinFile(fileId: String): Result<Unit>
+    suspend fun unpinFile(fileId: String): Result<Unit>
+    suspend fun isFilePinned(fileId: String): Boolean
 }

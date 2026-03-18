@@ -74,6 +74,18 @@ interface FileApi {
         @Query("limit") limit: Int = 50
     ): Response<FolderContentsResponse>
 
+    @POST("files/{id}/star")
+    suspend fun starFile(@Path("id") id: String): Response<Unit>
+
+    @DELETE("files/{id}/star")
+    suspend fun unstarFile(@Path("id") id: String): Response<Unit>
+
+    @GET("files/starred")
+    suspend fun getStarredFiles(
+        @Query("cursor") cursor: String? = null,
+        @Query("limit") limit: Int = 50
+    ): Response<FolderContentsResponse>
+
     @GET("files/search")
     suspend fun searchFiles(
         @Query("q") query: String,

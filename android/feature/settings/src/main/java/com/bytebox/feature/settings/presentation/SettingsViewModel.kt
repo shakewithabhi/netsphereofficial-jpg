@@ -9,6 +9,7 @@ import com.bytebox.core.datastore.UserPreferences
 import com.bytebox.core.worker.AutoUploadWorker
 import com.bytebox.domain.model.User
 import com.bytebox.domain.repository.AuthRepository
+import com.bytebox.feature.files.data.worker.BackupManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val userPreferences: UserPreferences,
+    private val backupManager: BackupManager,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -77,7 +79,8 @@ class SettingsViewModel @Inject constructor(
 
     fun setAutoUploadEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            userPreferences.setAutoUploadEnabled(enabled)
+            backupManager.setBackupEnabled(enabled)
+            // Also keep the legacy auto-upload worker in sync
             if (enabled) {
                 val wifiOnly = userPreferences.uploadOnWifiOnly.first()
                 AutoUploadWorker.enqueue(appContext, wifiOnly)
@@ -85,6 +88,10 @@ class SettingsViewModel @Inject constructor(
                 AutoUploadWorker.cancel(appContext)
             }
         }
+    }
+
+    fun runBackupNow() {
+        backupManager.runBackupNow()
     }
 
     fun logout(onLoggedOut: () -> Unit) {

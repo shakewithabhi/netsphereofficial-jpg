@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -347,6 +349,8 @@ fun FileListScreen(
                                     },
                                     onLongClick = { viewModel.toggleSelection(file.id) },
                                     onMoreClick = { contextMenuFileId = file.id },
+                                    onStarClick = { viewModel.toggleStar(file.id, file.isStarred) },
+                                    isPinned = uiState.pinnedFileIds.contains(file.id),
                                 )
                             }
                         }
@@ -559,6 +563,25 @@ fun FileListScreen(
                                 viewModel.copyFile(fileId)
                             },
                         )
+                        if (uiState.pinnedFileIds.contains(fileId)) {
+                            ListItem(
+                                headlineContent = { Text("Remove Offline") },
+                                leadingContent = { Icon(Icons.Default.OfflinePin, contentDescription = null) },
+                                modifier = Modifier.clickable {
+                                    contextMenuFileId = null
+                                    viewModel.unpinFile(fileId)
+                                },
+                            )
+                        } else {
+                            ListItem(
+                                headlineContent = { Text("Make Available Offline") },
+                                leadingContent = { Icon(Icons.Default.CloudDownload, contentDescription = null) },
+                                modifier = Modifier.clickable {
+                                    contextMenuFileId = null
+                                    viewModel.pinFile(fileId)
+                                },
+                            )
+                        }
                         ListItem(
                             headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
                             leadingContent = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },

@@ -2,10 +2,13 @@ package com.bytebox.feature.files.data.repository
 
 import com.bytebox.core.common.Result
 import com.bytebox.core.common.map
+import android.content.Context
 import com.bytebox.core.database.dao.FileDao
 import com.bytebox.core.database.dao.FolderDao
+import com.bytebox.core.database.dao.PinnedFileDao
 import com.bytebox.core.database.entity.CachedFileEntity
 import com.bytebox.core.database.entity.CachedFolderEntity
+import com.bytebox.core.database.entity.PinnedFileEntity
 import com.bytebox.core.network.api.FileApi
 import com.bytebox.core.network.dto.CreateFolderRequest
 import com.bytebox.core.network.dto.FileDto
@@ -18,12 +21,17 @@ import com.bytebox.domain.model.FileVersion
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.FolderContents
 import com.bytebox.domain.repository.FileRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.net.URL
 import javax.inject.Inject
 
 class FileRepositoryImpl @Inject constructor(
     private val fileApi: FileApi,
     private val fileDao: FileDao,
-    private val folderDao: FolderDao
+    private val folderDao: FolderDao,
+    private val pinnedFileDao: PinnedFileDao,
+    @ApplicationContext private val context: Context
 ) : FileRepository {
 
     override suspend fun getFolderContents(
@@ -97,6 +105,25 @@ class FileRepositoryImpl @Inject constructor(
         return safeApiCall { fileApi.restoreFolder(id) }
     }
 
+    override suspend fun starFile(id: String): Result<Unit> {
+        return safeApiCall { fileApi.starFile(id) }
+    }
+
+    override suspend fun unstarFile(id: String): Result<Unit> {
+        return safeApiCall { fileApi.unstarFile(id) }
+    }
+
+    override suspend fun getStarredFiles(cursor: String?): Result<FolderContents> {
+        return safeApiCall { fileApi.getStarredFiles(cursor) }.map { response ->
+            FolderContents(
+                files = response.files.map { it.toDomain() },
+                folders = response.folders.map { it.toDomain() },
+                nextCursor = response.nextCursor,
+                totalCount = response.totalCount
+            )
+        }
+    }
+
     override suspend fun getTrashContents(cursor: String?): Result<FolderContents> {
         return safeApiCall { fileApi.getTrashContents(cursor) }.map { response ->
             FolderContents(
@@ -143,6 +170,60 @@ class FileRepositoryImpl @Inject constructor(
         return safeApiCall { fileApi.deleteVersion(fileId, versionNumber) }
     }
 
+    override suspend fun pinFile(fileId: String): Result<Unit> {
+        return try {
+            val urlResult = getDownloadUrl(fileId)
+            if (urlResult is Result.Error) {
+                return Result.Error(urlResult.exception)
+            }
+            val downloadUrl = (urlResult as Result.Success).data
+
+            val cachedFile = fileDao.getFileById(fileId)
+                ?: return Result.Error(Exception("File not found in cache"))
+
+            val pinnedDir = File(context.filesDir, "pinned")
+            if (!pinnedDir.exists()) pinnedDir.mkdirs()
+
+            val localFile = File(pinnedDir, "${fileId}_${cachedFile.name}")
+            URL(downloadUrl).openStream().use { input ->
+                localFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            pinnedFileDao.insertPinnedFile(
+                PinnedFileEntity(
+                    id = fileId,
+                    name = cachedFile.name,
+                    mimeType = cachedFile.mimeType,
+                    size = cachedFile.size,
+                    localPath = localFile.absolutePath
+                )
+            )
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    override suspend fun unpinFile(fileId: String): Result<Unit> {
+        return try {
+            val pinnedFile = pinnedFileDao.getPinnedFile(fileId)
+            if (pinnedFile != null) {
+                val localFile = File(pinnedFile.localPath)
+                if (localFile.exists()) localFile.delete()
+                pinnedFileDao.deletePinnedFileById(fileId)
+            }
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    override suspend fun isFilePinned(fileId: String): Boolean {
+        return pinnedFileDao.isFilePinned(fileId)
+    }
+
     private fun FileVersionDto.toDomain() = FileVersion(
         id = id, fileId = fileId, versionNumber = versionNumber,
         size = size, contentHash = contentHash, createdAt = createdAt
@@ -151,7 +232,8 @@ class FileRepositoryImpl @Inject constructor(
     private fun FileDto.toDomain() = FileItem(
         id = id, name = name, folderId = folderId, size = size,
         mimeType = mimeType, thumbnailUrl = thumbnailUrl, scanStatus = scanStatus,
-        trashedAt = trashedAt, createdAt = createdAt, updatedAt = updatedAt
+        trashedAt = trashedAt, createdAt = createdAt, updatedAt = updatedAt,
+        isStarred = isStarred
     )
 
     private fun FolderDto.toDomain() = Folder(
@@ -162,7 +244,8 @@ class FileRepositoryImpl @Inject constructor(
     private fun FileDto.toEntity() = CachedFileEntity(
         id = id, name = name, folderId = folderId, size = size,
         mimeType = mimeType, thumbnailUrl = thumbnailUrl, scanStatus = scanStatus,
-        trashedAt = trashedAt, createdAt = createdAt, updatedAt = updatedAt
+        trashedAt = trashedAt, createdAt = createdAt, updatedAt = updatedAt,
+        isStarred = isStarred
     )
 
     private fun FolderDto.toEntity() = CachedFolderEntity(

@@ -13,12 +13,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -142,28 +144,64 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
 
-            // Auto-Upload Section
-            SectionHeader(title = "Auto-Upload")
+            // Camera Backup Section
+            SectionHeader(title = "Camera Backup")
 
-            ListItem(
-                headlineContent = { Text("Camera Auto-Upload") },
-                supportingContent = { Text("Automatically upload new photos and videos") },
-                leadingContent = {
-                    Icon(
-                        Icons.Default.PhotoCamera,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = ByteBoxTheme.spacing.md)
+                    .cardShadow(shape = RoundedCornerShape(ByteBoxTheme.radius.lg)),
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                Column {
+                    ListItem(
+                        headlineContent = { Text("Auto Camera Backup") },
+                        supportingContent = { Text("Automatically back up photos and videos from your camera roll to ByteBox") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Default.PhotoCamera,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = uiState.autoUploadEnabled,
+                                onCheckedChange = viewModel::setAutoUploadEnabled,
+                            )
+                        },
                     )
-                },
-                trailingContent = {
-                    Switch(
-                        checked = uiState.autoUploadEnabled,
-                        onCheckedChange = viewModel::setAutoUploadEnabled,
-                    )
-                },
-            )
 
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
+                    if (uiState.autoUploadEnabled) {
+                        ListItem(
+                            headlineContent = { Text("Backup Now") },
+                            supportingContent = { Text("Run a backup immediately") },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Default.Backup,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            modifier = Modifier.clickable { viewModel.runBackupNow() },
+                        )
+                    }
+
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                "Backs up new photos and videos to a \"Camera Backup\" folder in your ByteBox storage. Runs every 6 hours when connected to a network.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
 
             // Storage Section
             SectionHeader(title = "Storage")

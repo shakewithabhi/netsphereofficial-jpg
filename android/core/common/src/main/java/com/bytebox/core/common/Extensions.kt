@@ -35,10 +35,19 @@ fun String.mimeToCategory(): FileCategory = when {
     startsWith("video/") -> FileCategory.VIDEO
     startsWith("audio/") -> FileCategory.AUDIO
     this == "application/pdf" -> FileCategory.PDF
-    startsWith("application/") || startsWith("text/") -> FileCategory.DOCUMENT
+    startsWith("text/") -> FileCategory.TEXT_DOCUMENT
+    this in listOf(
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ) -> FileCategory.OFFICE_DOCUMENT
+    startsWith("application/") -> FileCategory.DOCUMENT
     else -> FileCategory.OTHER
 }
 
 enum class FileCategory {
-    IMAGE, VIDEO, AUDIO, PDF, DOCUMENT, OTHER
+    IMAGE, VIDEO, AUDIO, PDF, TEXT_DOCUMENT, OFFICE_DOCUMENT, DOCUMENT, OTHER
 }

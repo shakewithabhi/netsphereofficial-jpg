@@ -36,6 +36,7 @@ dependencies {
     implementation(project(":core:worker"))
     implementation(project(":core:ui"))
     implementation(project(":domain"))
+    implementation(project(":feature:files"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

@@ -1,16 +1,32 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Folder, Trash2, RotateCcw, AlertTriangle, X } from 'lucide-react';
+import { Folder, Trash2, RotateCcw, AlertTriangle, X, Eye, Clock, HardDrive } from 'lucide-react';
 import {
   getTrash,
   restoreFile,
   restoreFolder,
   deleteFilePermanently,
   deleteFolder,
+  getDownloadUrl,
   formatBytes,
 } from '../api/files';
 import type { FolderItem, FileItem } from '../api/files';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
+
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const seconds = Math.floor((now - then) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+}
 
 export default function Trash() {
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -23,6 +39,8 @@ export default function Trash() {
     name: string;
   } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [previewFile, setPreviewFile] = useState<{ name: string; url: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -81,6 +99,47 @@ export default function Trash() {
     }
   }
 
+  async function handlePreview(file: FileItem) {
+    if (!file.mime_type.startsWith('image/')) return;
+    setPreviewLoading(true);
+    try {
+      const url = await getDownloadUrl(file.id);
+      setPreviewFile({ name: file.name, url });
+    } catch {
+      setError('Failed to load preview.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  // Cache thumbnail URLs per file id
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const imageFiles = files.filter(
+      (f) => f.mime_type.startsWith('image/') && !thumbnailUrls[f.id]
+    );
+    if (imageFiles.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const entries: Record<string, string> = {};
+      await Promise.allSettled(
+        imageFiles.map(async (f) => {
+          try {
+            const url = await getDownloadUrl(f.id);
+            entries[f.id] = url;
+          } catch {
+            // skip failed thumbnails
+          }
+        })
+      );
+      if (!cancelled) {
+        setThumbnailUrls((prev) => ({ ...prev, ...entries }));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [files]);
+
   const isEmpty = !loading && folders.length === 0 && files.length === 0;
 
   return (
@@ -115,7 +174,7 @@ export default function Trash() {
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-3">
             {/* Trashed Folders */}
             {folders.map((folder) => (
               <div
@@ -152,41 +211,95 @@ export default function Trash() {
               </div>
             ))}
 
-            {/* Trashed Files */}
-            {files.map((file) => (
-              <div
-                key={file.id}
-                className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-xl group hover:bg-slate-50 transition-colors"
-              >
-                <FileIcon mimeType={file.mime_type} size={20} className="text-slate-400 shrink-0" />
-                <span className="flex-1 text-sm font-medium text-slate-700 truncate line-through decoration-slate-300">
-                  {file.name}
-                </span>
-                <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
-                  {formatBytes(file.size)}
-                </span>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleRestoreFile(file.id)}
-                    title="Restore"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                  >
-                    <RotateCcw size={14} />
-                    Restore
-                  </button>
-                  <button
-                    onClick={() =>
-                      setConfirmDelete({ type: 'file', id: file.id, name: file.name })
-                    }
-                    title="Delete permanently"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </button>
+            {/* Trashed Files as Cards */}
+            {files.map((file) => {
+              const isImage = file.mime_type.startsWith('image/');
+              const thumbUrl = thumbnailUrls[file.id];
+
+              return (
+                <div
+                  key={file.id}
+                  className="bg-white border border-slate-100 rounded-xl group hover:border-slate-200 hover:shadow-sm transition-all overflow-hidden"
+                >
+                  <div className="flex items-start gap-3 p-4">
+                    {/* Thumbnail / Icon */}
+                    <div className="shrink-0">
+                      {isImage && thumbUrl ? (
+                        <button
+                          onClick={() => handlePreview(file)}
+                          className="relative block w-14 h-14 rounded-lg overflow-hidden bg-slate-100 hover:opacity-90 transition-opacity"
+                        >
+                          <img
+                            src={thumbUrl}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20 transition-colors">
+                            <Eye size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-slate-50 flex items-center justify-center">
+                          <FileIcon mimeType={file.mime_type} size={24} className="text-slate-400" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* File info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700 truncate">{file.name}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="flex items-center gap-1 text-xs text-slate-400">
+                          <HardDrive size={12} />
+                          {formatBytes(file.size)}
+                        </span>
+                        {file.trashed_at && (
+                          <span className="flex items-center gap-1 text-xs text-slate-400">
+                            <Clock size={12} />
+                            Trashed {timeAgo(file.trashed_at)}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-300 hidden sm:block">
+                          {file.mime_type}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {isImage && (
+                        <button
+                          onClick={() => handlePreview(file)}
+                          title="Preview"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                        >
+                          <Eye size={14} />
+                          Preview
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleRestoreFile(file.id)}
+                        title="Restore"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                      >
+                        <RotateCcw size={14} />
+                        Restore
+                      </button>
+                      <button
+                        onClick={() =>
+                          setConfirmDelete({ type: 'file', id: file.id, name: file.name })
+                        }
+                        title="Delete permanently"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -230,6 +343,45 @@ export default function Trash() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Image preview modal */}
+      {previewFile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          onClick={() => setPreviewFile(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] mx-4 animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewFile(null)}
+              className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-100 transition-colors"
+            >
+              <X size={16} className="text-slate-600" />
+            </button>
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100">
+                <p className="text-sm font-medium text-slate-700 truncate">{previewFile.name}</p>
+              </div>
+              <div className="p-2 flex items-center justify-center bg-slate-50">
+                <img
+                  src={previewFile.url}
+                  alt={previewFile.name}
+                  className="max-w-full max-h-[75vh] object-contain rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview loading overlay */}
+      {previewLoading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-10 h-10 border-2 border-white border-t-transparent rounded-full animate-spin" />
         </div>
       )}
     </Layout>

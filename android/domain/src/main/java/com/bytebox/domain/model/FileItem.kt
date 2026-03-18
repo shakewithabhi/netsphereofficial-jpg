@@ -13,7 +13,8 @@ data class FileItem(
     val scanStatus: String,
     val trashedAt: String?,
     val createdAt: String,
-    val updatedAt: String
+    val updatedAt: String,
+    val isStarred: Boolean = false
 ) {
     val category: FileCategory get() = mimeType.mimeToCategory()
     val extension: String get() = name.substringAfterLast('.', "")

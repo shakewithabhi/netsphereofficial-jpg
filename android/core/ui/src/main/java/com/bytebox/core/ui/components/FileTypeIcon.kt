@@ -32,6 +32,8 @@ fun FileCategory.toColor(): Color = when (this) {
     FileCategory.VIDEO -> FileVideoColor
     FileCategory.AUDIO -> FileAudioColor
     FileCategory.PDF -> FilePdfColor
+    FileCategory.TEXT_DOCUMENT -> FileDocColor
+    FileCategory.OFFICE_DOCUMENT -> FileDocColor
     FileCategory.DOCUMENT -> FileDocColor
     FileCategory.OTHER -> FileOtherColor
 }
@@ -41,6 +43,8 @@ fun FileCategory.toIcon(): ImageVector = when (this) {
     FileCategory.VIDEO -> Icons.Default.VideoFile
     FileCategory.AUDIO -> Icons.Default.AudioFile
     FileCategory.PDF -> Icons.Default.PictureAsPdf
+    FileCategory.TEXT_DOCUMENT -> Icons.Default.Description
+    FileCategory.OFFICE_DOCUMENT -> Icons.Default.Description
     FileCategory.DOCUMENT -> Icons.Default.Description
     FileCategory.OTHER -> Icons.Default.InsertDriveFile
 }

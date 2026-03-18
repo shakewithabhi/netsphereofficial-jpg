@@ -70,6 +70,7 @@ type FileResponse struct {
 	StreamStatus      string     `json:"stream_status,omitempty"`
 	HLSURL            string     `json:"hls_url,omitempty"`
 	VideoThumbnailURL string     `json:"video_thumbnail_url,omitempty"`
+	IsStarred         bool       `json:"is_starred"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }
@@ -158,4 +159,46 @@ type FolderItem struct {
 	Name      string     `json:"name"`
 	Path      string     `json:"path"`
 	CreatedAt time.Time  `json:"created_at"`
+}
+
+// Comment types
+
+type Comment struct {
+	ID        uuid.UUID
+	FileID    uuid.UUID
+	UserID    uuid.UUID
+	UserName  string
+	Content   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type CommentResponse struct {
+	ID        uuid.UUID `json:"id"`
+	FileID    uuid.UUID `json:"file_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type CreateCommentRequest struct {
+	Content string `json:"content" validate:"required,min=1,max=2000"`
+}
+
+type UpdateCommentRequest struct {
+	Content string `json:"content" validate:"required,min=1,max=2000"`
+}
+
+func (c *Comment) ToResponse() CommentResponse {
+	return CommentResponse{
+		ID:        c.ID,
+		FileID:    c.FileID,
+		UserID:    c.UserID,
+		UserName:  c.UserName,
+		Content:   c.Content,
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
+	}
 }

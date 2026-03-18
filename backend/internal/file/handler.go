@@ -29,15 +29,22 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/upload", h.Upload)
 	r.Get("/search", h.Search)
 	r.Get("/trash", h.ListTrashed)
+	r.Get("/starred", h.ListStarred)
 	r.Get("/categories/summary", h.CategorySummary)
 	r.Get("/category/{category}", h.ListByCategory)
 	r.Get("/{id}", h.GetByID)
 	r.Put("/{id}", h.Rename)
 	r.Post("/{id}/copy", h.Copy)
 	r.Post("/{id}/move", h.Move)
+	r.Post("/{id}/star", h.Star)
+	r.Delete("/{id}/star", h.Unstar)
 	r.Post("/{id}/trash", h.Trash)
 	r.Post("/{id}/restore", h.Restore)
 	r.Delete("/{id}", h.Delete)
+	r.Get("/{id}/comments", h.ListComments)
+	r.Post("/{id}/comments", h.CreateComment)
+	r.Put("/{id}/comments/{commentId}", h.UpdateComment)
+	r.Delete("/{id}/comments/{commentId}", h.DeleteComment)
 	r.Get("/{id}/download", h.Download)
 	r.Get("/{id}/stream", h.Stream)
 	r.Get("/{id}/versions", h.ListVersions)
@@ -462,6 +469,175 @@ func (h *Handler) CategorySummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, summary)
+}
+
+func (h *Handler) ListStarred(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	files, err := h.service.ListStarred(r.Context(), claims)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{"files": files})
+}
+
+func (h *Handler) Star(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	if err := h.service.StarFile(r.Context(), claims, id); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "file starred"})
+}
+
+func (h *Handler) Unstar(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	if err := h.service.UnstarFile(r.Context(), claims, id); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "file unstarred"})
+}
+
+func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	comments, err := h.service.ListComments(r.Context(), claims, id)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{"comments": comments})
+}
+
+func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	var req CreateCommentRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.CreateComment(r.Context(), claims, id, req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusCreated, resp)
+}
+
+func (h *Handler) UpdateComment(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	commentID, err := uuid.Parse(chi.URLParam(r, "commentId"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid comment id"))
+		return
+	}
+
+	var req UpdateCommentRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.UpdateComment(r.Context(), claims, id, commentID, req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) DeleteComment(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	commentID, err := uuid.Parse(chi.URLParam(r, "commentId"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid comment id"))
+		return
+	}
+
+	if err := h.service.DeleteComment(r.Context(), claims, id, commentID); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "comment deleted"})
 }
 
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {

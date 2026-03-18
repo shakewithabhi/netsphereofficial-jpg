@@ -25,7 +25,9 @@ object DatabaseModule {
         ).addMigrations(
             ByteBoxDatabase.MIGRATION_1_2,
             ByteBoxDatabase.MIGRATION_2_3,
-            ByteBoxDatabase.MIGRATION_3_4
+            ByteBoxDatabase.MIGRATION_3_4,
+            ByteBoxDatabase.MIGRATION_4_5,
+            ByteBoxDatabase.MIGRATION_5_6
         ).fallbackToDestructiveMigration().build()
 
     @Provides fun provideFileDao(db: ByteBoxDatabase): FileDao = db.fileDao()
@@ -33,4 +35,5 @@ object DatabaseModule {
     @Provides fun provideUploadTaskDao(db: ByteBoxDatabase): UploadTaskDao = db.uploadTaskDao()
     @Provides fun provideDownloadTaskDao(db: ByteBoxDatabase): DownloadTaskDao = db.downloadTaskDao()
     @Provides fun providePendingOperationDao(db: ByteBoxDatabase): PendingOperationDao = db.pendingOperationDao()
+    @Provides fun providePinnedFileDao(db: ByteBoxDatabase): PinnedFileDao = db.pinnedFileDao()
 }

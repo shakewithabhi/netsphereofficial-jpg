@@ -15,5 +15,6 @@ data class CachedFileEntity(
     @ColumnInfo(name = "scan_status") val scanStatus: String,
     @ColumnInfo(name = "trashed_at") val trashedAt: String?,
     @ColumnInfo(name = "created_at") val createdAt: String,
-    @ColumnInfo(name = "updated_at") val updatedAt: String
+    @ColumnInfo(name = "updated_at") val updatedAt: String,
+    @ColumnInfo(name = "is_starred", defaultValue = "0") val isStarred: Boolean = false
 )

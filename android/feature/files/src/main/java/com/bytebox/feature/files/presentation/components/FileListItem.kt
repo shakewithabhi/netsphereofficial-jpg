@@ -15,6 +15,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OfflinePin
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.bytebox.core.common.FileCategory
@@ -46,6 +50,8 @@ fun FileListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onMoreClick: () -> Unit,
+    onStarClick: (() -> Unit)? = null,
+    isPinned: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -111,6 +117,27 @@ fun FileListItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
+        }
+
+        // Trailing: Offline pin indicator
+        if (isPinned) {
+            Icon(
+                imageVector = Icons.Filled.OfflinePin,
+                contentDescription = "Available offline",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        // Trailing: Star button
+        if (onStarClick != null) {
+            IconButton(onClick = onStarClick) {
+                Icon(
+                    imageVector = if (file.isStarred) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = if (file.isStarred) "Unstar" else "Star",
+                    tint = if (file.isStarred) Color(0xFFFFC107) else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         // Trailing: More button

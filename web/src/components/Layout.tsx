@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   HardDrive,
   Home,
+  Star,
   Trash2,
   Settings,
   LogOut,
@@ -53,6 +54,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
 
   const navItems = [
     { to: '/', label: 'Home', icon: Home },
+    { to: '/favorites', label: 'Favorites', icon: Star },
     { to: '/trash', label: 'Trash', icon: Trash2 },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];

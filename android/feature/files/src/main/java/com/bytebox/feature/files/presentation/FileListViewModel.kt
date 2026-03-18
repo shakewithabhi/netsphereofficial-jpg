@@ -41,7 +41,8 @@ data class FileListUiState(
     val shareItemSize: Long = 0,
     val shareItemMimeType: String? = null,
     val shareItemIsFolder: Boolean = false,
-    val isCreatingShare: Boolean = false
+    val isCreatingShare: Boolean = false,
+    val pinnedFileIds: Set<String> = emptySet()
 )
 
 data class BreadcrumbItem(val folderId: String?, val name: String)
@@ -97,6 +98,7 @@ class FileListViewModel @Inject constructor(
                             isLoading = false
                         )
                     }
+                    refreshPinnedStatus()
                 }
                 is Result.Error -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.exception.message) }
@@ -244,6 +246,17 @@ class FileListViewModel @Inject constructor(
         }
     }
 
+    fun toggleStar(fileId: String, isCurrentlyStarred: Boolean) {
+        viewModelScope.launch {
+            if (isCurrentlyStarred) {
+                fileRepository.unstarFile(fileId)
+            } else {
+                fileRepository.starFile(fileId)
+            }
+            loadContents()
+        }
+    }
+
     fun trashFile(fileId: String) {
         viewModelScope.launch {
             fileRepository.trashFile(fileId)
@@ -328,5 +341,27 @@ class FileListViewModel @Inject constructor(
 
     fun clearShareUrl() {
         _uiState.update { it.copy(shareUrl = null, shareItemName = null) }
+    }
+
+    fun pinFile(fileId: String) {
+        viewModelScope.launch {
+            fileRepository.pinFile(fileId)
+            _uiState.update { it.copy(pinnedFileIds = it.pinnedFileIds + fileId) }
+        }
+    }
+
+    fun unpinFile(fileId: String) {
+        viewModelScope.launch {
+            fileRepository.unpinFile(fileId)
+            _uiState.update { it.copy(pinnedFileIds = it.pinnedFileIds - fileId) }
+        }
+    }
+
+    private fun refreshPinnedStatus() {
+        viewModelScope.launch {
+            val fileIds = _uiState.value.files.map { it.id }
+            val pinned = fileIds.filter { fileRepository.isFilePinned(it) }.toSet()
+            _uiState.update { it.copy(pinnedFileIds = pinned) }
+        }
     }
 }

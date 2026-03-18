@@ -650,3 +650,131 @@ func (s *Service) ListTrashed(ctx context.Context, claims *auth.TokenClaims) ([]
 	}
 	return result, nil
 }
+
+func (s *Service) StarFile(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) error {
+	file, err := s.repo.GetByID(ctx, id, claims.UserID)
+	if err != nil || file == nil {
+		return common.ErrNotFound("file not found")
+	}
+
+	if err := s.repo.StarFile(ctx, id, claims.UserID); err != nil {
+		slog.Error("failed to star file", "error", err)
+		return common.ErrInternal("failed to star file")
+	}
+	return nil
+}
+
+func (s *Service) UnstarFile(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) error {
+	file, err := s.repo.GetByID(ctx, id, claims.UserID)
+	if err != nil || file == nil {
+		return common.ErrNotFound("file not found")
+	}
+
+	if err := s.repo.UnstarFile(ctx, id, claims.UserID); err != nil {
+		slog.Error("failed to unstar file", "error", err)
+		return common.ErrInternal("failed to unstar file")
+	}
+	return nil
+}
+
+func (s *Service) ListStarred(ctx context.Context, claims *auth.TokenClaims) ([]FileResponse, error) {
+	files, err := s.repo.ListStarred(ctx, claims.UserID)
+	if err != nil {
+		slog.Error("failed to list starred", "error", err)
+		return nil, common.ErrInternal("failed to list starred files")
+	}
+
+	result := make([]FileResponse, len(files))
+	for i, f := range files {
+		resp := f.ToResponse()
+		resp.IsStarred = true
+		result[i] = resp
+	}
+	return result, nil
+}
+
+func (s *Service) CreateComment(ctx context.Context, claims *auth.TokenClaims, fileID uuid.UUID, req CreateCommentRequest) (*CommentResponse, error) {
+	file, err := s.repo.GetByID(ctx, fileID, claims.UserID)
+	if err != nil || file == nil {
+		return nil, common.ErrNotFound("file not found")
+	}
+
+	comment := &Comment{
+		FileID:  fileID,
+		UserID:  claims.UserID,
+		Content: req.Content,
+	}
+
+	if err := s.repo.CreateComment(ctx, comment); err != nil {
+		slog.Error("failed to create comment", "error", err)
+		return nil, common.ErrInternal("failed to create comment")
+	}
+
+	// Fetch the comment with user name
+	created, err := s.repo.GetComment(ctx, comment.ID)
+	if err != nil || created == nil {
+		slog.Error("failed to get created comment", "error", err)
+		return nil, common.ErrInternal("failed to get comment")
+	}
+
+	resp := created.ToResponse()
+	return &resp, nil
+}
+
+func (s *Service) ListComments(ctx context.Context, claims *auth.TokenClaims, fileID uuid.UUID) ([]CommentResponse, error) {
+	file, err := s.repo.GetByID(ctx, fileID, claims.UserID)
+	if err != nil || file == nil {
+		return nil, common.ErrNotFound("file not found")
+	}
+
+	comments, err := s.repo.ListComments(ctx, fileID)
+	if err != nil {
+		slog.Error("failed to list comments", "error", err)
+		return nil, common.ErrInternal("failed to list comments")
+	}
+
+	result := make([]CommentResponse, len(comments))
+	for i, c := range comments {
+		result[i] = c.ToResponse()
+	}
+	return result, nil
+}
+
+func (s *Service) UpdateComment(ctx context.Context, claims *auth.TokenClaims, fileID, commentID uuid.UUID, req UpdateCommentRequest) (*CommentResponse, error) {
+	file, err := s.repo.GetByID(ctx, fileID, claims.UserID)
+	if err != nil || file == nil {
+		return nil, common.ErrNotFound("file not found")
+	}
+
+	if err := s.repo.UpdateComment(ctx, commentID, claims.UserID, req.Content); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, common.ErrNotFound("comment not found")
+		}
+		slog.Error("failed to update comment", "error", err)
+		return nil, common.ErrInternal("failed to update comment")
+	}
+
+	updated, err := s.repo.GetComment(ctx, commentID)
+	if err != nil || updated == nil {
+		return nil, common.ErrNotFound("comment not found")
+	}
+
+	resp := updated.ToResponse()
+	return &resp, nil
+}
+
+func (s *Service) DeleteComment(ctx context.Context, claims *auth.TokenClaims, fileID, commentID uuid.UUID) error {
+	file, err := s.repo.GetByID(ctx, fileID, claims.UserID)
+	if err != nil || file == nil {
+		return common.ErrNotFound("file not found")
+	}
+
+	if err := s.repo.DeleteComment(ctx, commentID, claims.UserID); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return common.ErrNotFound("comment not found")
+		}
+		slog.Error("failed to delete comment", "error", err)
+		return common.ErrInternal("failed to delete comment")
+	}
+	return nil
+}

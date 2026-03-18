@@ -695,3 +695,154 @@ func (r *Repository) GetByStreamVideoID(ctx context.Context, streamVideoID strin
 	}
 	return f, nil
 }
+
+// Star/Favorite methods
+
+func (r *Repository) StarFile(ctx context.Context, fileID, userID uuid.UUID) error {
+	query := `INSERT INTO file_stars (file_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`
+	_, err := r.db.Exec(ctx, query, fileID, userID)
+	if err != nil {
+		return fmt.Errorf("star file: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) UnstarFile(ctx context.Context, fileID, userID uuid.UUID) error {
+	query := `DELETE FROM file_stars WHERE file_id = $1 AND user_id = $2`
+	_, err := r.db.Exec(ctx, query, fileID, userID)
+	if err != nil {
+		return fmt.Errorf("unstar file: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListStarred(ctx context.Context, userID uuid.UUID) ([]File, error) {
+	query := `
+		SELECT f.id, f.user_id, f.folder_id, f.name, f.storage_key, COALESCE(f.thumbnail_key, ''),
+		       f.size, f.mime_type, COALESCE(f.content_hash, ''), f.scan_status, f.current_version,
+		       f.is_video, COALESCE(f.stream_video_id, ''), COALESCE(f.stream_status, ''),
+		       COALESCE(f.hls_url, ''), COALESCE(f.video_thumbnail_url, ''),
+		       f.trashed_at, f.created_at, f.updated_at
+		FROM files f
+		JOIN file_stars fs ON f.id = fs.file_id
+		WHERE fs.user_id = $1 AND f.trashed_at IS NULL
+		ORDER BY fs.starred_at DESC
+		LIMIT 200`
+
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list starred: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		if err := rows.Scan(
+			&f.ID, &f.UserID, &f.FolderID, &f.Name, &f.StorageKey, &f.ThumbnailKey,
+			&f.Size, &f.MimeType, &f.ContentHash, &f.ScanStatus, &f.CurrentVersion,
+			&f.IsVideo, &f.StreamVideoID, &f.StreamStatus, &f.HLSURL, &f.VideoThumbnailURL,
+			&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan file: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, nil
+}
+
+func (r *Repository) IsStarred(ctx context.Context, fileID, userID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM file_stars WHERE file_id = $1 AND user_id = $2)`
+	var exists bool
+	err := r.db.QueryRow(ctx, query, fileID, userID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check starred: %w", err)
+	}
+	return exists, nil
+}
+
+// Comment methods
+
+func (r *Repository) CreateComment(ctx context.Context, comment *Comment) error {
+	query := `
+		INSERT INTO file_comments (file_id, user_id, content)
+		VALUES ($1, $2, $3)
+		RETURNING id, created_at, updated_at`
+
+	err := r.db.QueryRow(ctx, query, comment.FileID, comment.UserID, comment.Content).Scan(
+		&comment.ID, &comment.CreatedAt, &comment.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("create comment: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListComments(ctx context.Context, fileID uuid.UUID) ([]Comment, error) {
+	query := `
+		SELECT fc.id, fc.file_id, fc.user_id, u.display_name, fc.content, fc.created_at, fc.updated_at
+		FROM file_comments fc
+		JOIN users u ON fc.user_id = u.id
+		WHERE fc.file_id = $1
+		ORDER BY fc.created_at ASC`
+
+	rows, err := r.db.Query(ctx, query, fileID)
+	if err != nil {
+		return nil, fmt.Errorf("list comments: %w", err)
+	}
+	defer rows.Close()
+
+	var comments []Comment
+	for rows.Next() {
+		var c Comment
+		if err := rows.Scan(&c.ID, &c.FileID, &c.UserID, &c.UserName, &c.Content, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan comment: %w", err)
+		}
+		comments = append(comments, c)
+	}
+	return comments, nil
+}
+
+func (r *Repository) GetComment(ctx context.Context, commentID uuid.UUID) (*Comment, error) {
+	query := `
+		SELECT fc.id, fc.file_id, fc.user_id, u.display_name, fc.content, fc.created_at, fc.updated_at
+		FROM file_comments fc
+		JOIN users u ON fc.user_id = u.id
+		WHERE fc.id = $1`
+
+	c := &Comment{}
+	err := r.db.QueryRow(ctx, query, commentID).Scan(
+		&c.ID, &c.FileID, &c.UserID, &c.UserName, &c.Content, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get comment: %w", err)
+	}
+	return c, nil
+}
+
+func (r *Repository) UpdateComment(ctx context.Context, commentID, userID uuid.UUID, content string) error {
+	query := `UPDATE file_comments SET content = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3`
+	result, err := r.db.Exec(ctx, query, content, commentID, userID)
+	if err != nil {
+		return fmt.Errorf("update comment: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("comment not found")
+	}
+	return nil
+}
+
+func (r *Repository) DeleteComment(ctx context.Context, commentID, userID uuid.UUID) error {
+	query := `DELETE FROM file_comments WHERE id = $1 AND user_id = $2`
+	result, err := r.db.Exec(ctx, query, commentID, userID)
+	if err != nil {
+		return fmt.Errorf("delete comment: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("comment not found")
+	}
+	return nil
+}

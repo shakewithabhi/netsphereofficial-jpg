@@ -9,6 +9,8 @@ export interface FileItem {
   created_at: string;
   updated_at: string;
   is_trashed?: boolean;
+  is_starred?: boolean;
+  trashed_at?: string;
 }
 
 export interface FolderItem {
@@ -137,6 +139,43 @@ export async function createShare(
     ...(password ? { password } : {}),
   });
   return res.data.data;
+}
+
+export async function starFile(id: string): Promise<void> {
+  await client.post(`/files/${id}/star`);
+}
+
+export async function unstarFile(id: string): Promise<void> {
+  await client.delete(`/files/${id}/star`);
+}
+
+export async function getStarredFiles(): Promise<{ files: FileItem[] }> {
+  const res = await client.get('/files/starred');
+  return res.data.data;
+}
+
+export interface Comment {
+  id: string;
+  file_id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getComments(fileId: string): Promise<Comment[]> {
+  const res = await client.get(`/files/${fileId}/comments`);
+  return res.data.data.comments;
+}
+
+export async function createComment(fileId: string, content: string): Promise<Comment> {
+  const res = await client.post(`/files/${fileId}/comments`, { content });
+  return res.data.data;
+}
+
+export async function deleteComment(fileId: string, commentId: string): Promise<void> {
+  await client.delete(`/files/${fileId}/comments/${commentId}`);
 }
 
 export function formatBytes(bytes: number): string {

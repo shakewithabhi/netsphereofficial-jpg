@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,6 +75,7 @@ import com.bytebox.feature.settings.presentation.ProfileScreen
 import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
+import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
 import kotlinx.coroutines.launch
@@ -98,10 +100,11 @@ fun ByteBoxNavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // 4-tab navigation: Home, Files, Shares, Profile
+    // 5-tab navigation: Home, Files, Favorites, Shares, Profile
     val bottomNavItems = listOf(
         BottomNavItem("Home", { Icon(Icons.Default.Home, "Home") }, Screen.Dashboard.route),
         BottomNavItem("Files", { Icon(Icons.Default.Folder, "Files") }, Screen.Files.route),
+        BottomNavItem("Favorites", { Icon(Icons.Default.Star, "Favorites") }, Screen.Favorites.route),
         BottomNavItem("Shares", { Icon(Icons.Default.Link, "Shares") }, Screen.Shares.route),
         BottomNavItem("Profile", { Icon(Icons.Default.Person, "Profile") }, Screen.Profile.route),
     )
@@ -377,6 +380,15 @@ fun ByteBoxNavHost(
             composable(Screen.Trash.route) {
                 TrashScreen(
                     onNavigateBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Screen.Favorites.route) {
+                FavoritesScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onFileClick = { fileId, mimeType ->
+                        navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
+                    },
                 )
             }
 

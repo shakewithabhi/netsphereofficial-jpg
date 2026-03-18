@@ -21,6 +21,9 @@ import {
   Check,
   CloudUpload,
   Search,
+  Star,
+  StarOff,
+  MessageCircle,
 } from 'lucide-react';
 import {
   getRootContents,
@@ -34,12 +37,15 @@ import {
   searchFiles,
   uploadFile,
   formatBytes,
+  starFile,
+  unstarFile,
 } from '../api/files';
 import type { FolderItem, FileItem } from '../api/files';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
 import { ShareDialog } from '../components/ShareDialog';
 import { UploadModal } from '../components/UploadModal';
+import { CommentsDialog } from '../components/CommentsDialog';
 
 interface BreadcrumbItem {
   label: string;
@@ -75,6 +81,7 @@ export default function Files() {
   } | null>(null);
 
   const [shareFile, setShareFile] = useState<FileItem | null>(null);
+  const [commentsFile, setCommentsFile] = useState<FileItem | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -198,6 +205,23 @@ export default function Files() {
       refresh();
     } catch {
       setError('Failed to copy file.');
+    }
+  }
+
+  async function handleToggleStar(file: FileItem) {
+    try {
+      if (file.is_starred) {
+        await unstarFile(file.id);
+      } else {
+        await starFile(file.id);
+      }
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === file.id ? { ...f, is_starred: !f.is_starred } : f
+        )
+      );
+    } catch {
+      setError('Failed to update star.');
     }
   }
 
@@ -366,6 +390,7 @@ export default function Files() {
                 onContextMenu={(e) => openContextMenu(e, 'file', file)}
                 onMenuClick={(e) => openContextMenu(e, 'file', file)}
                 onDownload={() => handleDownload(file.id)}
+                onToggleStar={() => handleToggleStar(file)}
               />
             ))}
           </div>
@@ -414,6 +439,22 @@ export default function Files() {
                   setContextMenu(null);
                 }}
               />
+              <ContextMenuItem
+                icon={(contextMenu.item as FileItem).is_starred ? <StarOff size={15} /> : <Star size={15} />}
+                label={(contextMenu.item as FileItem).is_starred ? 'Unstar' : 'Star'}
+                onClick={() => {
+                  handleToggleStar(contextMenu.item as FileItem);
+                  setContextMenu(null);
+                }}
+              />
+              <ContextMenuItem
+                icon={<MessageCircle size={15} />}
+                label="Comments"
+                onClick={() => {
+                  setCommentsFile(contextMenu.item as FileItem);
+                  setContextMenu(null);
+                }}
+              />
               <div className="my-1 border-t border-slate-100" />
               <ContextMenuItem
                 icon={<Trash2 size={15} />}
@@ -455,6 +496,14 @@ export default function Files() {
         <ShareDialog
           file={shareFile}
           onClose={() => setShareFile(null)}
+        />
+      )}
+
+      {commentsFile && (
+        <CommentsDialog
+          fileId={commentsFile.id}
+          fileName={commentsFile.name}
+          onClose={() => setCommentsFile(null)}
         />
       )}
 
@@ -610,12 +659,14 @@ function FileCard({
   onContextMenu,
   onMenuClick,
   onDownload,
+  onToggleStar,
 }: {
   file: FileItem;
   viewMode: 'grid' | 'list';
   onContextMenu: (e: React.MouseEvent) => void;
   onMenuClick: (e: React.MouseEvent) => void;
   onDownload: () => void;
+  onToggleStar: () => void;
 }) {
   if (viewMode === 'list') {
     return (
@@ -624,6 +675,17 @@ function FileCard({
         className="flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-slate-50 rounded-xl border border-slate-100 cursor-pointer group transition-colors"
         onDoubleClick={onDownload}
       >
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+          className="shrink-0 p-0.5 transition-colors"
+          title={file.is_starred ? 'Unstar' : 'Star'}
+        >
+          {file.is_starred ? (
+            <Star size={16} className="text-yellow-500 fill-yellow-500" />
+          ) : (
+            <Star size={16} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
+        </button>
         <FileIcon mimeType={file.mime_type} size={20} />
         <span className="flex-1 text-sm font-medium text-slate-800 truncate">{file.name}</span>
         <span className="text-xs text-slate-400 shrink-0">{formatBytes(file.size)}</span>
@@ -646,6 +708,17 @@ function FileCard({
       className="flex flex-col items-center p-4 bg-white hover:bg-slate-50 border border-slate-100 rounded-xl cursor-pointer group transition-colors relative"
       onDoubleClick={onDownload}
     >
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+        className="absolute top-2 left-2 p-0.5 transition-colors"
+        title={file.is_starred ? 'Unstar' : 'Star'}
+      >
+        {file.is_starred ? (
+          <Star size={14} className="text-yellow-500 fill-yellow-500" />
+        ) : (
+          <Star size={14} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all" />
+        )}
+      </button>
       <button
         onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
