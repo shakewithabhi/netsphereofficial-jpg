@@ -2,6 +2,7 @@ package com.bytebox.feature.files.presentation
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,8 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -69,6 +72,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -131,6 +135,7 @@ fun FileListScreen(
     var isSearchMode by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var isFabExpanded by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     BackHandler(enabled = uiState.breadcrumbs.size > 1 || uiState.isSelectionMode || isSearchMode) {
         when {
@@ -214,21 +219,10 @@ fun FileListScreen(
                             Text(
                                 uiState.currentFolderName,
                                 style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
                             )
                         },
                         actions = {
-                            IconButton(onClick = { isSearchMode = true }) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
-                            }
-                            IconButton(onClick = onNavigateToTrash) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = "Trash")
-                            }
-                            IconButton(onClick = viewModel::toggleViewMode) {
-                                Icon(
-                                    if (uiState.viewMode == ViewMode.LIST) Icons.Default.GridView else Icons.Default.ViewList,
-                                    contentDescription = "Toggle view",
-                                )
-                            }
                             Box {
                                 IconButton(onClick = { showSortMenu = true }) {
                                     Icon(Icons.Default.Sort, contentDescription = "Sort")
@@ -290,12 +284,100 @@ fun FileListScreen(
             }
         },
     ) { padding ->
+        // Compute tab-filtered lists
+        val isAtRoot = uiState.breadcrumbs.size <= 1
+        val displayFolders = if (selectedTab == 0) uiState.folders else emptyList()
+        val displayFiles = when (selectedTab) {
+            1 -> uiState.files.filter { uiState.pinnedFileIds.contains(it.id) }
+            2 -> uiState.files.filter { it.isStarred }
+            else -> uiState.files
+        }
+
         Column(modifier = Modifier.padding(padding)) {
             // Breadcrumb - always visible
             FolderBreadcrumb(
                 breadcrumbs = uiState.breadcrumbs,
                 onItemClick = viewModel::navigateToBreadcrumb,
             )
+
+            // ── Root-level: persistent search bar + tabs + sort row ───────────
+            if (isAtRoot && !isSearchMode && !uiState.isSelectionMode) {
+                // Search bar
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clickable { isSearchMode = true },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Search in ByteBox",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                // Tabs: All | Offline | Starred
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground,
+                    divider = {},
+                ) {
+                    listOf("All", "Offline", "Starred").forEachIndexed { index, label ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = {
+                                Text(
+                                    text = label,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
+                                )
+                            },
+                        )
+                    }
+                }
+                // Sort info row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showSortMenu = true }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Default.Sort,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Sort by ${uiState.sortBy.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            }
 
             when {
                 uiState.isLoading -> {
@@ -309,50 +391,40 @@ fun FileListScreen(
                         onRetry = viewModel::loadContents,
                     )
                 }
-                uiState.files.isEmpty() && uiState.folders.isEmpty() -> {
+                displayFiles.isEmpty() && displayFolders.isEmpty() && !uiState.isLoading -> {
                     EmptyState(
                         icon = Icons.Default.FolderOpen,
-                        title = "This folder is empty",
-                        subtitle = "Upload files or create folders to get started",
+                        title = if (selectedTab == 1) "No offline files" else if (selectedTab == 2) "No starred files" else "This folder is empty",
+                        subtitle = if (selectedTab == 0) "Upload files or create folders to get started" else "",
                     )
                 }
                 uiState.viewMode == ViewMode.LIST -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        if (uiState.folders.isNotEmpty()) {
-                            item {
-                                SectionHeader(title = "Folders")
-                            }
-                            items(uiState.folders, key = { it.id }) { folder ->
-                                FolderItem(
-                                    folder = folder,
-                                    isSelected = uiState.selectedItems.contains(folder.id),
-                                    onClick = {
-                                        if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
-                                        else viewModel.navigateToFolder(folder)
-                                    },
-                                    onLongClick = { viewModel.toggleSelection(folder.id) },
-                                    onMoreClick = { contextMenuFolderId = folder.id },
-                                )
-                            }
+                        items(displayFolders, key = { it.id }) { folder ->
+                            FolderItem(
+                                folder = folder,
+                                isSelected = uiState.selectedItems.contains(folder.id),
+                                onClick = {
+                                    if (uiState.isSelectionMode) viewModel.toggleSelection(folder.id)
+                                    else viewModel.navigateToFolder(folder)
+                                },
+                                onLongClick = { viewModel.toggleSelection(folder.id) },
+                                onMoreClick = { contextMenuFolderId = folder.id },
+                            )
                         }
-                        if (uiState.files.isNotEmpty()) {
-                            item {
-                                SectionHeader(title = "Files")
-                            }
-                            items(uiState.files, key = { it.id }) { file ->
-                                FileListItem(
-                                    file = file,
-                                    isSelected = uiState.selectedItems.contains(file.id),
-                                    onClick = {
-                                        if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
-                                        else onFileClick(file.id, file.mimeType)
-                                    },
-                                    onLongClick = { viewModel.toggleSelection(file.id) },
-                                    onMoreClick = { contextMenuFileId = file.id },
-                                    onStarClick = { viewModel.toggleStar(file.id, file.isStarred) },
-                                    isPinned = uiState.pinnedFileIds.contains(file.id),
-                                )
-                            }
+                        items(displayFiles, key = { it.id }) { file ->
+                            FileListItem(
+                                file = file,
+                                isSelected = uiState.selectedItems.contains(file.id),
+                                onClick = {
+                                    if (uiState.isSelectionMode) viewModel.toggleSelection(file.id)
+                                    else onFileClick(file.id, file.mimeType)
+                                },
+                                onLongClick = { viewModel.toggleSelection(file.id) },
+                                onMoreClick = { contextMenuFileId = file.id },
+                                onStarClick = { viewModel.toggleStar(file.id, file.isStarred) },
+                                isPinned = uiState.pinnedFileIds.contains(file.id),
+                            )
                         }
                         if (uiState.isLoadingMore) {
                             item {

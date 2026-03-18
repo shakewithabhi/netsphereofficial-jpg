@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Shadow card -->
+    <group
+        android:pivotX="50"
+        android:pivotY="50"
+        android:rotation="-14">
+        <path
+            android:pathData="M16,6 L84,6 Q94,6 94,16 L94,84 Q94,94 84,94 L16,94 Q6,94 6,84 L6,16 Q6,6 16,6 Z"
+            android:fillColor="#90CAF9" />
+    </group>
+
+    <!-- Front card -->
+    <group>
+        <clip-path
+            android:pathData="M18,10 L82,10 Q90,10 90,18 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 L10,18 Q10,10 18,10 Z" />
+        <path
+            android:pathData="M10,10 L90,10 L90,90 L10,90 Z"
+            android:fillColor="#E3F2FD" />
+        <!-- Document body with fold corner -->
+        <path
+            android:pathData="M28,16 L66,16 L78,28 L78,86 Q78,90 74,90 L32,90 Q28,90 28,86 Z"
+            android:fillColor="#FFFFFF" />
+        <!-- Fold triangle -->
+        <path
+            android:pathData="M66,16 L78,28 L66,28 Z"
+            android:fillColor="#90CAF9" />
+        <!-- Text lines -->
+        <path
+            android:pathData="M36,40 L70,40"
+            android:strokeColor="#1E88E5"
+            android:strokeWidth="3"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M36,50 L70,50"
+            android:strokeColor="#1E88E5"
+            android:strokeWidth="3"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M36,60 L70,60"
+            android:strokeColor="#1E88E5"
+            android:strokeWidth="3"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M36,70 L58,70"
+            android:strokeColor="#1E88E5"
+            android:strokeWidth="3"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

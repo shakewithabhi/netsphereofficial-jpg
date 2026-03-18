@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.bytebox.core.common.toLocalDateTime
 import com.bytebox.core.common.toRelativeTime
 import com.bytebox.core.ui.theme.ByteBoxTheme
+import com.bytebox.core.ui.theme.WarmAmber100
+import com.bytebox.core.ui.theme.WarmAmber400
 import com.bytebox.domain.model.Folder
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -57,12 +59,12 @@ fun FolderItem(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Folder icon with colored container
-        Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = WarmAmber100,
                         shape = RoundedCornerShape(ByteBoxTheme.radius.sm),
                     ),
                 contentAlignment = Alignment.Center,
@@ -70,8 +72,8 @@ fun FolderItem(
                 Icon(
                     Icons.Default.Folder,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
+                    tint = WarmAmber400,
+                    modifier = Modifier.size(26.dp),
                 )
             }
 

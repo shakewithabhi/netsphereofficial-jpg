@@ -1,5 +1,6 @@
 package com.bytebox.feature.auth.presentation.onboarding
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,149 +10,188 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.bytebox.core.ui.components.ByteBoxButton
-import com.bytebox.core.ui.components.ByteBoxOutlinedButton
-import com.bytebox.core.ui.theme.ByteBoxTheme
-import com.bytebox.core.ui.theme.cardShadow
+import androidx.compose.ui.unit.sp
+import com.bytebox.core.ui.components.LottieAnimatedAsset
+
+private val GradientStart = Color(0xFF6B63F6)
+private val GradientEnd   = Color(0xFF9B6FE8)
 
 @Composable
 fun OnboardingScreen(
     onGetStarted: () -> Unit,
     onSignIn: () -> Unit,
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(ByteBoxTheme.spacing.xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(GradientStart, GradientEnd),
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    end   = androidx.compose.ui.geometry.Offset(1000f, 2000f),
+                )
+            ),
     ) {
         Column(
-            modifier = Modifier.widthIn(max = 400.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            // Cloud illustration
+            // ── Illustration with Lottie floating badges ─────────────────────
             Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                modifier = Modifier.size(280.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Cloud,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                // Hero Lottie animation (rotating ring + floating folder)
+                LottieAnimatedAsset(
+                    assetFileName = "lottie_onboarding_hero.json",
+                    modifier = Modifier.size(240.dp),
+                )
+
+                // Lottie badge — top left (Lock)
+                LottieAnimatedAsset(
+                    assetFileName = "lottie_badge_lock.json",
+                    modifier = Modifier
+                        .size(54.dp)
+                        .align(Alignment.TopStart)
+                        .offset(x = 4.dp, y = 18.dp)
+                        .rotate(-10f),
+                )
+                // Lottie badge — top right (Cloud)
+                LottieAnimatedAsset(
+                    assetFileName = "lottie_badge_cloud.json",
+                    modifier = Modifier
+                        .size(54.dp)
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-4).dp, y = 26.dp)
+                        .rotate(8f),
+                )
+                // Lottie badge — bottom left (Share)
+                LottieAnimatedAsset(
+                    assetFileName = "lottie_badge_share.json",
+                    modifier = Modifier
+                        .size(54.dp)
+                        .align(Alignment.BottomStart)
+                        .offset(x = 10.dp, y = (-14).dp)
+                        .rotate(6f),
+                )
+                // Lottie badge — bottom right (Speed)
+                LottieAnimatedAsset(
+                    assetFileName = "lottie_badge_speed.json",
+                    modifier = Modifier
+                        .size(54.dp)
+                        .align(Alignment.BottomEnd)
+                        .offset(x = (-10).dp, y = (-10).dp)
+                        .rotate(-8f),
                 )
             }
 
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))
+            Spacer(modifier = Modifier.height(36.dp))
 
+            // ── Title ────────────────────────────────────────────────────────
             Text(
-                text = "Welcome to",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "ByteBox",
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
-
-            Text(
-                text = "Your files, everywhere. Store, share, and access your files from any device.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Manage Storage",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.lg),
             )
 
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxxl))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Feature highlights
+            Text(
+                text = "Easily manage and access your data\nfrom all media",
+                fontSize = 15.sp,
+                color = Color.White.copy(alpha = 0.75f),
+                textAlign = TextAlign.Center,
+                lineHeight = 22.sp,
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // ── Pagination dots ──────────────────────────────────────────────
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                FeatureChip(icon = Icons.Default.Lock, label = "Secure")
-                FeatureChip(icon = Icons.Default.Speed, label = "Fast")
-                FeatureChip(icon = Icons.Default.Share, label = "Shareable")
+                PaginationDot(active = false)
+                PaginationDot(active = true)
+                PaginationDot(active = false)
+                PaginationDot(active = false)
             }
 
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxxl))
+            Spacer(modifier = Modifier.height(40.dp))
 
-            ByteBoxButton(
-                text = "Get Started",
+            // ── CTA button ───────────────────────────────────────────────────
+            Button(
                 onClick = onGetStarted,
-            )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(26.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = GradientStart,
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+            ) {
+                Text(
+                    text = "Get Started",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
 
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            ByteBoxOutlinedButton(
-                text = "Sign In",
-                onClick = onSignIn,
-            )
+            // Sign in text link
+            androidx.compose.material3.TextButton(onClick = onSignIn) {
+                Text(
+                    text = "Already have an account? Sign In",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 14.sp,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun FeatureChip(
-    icon: ImageVector,
-    label: String,
-) {
-    Surface(
-        modifier = Modifier.cardShadow(shape = RoundedCornerShape(ByteBoxTheme.radius.md)),
-        shape = RoundedCornerShape(ByteBoxTheme.radius.md),
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(
-            modifier = Modifier.padding(
-                horizontal = ByteBoxTheme.spacing.lg,
-                vertical = ByteBoxTheme.spacing.md,
+private fun PaginationDot(active: Boolean) {
+    val width by animateDpAsState(
+        targetValue = if (active) 20.dp else 6.dp,
+        label = "dot_width",
+    )
+    Box(
+        modifier = Modifier
+            .height(6.dp)
+            .width(width)
+            .clip(CircleShape)
+            .background(
+                if (active) Color.White.copy(alpha = 0.90f)
+                else Color.White.copy(alpha = 0.30f)
             ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxs))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    )
 }

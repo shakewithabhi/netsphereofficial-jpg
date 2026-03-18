@@ -53,7 +53,6 @@ import com.bytebox.core.ui.components.EmptyState
 import com.bytebox.core.ui.components.ErrorState
 import com.bytebox.core.ui.components.FileListShimmer
 import com.bytebox.core.ui.components.FileTypeIcon
-import com.bytebox.core.ui.components.toColor
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.domain.model.FileItem
 

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Settings
@@ -36,7 +37,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytebox.core.ui.components.ConfirmationDialog
 import com.bytebox.core.ui.components.ProfileCard
 import com.bytebox.core.ui.components.ProfileMenuItem
+import com.bytebox.core.ui.components.StorageOverviewCard
 import com.bytebox.core.ui.theme.ByteBoxTheme
+import com.bytebox.core.ui.theme.Lavender400
+import com.bytebox.core.ui.theme.Lavender500
 import com.bytebox.core.ui.theme.cardShadow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,15 +79,24 @@ fun ProfileScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(padding),
         ) {
-            // Profile card
+            // Profile card + storage overview
             uiState.user?.let { user ->
                 ProfileCard(
                     displayName = user.displayName ?: "User",
                     email = user.email,
                     plan = user.plan,
-                    storageUsed = user.storageUsed,
-                    storageLimit = user.storageLimit,
                     modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.md),
+                )
+                Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                StorageOverviewCard(
+                    title = "ByteBox Storage",
+                    usedBytes = user.storageUsed,
+                    totalBytes = user.storageLimit,
+                    gradientColors = listOf(Lavender500, Lavender400),
+                    icon = Icons.Default.Cloud,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = ByteBoxTheme.spacing.md),
                 )
             }
 

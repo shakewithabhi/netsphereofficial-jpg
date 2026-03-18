@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
@@ -75,6 +76,7 @@ import com.bytebox.feature.settings.presentation.ProfileScreen
 import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
+import com.bytebox.feature.explore.presentation.ExploreScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
@@ -100,11 +102,11 @@ fun ByteBoxNavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // 5-tab navigation: Home, Files, Favorites, Shares, Profile
+    // 5-tab navigation: Home, Files, Explore, Shares, Profile
     val bottomNavItems = listOf(
         BottomNavItem("Home", { Icon(Icons.Default.Home, "Home") }, Screen.Dashboard.route),
         BottomNavItem("Files", { Icon(Icons.Default.Folder, "Files") }, Screen.Files.route),
-        BottomNavItem("Favorites", { Icon(Icons.Default.Star, "Favorites") }, Screen.Favorites.route),
+        BottomNavItem("Explore", { Icon(Icons.Default.Explore, "Explore") }, Screen.Explore.route),
         BottomNavItem("Shares", { Icon(Icons.Default.Link, "Shares") }, Screen.Shares.route),
         BottomNavItem("Profile", { Icon(Icons.Default.Person, "Profile") }, Screen.Profile.route),
     )
@@ -227,6 +229,12 @@ fun ByteBoxNavHost(
                     },
                     onSeeAllFolders = {
                         navController.navigate(Screen.Files.route)
+                    },
+                    onFavoritesClick = {
+                        navController.navigate(Screen.Favorites.route)
+                    },
+                    onSharesClick = {
+                        navController.navigate(Screen.Shares.route)
                     },
                 )
             }
@@ -388,6 +396,14 @@ fun ByteBoxNavHost(
                     onNavigateBack = { navController.popBackStack() },
                     onFileClick = { fileId, mimeType ->
                         navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
+                    },
+                )
+            }
+
+            composable(Screen.Explore.route) {
+                ExploreScreen(
+                    onItemClick = { code ->
+                        navController.navigate(Screen.ShareView.createRoute(code))
                     },
                 )
             }

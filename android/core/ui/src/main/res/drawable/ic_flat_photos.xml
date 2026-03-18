@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- Shadow card (back, rotated) -->
+    <group
+        android:pivotX="50"
+        android:pivotY="50"
+        android:rotation="-14">
+        <path
+            android:pathData="M16,6 L84,6 Q94,6 94,16 L94,84 Q94,94 84,94 L16,94 Q6,94 6,84 L6,16 Q6,6 16,6 Z"
+            android:fillColor="#C0CDD4" />
+    </group>
+
+    <!-- Front card with clipped landscape -->
+    <group>
+        <clip-path
+            android:pathData="M18,10 L82,10 Q90,10 90,18 L90,82 Q90,90 82,90 L18,90 Q10,90 10,82 L10,18 Q10,10 18,10 Z" />
+        <path
+            android:pathData="M10,10 L90,10 L90,90 L10,90 Z"
+            android:fillColor="#FFFFFF" />
+        <!-- Sky -->
+        <path
+            android:pathData="M10,10 L90,10 L90,58 L10,58 Z"
+            android:fillColor="#E3F2FD" />
+        <!-- Dark mountain -->
+        <path
+            android:pathData="M20,90 L20,60 L62,26 L90,50 L90,90 Z"
+            android:fillColor="#388E3C" />
+        <!-- Light mountain (front) -->
+        <path
+            android:pathData="M10,90 L10,68 L30,46 L56,68 L56,90 Z"
+            android:fillColor="#66BB6A" />
+        <!-- Sun -->
+        <path
+            android:pathData="M26,34 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0"
+            android:fillColor="#FFC107" />
+    </group>
+</vector>

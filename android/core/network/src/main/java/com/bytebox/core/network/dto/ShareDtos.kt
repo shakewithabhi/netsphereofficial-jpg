@@ -40,3 +40,22 @@ data class ApiError(
     val error: String,
     val message: String
 )
+
+@JsonClass(generateAdapter = true)
+data class ExploreItemDto(
+    val id: String,
+    val code: String,
+    @Json(name = "file_name") val fileName: String,
+    @Json(name = "file_size") val fileSize: Long = 0,
+    @Json(name = "mime_type") val mimeType: String,
+    @Json(name = "thumbnail_url") val thumbnailUrl: String? = null,
+    @Json(name = "owner_name") val ownerName: String = "",
+    @Json(name = "download_count") val downloadCount: Int = 0,
+    @Json(name = "created_at") val createdAt: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class ExploreResponse(
+    val items: List<ExploreItemDto> = emptyList(),
+    @Json(name = "next_cursor") val nextCursor: String? = null,
+)
