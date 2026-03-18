@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -153,10 +154,12 @@ fun FileListScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         topBar = {
             when {
                 uiState.isSelectionMode -> {
                     TopAppBar(
+                        windowInsets = WindowInsets(0),
                         title = { Text("${uiState.selectedItems.size} selected") },
                         navigationIcon = {
                             IconButton(onClick = viewModel::clearSelection) {
@@ -178,6 +181,7 @@ fun FileListScreen(
                 }
                 isSearchMode -> {
                     TopAppBar(
+                        windowInsets = WindowInsets(0),
                         title = {
                             TextField(
                                 value = searchQuery,
@@ -226,15 +230,16 @@ fun FileListScreen(
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                            actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = MaterialTheme.colorScheme.background,
+                            titleContentColor = MaterialTheme.colorScheme.onBackground,
+                            navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                            actionIconContentColor = MaterialTheme.colorScheme.onBackground,
                         ),
                     )
                 }
                 else -> {
                     TopAppBar(
+                        windowInsets = WindowInsets(0),
                         title = {
                             Text(
                                 uiState.currentFolderName,
@@ -280,9 +285,9 @@ fun FileListScreen(
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                            actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = MaterialTheme.colorScheme.background,
+                            titleContentColor = MaterialTheme.colorScheme.onBackground,
+                            actionIconContentColor = MaterialTheme.colorScheme.onBackground,
                         ),
                     )
                 }

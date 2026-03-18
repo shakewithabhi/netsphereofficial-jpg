@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -116,11 +117,13 @@ fun ExploreScreen(
     var isSearchVisible by remember { mutableStateOf(false) }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             if (isSearchVisible) {
                 // Search bar
                 TopAppBar(
+                    windowInsets = WindowInsets(0),
                     title = {
                         TextField(
                             value = uiState.searchQuery,
@@ -155,11 +158,12 @@ fun ExploreScreen(
                 )
             } else {
                 TopAppBar(
+                    windowInsets = WindowInsets(0),
                     title = {
                         Text(
                             text = "Explore",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
                         )
                     },
                     actions = {
@@ -167,22 +171,13 @@ fun ExploreScreen(
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = "Search",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(24.dp),
-                            )
-                        }
-                        IconButton(onClick = { /* notifications */ }) {
-                            Icon(
-                                Icons.Default.Notifications,
-                                contentDescription = "Notifications",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(24.dp),
+                                modifier = Modifier.size(22.dp),
                             )
                         }
                         IconButton(onClick = onCreatePost) {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(30.dp)
                                     .background(
                                         brush = Brush.linearGradient(
                                             colors = listOf(
@@ -198,14 +193,14 @@ fun ExploreScreen(
                                     Icons.Default.Add,
                                     contentDescription = "Create Post",
                                     tint = Color.White,
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
                     ),
                 )
             }
