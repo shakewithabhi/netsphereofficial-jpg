@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,19 +16,25 @@ import (
 	"github.com/bytebox/backend/internal/common"
 	"github.com/bytebox/backend/internal/file"
 	"github.com/bytebox/backend/internal/folder"
+	"github.com/bytebox/backend/internal/quota"
 	"github.com/bytebox/backend/internal/storage"
 )
 
 type Service struct {
-	repo       *Repository
-	fileRepo   *file.Repository
-	folderRepo *folder.Repository
-	store      *storage.Client
-	baseURL    string // e.g., "https://byteboxapp.com"
+	repo         *Repository
+	fileRepo     *file.Repository
+	folderRepo   *folder.Repository
+	store        *storage.Client
+	quotaService *quota.Service
+	baseURL      string // e.g., "https://byteboxapp.com"
 }
 
 func NewService(repo *Repository, fileRepo *file.Repository, folderRepo *folder.Repository, store *storage.Client, baseURL string) *Service {
 	return &Service{repo: repo, fileRepo: fileRepo, folderRepo: folderRepo, store: store, baseURL: baseURL}
+}
+
+func (s *Service) SetQuotaService(qs *quota.Service) {
+	s.quotaService = qs
 }
 
 func (s *Service) Create(ctx context.Context, claims *auth.TokenClaims, req CreateShareRequest) (*ShareResponse, error) {
@@ -171,7 +178,10 @@ func (s *Service) GetPublicInfo(ctx context.Context, code string) (*PublicShareR
 		resp.FileSize = f.Size
 		resp.MimeType = f.MimeType
 		resp.IsVideo = f.IsVideo
+		resp.IsImage = strings.HasPrefix(f.MimeType, "image/")
 		resp.VideoThumbnailURL = f.VideoThumbnailURL
+		resp.ThumbnailURL = f.ThumbnailKey
+		resp.PreviewAvailable = f.IsVideo || strings.HasPrefix(f.MimeType, "image/")
 	} else {
 		fd, err := s.folderRepo.GetByID(ctx, *share.FolderID, share.UserID)
 		if err != nil || fd == nil || fd.TrashedAt != nil {
@@ -298,6 +308,150 @@ func (s *Service) DownloadPublic(ctx context.Context, code, password string, fil
 	}
 
 	return resp, nil
+}
+
+func (s *Service) PreviewPublic(ctx context.Context, code, password string) (*PreviewResponse, error) {
+	share, err := s.repo.GetByCode(ctx, code)
+	if err != nil || share == nil {
+		return nil, common.ErrNotFound("share not found")
+	}
+
+	if err := s.validateShare(share); err != nil {
+		return nil, err
+	}
+
+	if share.ShareType != "file" {
+		return nil, common.ErrBadRequest("preview is only available for file shares")
+	}
+
+	// Check password
+	if share.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)); err != nil {
+			return nil, common.ErrUnauthorized("incorrect password")
+		}
+	}
+
+	f, err := s.fileRepo.GetByID(ctx, *share.FileID, share.UserID)
+	if err != nil || f == nil || f.TrashedAt != nil {
+		return nil, common.ErrNotFound("file no longer available")
+	}
+
+	resp := &PreviewResponse{
+		FileName: f.Name,
+		FileSize: f.Size,
+		MimeType: f.MimeType,
+		IsVideo:  f.IsVideo,
+		IsImage:  strings.HasPrefix(f.MimeType, "image/"),
+	}
+
+	if f.IsVideo {
+		// Short-lived presigned URL for video preview (30 seconds)
+		url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), f.StorageKey, 30*time.Second)
+		if err != nil {
+			slog.Error("failed to generate preview URL", "error", err)
+			return nil, common.ErrInternal("failed to generate preview URL")
+		}
+		resp.URL = url
+		resp.PreviewDuration = 30
+		resp.HLSURL = f.HLSURL
+		resp.VideoThumbnailURL = f.VideoThumbnailURL
+		resp.RequiresLogin = false
+	} else if strings.HasPrefix(f.MimeType, "image/") {
+		// Images get a 60-second presigned URL
+		url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), f.StorageKey, 60*time.Second)
+		if err != nil {
+			slog.Error("failed to generate preview URL", "error", err)
+			return nil, common.ErrInternal("failed to generate preview URL")
+		}
+		resp.URL = url
+		resp.PreviewDuration = 0
+		if f.ThumbnailKey != "" {
+			thumbURL, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), f.ThumbnailKey, 60*time.Second)
+			if err == nil {
+				resp.ThumbnailURL = thumbURL
+			}
+		}
+	}
+	// For other file types: no URL, just metadata
+
+	return resp, nil
+}
+
+func (s *Service) SaveToStorage(ctx context.Context, claims *auth.TokenClaims, code, password string, req SaveToStorageRequest) (*file.FileResponse, error) {
+	share, err := s.repo.GetByCode(ctx, code)
+	if err != nil || share == nil {
+		return nil, common.ErrNotFound("share not found")
+	}
+
+	if err := s.validateShare(share); err != nil {
+		return nil, err
+	}
+
+	if share.ShareType != "file" {
+		return nil, common.ErrBadRequest("save to storage is only available for file shares")
+	}
+
+	// Check password
+	if share.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)); err != nil {
+			return nil, common.ErrUnauthorized("incorrect password")
+		}
+	}
+
+	// Get the source file
+	f, err := s.fileRepo.GetByID(ctx, *share.FileID, share.UserID)
+	if err != nil || f == nil || f.TrashedAt != nil {
+		return nil, common.ErrNotFound("file no longer available")
+	}
+
+	// Check quota before saving
+	if s.quotaService != nil {
+		check, err := s.quotaService.CheckUpload(ctx, claims.UserID, f.Size)
+		if err != nil {
+			slog.Error("failed to check quota", "error", err)
+			return nil, common.ErrInternal("failed to check storage quota")
+		}
+		if !check.Allowed {
+			return nil, common.ErrBadRequest(check.WarningMsg)
+		}
+	}
+
+	// Generate a new storage key for the copy
+	newStorageKey := fmt.Sprintf("%s/%s/%s", claims.UserID.String(), uuid.New().String(), f.Name)
+
+	// Copy the actual S3 object
+	if err := s.store.Copy(ctx, s.store.BucketFiles(), f.StorageKey, newStorageKey); err != nil {
+		slog.Error("failed to copy file in storage", "error", err)
+		return nil, common.ErrInternal("failed to save file to your storage")
+	}
+
+	// Create a new file record for the current user
+	newFile := &file.File{
+		UserID:     claims.UserID,
+		FolderID:   req.FolderID,
+		Name:       f.Name,
+		StorageKey: newStorageKey,
+		Size:       f.Size,
+		MimeType:   f.MimeType,
+		IsVideo:    f.IsVideo,
+	}
+
+	if err := s.fileRepo.Create(ctx, newFile); err != nil {
+		slog.Error("failed to create file record", "error", err)
+		// Attempt to clean up the copied object
+		_ = s.store.Delete(ctx, s.store.BucketFiles(), newStorageKey)
+		return nil, common.ErrInternal("failed to save file record")
+	}
+
+	// Update storage usage
+	if s.quotaService != nil {
+		if err := s.quotaService.UpdateUsage(ctx, claims.UserID, f.Size); err != nil {
+			slog.Error("failed to update storage usage", "error", err, "user_id", claims.UserID)
+		}
+	}
+
+	resp := newFile.ToResponse()
+	return &resp, nil
 }
 
 func (s *Service) validateShare(share *Share) error {

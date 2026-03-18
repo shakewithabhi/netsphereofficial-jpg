@@ -67,6 +67,10 @@ type ShareResponse struct {
 	CreatedAt     time.Time  `json:"created_at"`
 }
 
+type SaveToStorageRequest struct {
+	FolderID *uuid.UUID `json:"folder_id"` // nil = save to root
+}
+
 type PublicShareResponse struct {
 	ShareType         string `json:"share_type"`
 	FileName          string `json:"file_name,omitempty"`
@@ -76,6 +80,23 @@ type PublicShareResponse struct {
 	ItemCount         int    `json:"item_count,omitempty"`
 	HasPassword       bool   `json:"has_password"`
 	IsVideo           bool   `json:"is_video,omitempty"`
+	IsImage           bool   `json:"is_image,omitempty"`
+	PreviewAvailable  bool   `json:"preview_available"`
+	ThumbnailURL      string `json:"thumbnail_url,omitempty"`
+	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
+}
+
+type PreviewResponse struct {
+	URL               string `json:"url,omitempty"`
+	PreviewDuration   int    `json:"preview_duration_seconds"`
+	FileName          string `json:"file_name"`
+	FileSize          int64  `json:"file_size"`
+	MimeType          string `json:"mime_type"`
+	IsVideo           bool   `json:"is_video"`
+	IsImage           bool   `json:"is_image"`
+	RequiresLogin     bool   `json:"requires_login"`
+	ThumbnailURL      string `json:"thumbnail_url,omitempty"`
+	HLSURL            string `json:"hls_url,omitempty"`
 	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
 }
 

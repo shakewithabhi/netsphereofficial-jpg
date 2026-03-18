@@ -1,6 +1,7 @@
 package share
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -39,6 +40,7 @@ func (h *Handler) PublicRoutes() chi.Router {
 	r.Get("/{code}", h.GetPublicInfo)
 	r.Post("/{code}/download", h.DownloadPublic)
 	r.Get("/{code}/contents", h.GetPublicFolderContents)
+	r.Post("/{code}/save", h.SaveToStorage)
 
 	return r
 }
@@ -193,6 +195,55 @@ func (h *Handler) GetPublicFolderContents(w http.ResponseWriter, r *http.Request
 	}
 
 	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) PreviewPublic(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+
+	// Password can be passed via query param or header for GET requests
+	password := r.URL.Query().Get("password")
+	if password == "" {
+		password = r.Header.Get("X-Share-Password")
+	}
+
+	resp, err := h.service.PreviewPublic(r.Context(), code, password)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) SaveToStorage(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("login required to save files"))
+		return
+	}
+
+	code := chi.URLParam(r, "code")
+
+	// Get password from body
+	var body struct {
+		Password string     `json:"password"`
+		FolderID *uuid.UUID `json:"folder_id"`
+	}
+	if r.Body != nil {
+		json.NewDecoder(r.Body).Decode(&body)
+	}
+
+	req := SaveToStorageRequest{
+		FolderID: body.FolderID,
+	}
+
+	resp, err := h.service.SaveToStorage(r.Context(), claims, code, body.Password, req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusCreated, resp)
 }
 
 func (h *Handler) serveSharePage(w http.ResponseWriter, code string, info *PublicShareResponse) {

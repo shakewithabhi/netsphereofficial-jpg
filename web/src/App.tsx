@@ -8,6 +8,7 @@ import Favorites from './pages/Favorites';
 import Settings from './pages/Settings';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
+import ShareView from './pages/ShareView';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -70,6 +71,7 @@ export default function App() {
         />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/s/:code" element={<ShareView />} />
         <Route
           path="/"
           element={

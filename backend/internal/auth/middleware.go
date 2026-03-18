@@ -45,6 +45,26 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// OptionalAuthenticate extracts claims from the Authorization header if present,
+// but does not reject requests without authentication. Claims may be nil.
+func (m *Middleware) OptionalAuthenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := r.Header.Get("Authorization")
+		if header != "" {
+			parts := strings.SplitN(header, " ", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+				claims, err := m.jwt.ValidateAccessToken(parts[1])
+				if err == nil {
+					ctx := context.WithValue(r.Context(), claimsKey, claims)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims := GetClaims(r.Context())

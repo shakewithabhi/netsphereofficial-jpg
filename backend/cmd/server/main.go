@@ -122,6 +122,7 @@ func main() {
 	// Share module
 	shareRepo := share.NewRepository(db)
 	shareService := share.NewService(shareRepo, fileRepo, folderRepo, store, cfg.App.BaseURL)
+	shareService.SetQuotaService(quotaService)
 	shareHandler := share.NewHandler(shareService)
 
 	// Backup module
@@ -202,9 +203,17 @@ func main() {
 		})
 
 		// Public share routes: 30 req/min by IP
+		// OptionalAuthenticate allows save-to-storage to access claims when logged in
 		r.Group(func(r chi.Router) {
+			r.Use(authMiddleware.OptionalAuthenticate)
 			r.Use(rateLimiter.Limit(30, time.Minute, middleware.ByIP))
 			r.Mount("/s", shareHandler.PublicRoutes())
+		})
+
+		// Share preview: 60 req/min by IP (separate limit from download)
+		r.Group(func(r chi.Router) {
+			r.Use(rateLimiter.Limit(60, time.Minute, middleware.ByIP))
+			r.Get("/s/{code}/preview", shareHandler.PreviewPublic)
 		})
 
 		// Protected routes: 100 req/min by user

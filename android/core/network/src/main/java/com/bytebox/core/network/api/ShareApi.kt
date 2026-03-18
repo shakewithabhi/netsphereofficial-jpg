@@ -26,4 +26,27 @@ interface ShareApi {
         @Query("cursor") cursor: String? = null,
         @Query("limit") limit: Int = 50
     ): Response<ShareListResponse>
+
+    // Public share view endpoints (no auth required)
+    @GET("s/{code}")
+    suspend fun getShareInfo(@Path("code") code: String): Response<ShareInfoResponse>
+
+    @GET("s/{code}/preview")
+    suspend fun getSharePreview(
+        @Path("code") code: String,
+        @Header("X-Share-Password") password: String? = null
+    ): Response<SharePreviewResponse>
+
+    @POST("s/{code}/download")
+    suspend fun getShareDownload(
+        @Path("code") code: String,
+        @Header("X-Share-Password") password: String? = null
+    ): Response<DownloadUrlResponse>
+
+    @POST("s/{code}/save")
+    suspend fun saveToStorage(
+        @Path("code") code: String,
+        @Body request: SaveToStorageRequest,
+        @Header("X-Share-Password") password: String? = null
+    ): Response<FileDto>
 }

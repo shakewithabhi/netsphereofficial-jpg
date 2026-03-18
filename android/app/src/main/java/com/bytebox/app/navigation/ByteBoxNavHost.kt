@@ -4,43 +4,21 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,10 +26,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -61,7 +37,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.byteboxapp.com.BuildConfig
-import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.theme.ByteBoxTheme
 import com.bytebox.feature.auth.presentation.forgotpassword.ForgotPasswordScreen
 import com.bytebox.feature.auth.presentation.forgotpassword.ResetPasswordScreen
@@ -76,11 +51,11 @@ import com.bytebox.feature.settings.presentation.ProfileScreen
 import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
+import com.bytebox.feature.share.presentation.ShareViewScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
 import com.bytebox.feature.files.presentation.notifications.NotificationsScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
-import kotlinx.coroutines.launch
 
 data class BottomNavItem(
     val label: String,
@@ -418,148 +393,13 @@ fun ByteBoxNavHost(
                 ShareViewScreen(
                     code = code,
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToLogin = {
+                        navController.navigate(Screen.Login.route)
+                    },
+                    onNavigateToRegister = {
+                        navController.navigate(Screen.Register.route)
+                    },
                 )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ShareViewScreen(code: String, onNavigateBack: () -> Unit) {
-    val context = LocalContext.current
-    var fileName by remember { mutableStateOf("Loading...") }
-    var fileSize by remember { mutableStateOf<Long?>(null) }
-    var mimeType by remember { mutableStateOf("") }
-    var shareType by remember { mutableStateOf("file") }
-    var isLoading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(code) {
-        try {
-            val resp = java.net.URL("${BuildConfig.BASE_URL}s/$code").openConnection() as java.net.HttpURLConnection
-            resp.setRequestProperty("Accept", "application/json")
-            if (resp.responseCode == 200) {
-                val json = org.json.JSONObject(resp.inputStream.bufferedReader().readText())
-                val data = if (json.has("data")) json.getJSONObject("data") else json
-                fileName = data.optString("file_name", data.optString("folder_name", "Shared File"))
-                fileSize = if (data.has("file_size")) data.optLong("file_size") else null
-                mimeType = data.optString("mime_type", "")
-                shareType = data.optString("share_type", "file")
-            } else {
-                error = "Share not found or expired"
-            }
-        } catch (e: Exception) {
-            error = e.message
-        }
-        isLoading = false
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Shared File") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center,
-        ) {
-            when {
-                isLoading -> CircularProgressIndicator()
-                error != null -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.ErrorOutline,
-                            null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
-                        Text(
-                            error!!,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                else -> {
-                    Column(
-                        modifier = Modifier.padding(ByteBoxTheme.spacing.xxl),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(96.dp),
-                            shape = RoundedCornerShape(ByteBoxTheme.radius.xxl),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    when {
-                                        shareType == "folder" -> Icons.Default.Folder
-                                        mimeType.startsWith("image/") -> Icons.Default.Image
-                                        mimeType.startsWith("video/") -> Icons.Default.Videocam
-                                        mimeType.startsWith("audio/") -> Icons.Default.MusicNote
-                                        else -> Icons.Default.Description
-                                    },
-                                    null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xl))
-                        Text(
-                            fileName,
-                            style = MaterialTheme.typography.headlineMedium,
-                            textAlign = TextAlign.Center,
-                        )
-
-                        val sizeVal = fileSize
-                        if (sizeVal != null && sizeVal > 0) {
-                            Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxs))
-                            Text(
-                                sizeVal.toReadableFileSize(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xxl))
-
-                        com.bytebox.core.ui.components.ByteBoxButton(
-                            text = "Download",
-                            onClick = {
-                                kotlinx.coroutines.MainScope().launch {
-                                    try {
-                                        val conn = java.net.URL("${BuildConfig.BASE_URL}s/$code/download").openConnection() as java.net.HttpURLConnection
-                                        conn.requestMethod = "POST"
-                                        conn.setRequestProperty("Content-Type", "application/json")
-                                        conn.doOutput = true
-                                        conn.outputStream.write("{}".toByteArray())
-                                        if (conn.responseCode == 200) {
-                                            val json = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
-                                            val data = if (json.has("data")) json.getJSONObject("data") else json
-                                            val url = data.getString("url")
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                            context.startActivity(intent)
-                                        }
-                                    } catch (_: Exception) {}
-                                }
-                            },
-                            leadingIcon = Icons.Default.Download,
-                        )
-                    }
-                }
             }
         }
     }

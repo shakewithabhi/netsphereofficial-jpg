@@ -40,3 +40,33 @@ data class ApiError(
     val error: String,
     val message: String
 )
+
+@JsonClass(generateAdapter = true)
+data class ShareInfoResponse(
+    @Json(name = "file_name") val fileName: String,
+    @Json(name = "file_size") val fileSize: Long,
+    @Json(name = "mime_type") val mimeType: String,
+    @Json(name = "is_video") val isVideo: Boolean = false,
+    @Json(name = "is_image") val isImage: Boolean = false,
+    @Json(name = "is_folder") val isFolder: Boolean = false,
+    @Json(name = "has_password") val hasPassword: Boolean = false,
+    @Json(name = "preview_available") val previewAvailable: Boolean = false,
+    @Json(name = "video_thumbnail_url") val videoThumbnailUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SharePreviewResponse(
+    val url: String,
+    @Json(name = "preview_duration_seconds") val previewDurationSeconds: Int = 0,
+    @Json(name = "file_name") val fileName: String,
+    @Json(name = "file_size") val fileSize: Long,
+    @Json(name = "mime_type") val mimeType: String,
+    @Json(name = "is_video") val isVideo: Boolean = false,
+    @Json(name = "is_image") val isImage: Boolean = false,
+    @Json(name = "requires_login") val requiresLogin: Boolean = true
+)
+
+@JsonClass(generateAdapter = true)
+data class SaveToStorageRequest(
+    @Json(name = "folder_id") val folderId: String? = null
+)
