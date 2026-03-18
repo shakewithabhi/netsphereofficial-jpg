@@ -112,7 +112,7 @@ func main() {
 
 	// File module
 	fileService := file.NewService(fileRepo, store, streamClient, quotaService, asynqClient, cfg.App.MaxUploadSize)
-	fileHandler := file.NewHandler(fileService, cfg.App.MaxUploadSize)
+	fileHandler := file.NewHandler(fileService, cfg.App.MaxUploadSize, cfg.App.BaseURL)
 
 	// Upload module
 	uploadRepo := upload.NewRepository(db)
@@ -233,6 +233,8 @@ func main() {
 		// Stricter rate limits for specific file endpoints
 		r.Group(func(r chi.Router) {
 			r.Use(authMiddleware.Authenticate)
+			// Remote upload: 5 req/min (expensive operation)
+			r.With(rateLimiter.Limit(5, time.Minute, middleware.ByUserOrIP)).Post("/files/remote-upload", fileHandler.RemoteUpload)
 			// Starred: 60 req/min
 			r.With(rateLimiter.Limit(60, time.Minute, middleware.ByUserOrIP)).Get("/files/starred", fileHandler.ListStarred)
 			// Star/unstar: 30 req/min

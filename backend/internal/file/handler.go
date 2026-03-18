@@ -1,8 +1,11 @@
 package file
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -14,12 +17,14 @@ import (
 type Handler struct {
 	service       *Service
 	maxUploadSize int64
+	baseURL       string
 }
 
-func NewHandler(service *Service, maxUploadSize int64) *Handler {
+func NewHandler(service *Service, maxUploadSize int64, baseURL string) *Handler {
 	return &Handler{
 		service:       service,
 		maxUploadSize: maxUploadSize,
+		baseURL:       baseURL,
 	}
 }
 
@@ -27,6 +32,7 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 
 	r.Post("/upload", h.Upload)
+	r.Post("/remote-upload", h.RemoteUpload)
 	r.Get("/search", h.Search)
 	r.Get("/trash", h.ListTrashed)
 	r.Get("/starred", h.ListStarred)
@@ -46,6 +52,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Put("/{id}/comments/{commentId}", h.UpdateComment)
 	r.Delete("/{id}/comments/{commentId}", h.DeleteComment)
 	r.Get("/{id}/download", h.Download)
+	r.Get("/{id}/download-proxy", h.DownloadProxy)
 	r.Get("/{id}/stream", h.Stream)
 	r.Get("/{id}/versions", h.ListVersions)
 	r.Get("/{id}/versions/{version}/download", h.DownloadVersion)
@@ -120,6 +127,31 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	common.JSON(w, http.StatusOK, resp)
 }
 
+func (h *Handler) RemoteUpload(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	var req RemoteUploadRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	resp, err := h.service.RemoteUpload(r.Context(), claims, req)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusCreated, RemoteUploadResponse{
+		File:    *resp,
+		Message: "file uploaded from URL",
+	})
+}
+
 func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetClaims(r.Context())
 	if claims == nil {
@@ -133,13 +165,90 @@ func (h *Handler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := h.service.Download(r.Context(), claims, id)
+	resp, err := h.service.Download(r.Context(), claims, id, h.baseURL)
 	if err != nil {
 		common.JSONError(w, err)
 		return
 	}
 
 	common.JSON(w, http.StatusOK, resp)
+}
+
+// DownloadProxy streams a file through the backend with speed throttling for free users.
+func (h *Handler) DownloadProxy(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid file id"))
+		return
+	}
+
+	file, body, err := h.service.DownloadProxy(r.Context(), claims, id)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	defer body.Close()
+
+	// Set response headers
+	w.Header().Set("Content-Type", file.MimeType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, file.Name))
+	if file.Size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(file.Size, 10))
+	}
+
+	// Determine speed limit based on plan
+	plan := claims.Plan
+	if plan == "" {
+		plan = "free"
+	}
+
+	var speedLimit int64 // bytes per second; 0 = unlimited
+	switch plan {
+	case "free":
+		speedLimit = 1 * 1024 * 1024 // 1 MB/s
+	case "pro":
+		speedLimit = 10 * 1024 * 1024 // 10 MB/s
+	default:
+		speedLimit = 0 // unlimited for premium
+	}
+
+	if speedLimit <= 0 {
+		// Unlimited: stream directly
+		io.Copy(w, body)
+		return
+	}
+
+	// Throttled copy: write in chunks, sleeping to enforce the speed limit
+	buf := make([]byte, 64*1024) // 64KB chunks
+	var totalWritten int64
+	startTime := time.Now()
+
+	for {
+		n, readErr := body.Read(buf)
+		if n > 0 {
+			written, writeErr := w.Write(buf[:n])
+			totalWritten += int64(written)
+			if writeErr != nil {
+				return // client disconnected
+			}
+
+			// Throttle: calculate expected duration and sleep if ahead of schedule
+			elapsed := time.Since(startTime)
+			expectedDuration := time.Duration(float64(totalWritten) / float64(speedLimit) * float64(time.Second))
+			if expectedDuration > elapsed {
+				time.Sleep(expectedDuration - elapsed)
+			}
+		}
+		if readErr != nil {
+			return // EOF or error
+		}
+	}
 }
 
 func (h *Handler) Stream(w http.ResponseWriter, r *http.Request) {

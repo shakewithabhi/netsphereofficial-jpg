@@ -41,4 +41,5 @@ interface FileRepository {
     suspend fun markNotificationRead(id: String): Result<Unit>
     suspend fun markAllNotificationsRead(): Result<Unit>
     suspend fun registerPushToken(token: String): Result<Unit>
+    suspend fun remoteUpload(url: String, folderId: String? = null, fileName: String? = null): Result<FileItem>
 }

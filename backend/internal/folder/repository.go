@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -289,6 +290,17 @@ func (r *Repository) MoveMany(ctx context.Context, ids []uuid.UUID, userID uuid.
 	result, err := r.db.Exec(ctx, query, parentID, newPath, ids, userID)
 	if err != nil {
 		return 0, fmt.Errorf("move many folders: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
+// DeleteExpiredTrash permanently deletes folders that have been in the trash longer than the given cutoff time.
+// Returns the number of rows deleted.
+func (r *Repository) DeleteExpiredTrash(ctx context.Context, olderThan time.Time) (int64, error) {
+	query := `DELETE FROM folders WHERE trashed_at IS NOT NULL AND trashed_at < $1`
+	result, err := r.db.Exec(ctx, query, olderThan)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired trash folders: %w", err)
 	}
 	return result.RowsAffected(), nil
 }

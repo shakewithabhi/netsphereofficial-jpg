@@ -20,6 +20,7 @@ import {
   X,
   Check,
   CloudUpload,
+  Link2,
   Search,
   Star,
   StarOff,
@@ -51,6 +52,7 @@ import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
 import { ShareDialog } from '../components/ShareDialog';
 import { UploadModal } from '../components/UploadModal';
+import { RemoteUploadModal } from '../components/RemoteUploadModal';
 import { CommentsDialog } from '../components/CommentsDialog';
 import { FilePreview } from '../components/FilePreview';
 import { HeaderAd, InFeedAd } from '../components/AdBanner';
@@ -93,6 +95,7 @@ export default function Files() {
   const [shareFile, setShareFile] = useState<FileItem | null>(null);
   const [commentsFile, setCommentsFile] = useState<FileItem | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [showRemoteUpload, setShowRemoteUpload] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const newFolderRef = useRef<HTMLInputElement>(null);
@@ -547,6 +550,14 @@ export default function Files() {
               <span className="hidden sm:inline">New folder</span>
             </button>
             <button
+              onClick={() => setShowRemoteUpload(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+              title="Upload from URL"
+            >
+              <Link2 size={18} />
+              <span className="hidden sm:inline">URL</span>
+            </button>
+            <button
               onClick={() => setShowUpload(true)}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors text-sm font-medium"
             >
@@ -850,6 +861,14 @@ export default function Files() {
           folderId={folderId}
           onClose={() => setShowUpload(false)}
           onUploaded={() => { setShowUpload(false); refresh(); }}
+        />
+      )}
+
+      {showRemoteUpload && (
+        <RemoteUploadModal
+          folderId={folderId}
+          onClose={() => setShowRemoteUpload(false)}
+          onUploaded={() => { setShowRemoteUpload(false); refresh(); }}
         />
       )}
 

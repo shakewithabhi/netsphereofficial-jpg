@@ -42,7 +42,11 @@ data class FileListUiState(
     val shareItemMimeType: String? = null,
     val shareItemIsFolder: Boolean = false,
     val isCreatingShare: Boolean = false,
-    val pinnedFileIds: Set<String> = emptySet()
+    val pinnedFileIds: Set<String> = emptySet(),
+    val showRemoteUploadDialog: Boolean = false,
+    val isRemoteUploading: Boolean = false,
+    val remoteUploadError: String? = null,
+    val remoteUploadSuccess: String? = null
 )
 
 data class BreadcrumbItem(val folderId: String?, val name: String)
@@ -355,6 +359,57 @@ class FileListViewModel @Inject constructor(
             fileRepository.unpinFile(fileId)
             _uiState.update { it.copy(pinnedFileIds = it.pinnedFileIds - fileId) }
         }
+    }
+
+    fun showRemoteUploadDialog() {
+        _uiState.update { it.copy(showRemoteUploadDialog = true, remoteUploadError = null, remoteUploadSuccess = null) }
+    }
+
+    fun hideRemoteUploadDialog() {
+        _uiState.update { it.copy(showRemoteUploadDialog = false, remoteUploadError = null, remoteUploadSuccess = null) }
+    }
+
+    fun remoteUpload(url: String, fileName: String?) {
+        if (url.isBlank()) return
+        val trimmedUrl = url.trim()
+        if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) {
+            _uiState.update { it.copy(remoteUploadError = "Please enter a valid URL starting with http:// or https://") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRemoteUploading = true, remoteUploadError = null) }
+            val result = fileRepository.remoteUpload(
+                url = trimmedUrl,
+                folderId = _uiState.value.currentFolderId,
+                fileName = fileName?.takeIf { it.isNotBlank() }
+            )
+            when (result) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isRemoteUploading = false,
+                            remoteUploadSuccess = result.data.name,
+                            showRemoteUploadDialog = false
+                        )
+                    }
+                    loadContents()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isRemoteUploading = false,
+                            remoteUploadError = result.exception.message ?: "Failed to download file"
+                        )
+                    }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun clearRemoteUploadSuccess() {
+        _uiState.update { it.copy(remoteUploadSuccess = null) }
     }
 
     private fun refreshPinnedStatus() {

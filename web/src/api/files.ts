@@ -128,6 +128,11 @@ export async function searchFiles(q: string): Promise<FolderContents> {
   return res.data.data;
 }
 
+export async function remoteUpload(url: string, folder_id?: string, file_name?: string): Promise<FileItem> {
+  const res = await client.post('/files/remote-upload', { url, folder_id, file_name });
+  return res.data.data;
+}
+
 export async function createShare(
   file_id: string,
   expires_in_hours?: number,

@@ -122,4 +122,7 @@ interface FileApi {
 
     @POST("notifications/token")
     suspend fun registerPushToken(@Body request: RegisterTokenRequest): Response<Unit>
+
+    @POST("files/remote-upload")
+    suspend fun remoteUpload(@Body request: RemoteUploadRequest): Response<FileDto>
 }

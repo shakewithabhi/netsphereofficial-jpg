@@ -102,3 +102,10 @@ data class RegisterTokenRequest(
     val token: String,
     val platform: String = "android"
 )
+
+@JsonClass(generateAdapter = true)
+data class RemoteUploadRequest(
+    val url: String,
+    @Json(name = "folder_id") val folderId: String? = null,
+    @Json(name = "file_name") val fileName: String? = null
+)

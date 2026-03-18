@@ -176,6 +176,45 @@ final class FilesViewModel: ObservableObject {
         searchResults = []
     }
 
+    // MARK: - Remote Upload
+
+    @Published var showRemoteUpload = false
+    @Published var remoteUploadUrl = ""
+    @Published var remoteUploadFileName = ""
+    @Published var isRemoteUploading = false
+    @Published var remoteUploadSuccessName: String?
+
+    func remoteUpload() async {
+        let trimmedUrl = remoteUploadUrl.trimmingCharacters(in: .whitespaces)
+        guard !trimmedUrl.isEmpty else { return }
+
+        guard trimmedUrl.hasPrefix("http://") || trimmedUrl.hasPrefix("https://") else {
+            errorMessage = "Please enter a valid URL starting with http:// or https://"
+            showError = true
+            return
+        }
+
+        isRemoteUploading = true
+        do {
+            let fileName = remoteUploadFileName.trimmingCharacters(in: .whitespaces)
+            let file = try await fileService.remoteUpload(
+                url: trimmedUrl,
+                folderId: currentFolderId,
+                fileName: fileName.isEmpty ? nil : fileName
+            )
+            isRemoteUploading = false
+            remoteUploadSuccessName = file.name
+            remoteUploadUrl = ""
+            remoteUploadFileName = ""
+            showRemoteUpload = false
+            await loadContents()
+        } catch {
+            isRemoteUploading = false
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
     // MARK: - Upload
 
     func uploadFile(data: Data, fileName: String, mimeType: String) async {

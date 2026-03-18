@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -843,6 +844,49 @@ func (r *Repository) DeleteComment(ctx context.Context, commentID, userID uuid.U
 	}
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("comment not found")
+	}
+	return nil
+}
+
+// ListExpiredTrash returns files that have been in the trash longer than the given cutoff time.
+func (r *Repository) ListExpiredTrash(ctx context.Context, olderThan time.Time) ([]File, error) {
+	query := `
+		SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),
+		       size, mime_type, COALESCE(content_hash, ''), scan_status, current_version,
+		       is_video, COALESCE(stream_video_id, ''), COALESCE(stream_status, ''),
+		       COALESCE(hls_url, ''), COALESCE(video_thumbnail_url, ''),
+		       trashed_at, created_at, updated_at
+		FROM files
+		WHERE trashed_at IS NOT NULL AND trashed_at < $1
+		LIMIT 500`
+
+	rows, err := r.db.Query(ctx, query, olderThan)
+	if err != nil {
+		return nil, fmt.Errorf("list expired trash: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		if err := rows.Scan(
+			&f.ID, &f.UserID, &f.FolderID, &f.Name, &f.StorageKey, &f.ThumbnailKey,
+			&f.Size, &f.MimeType, &f.ContentHash, &f.ScanStatus, &f.CurrentVersion,
+			&f.IsVideo, &f.StreamVideoID, &f.StreamStatus, &f.HLSURL, &f.VideoThumbnailURL,
+			&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan expired trash file: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, nil
+}
+
+// DeleteByID permanently deletes a file record by ID (no user check, for system cleanup).
+func (r *Repository) DeleteByID(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM files WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete file by id: %w", err)
 	}
 	return nil
 }

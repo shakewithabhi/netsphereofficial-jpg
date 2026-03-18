@@ -16,6 +16,7 @@ import com.bytebox.core.network.dto.FileVersionDto
 import com.bytebox.core.network.dto.FolderDto
 import com.bytebox.core.network.dto.NotificationDto
 import com.bytebox.core.network.dto.RegisterTokenRequest
+import com.bytebox.core.network.dto.RemoteUploadRequest
 import com.bytebox.core.network.dto.RenameFolderRequest
 import com.bytebox.core.network.safeApiCall
 import com.bytebox.domain.model.FileItem
@@ -247,6 +248,12 @@ class FileRepositoryImpl @Inject constructor(
 
     override suspend fun registerPushToken(token: String): Result<Unit> {
         return safeApiCall { fileApi.registerPushToken(RegisterTokenRequest(token)) }
+    }
+
+    override suspend fun remoteUpload(url: String, folderId: String?, fileName: String?): Result<FileItem> {
+        return safeApiCall {
+            fileApi.remoteUpload(RemoteUploadRequest(url = url, folderId = folderId, fileName = fileName))
+        }.map { it.toDomain() }
     }
 
     private fun NotificationDto.toDomain() = NotificationItem(

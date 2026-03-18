@@ -139,12 +139,26 @@ var CategoryMimePatterns = map[string][]string{
 	"documents": {"application/pdf", "application/msword", "application/vnd.openxmlformats-%", "text/%"},
 }
 
+// Remote upload request types
+
+type RemoteUploadRequest struct {
+	URL      string     `json:"url" validate:"required,url"`
+	FolderID *uuid.UUID `json:"folder_id"`
+	FileName string     `json:"file_name"` // optional, auto-detect from URL if empty
+}
+
+type RemoteUploadResponse struct {
+	File    FileResponse `json:"file"`
+	Message string       `json:"message"`
+}
+
 type DownloadResponse struct {
 	URL               string `json:"url"`
 	ExpiresIn         int64  `json:"expires_in"` // seconds
 	IsVideo           bool   `json:"is_video"`
 	HLSURL            string `json:"hls_url,omitempty"`
 	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
+	Proxied           bool   `json:"proxied,omitempty"` // true if download goes through backend proxy
 }
 
 // Combined listing response for folder contents

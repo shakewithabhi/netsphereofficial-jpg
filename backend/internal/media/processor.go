@@ -96,12 +96,12 @@ func (p *Processor) HandleGenerateThumbnail(ctx context.Context, t *asynq.Task) 
 func (p *Processor) HandleCleanupTrash(ctx context.Context, t *asynq.Task) error {
 	slog.Info("running trash cleanup")
 
-	// Get files trashed more than 30 days ago
+	// Get files trashed more than 30 days ago (process in batches of 500)
 	query := `
-		SELECT id, user_id, storage_key, thumbnail_key, size, stream_video_id
+		SELECT id, user_id, storage_key, COALESCE(thumbnail_key, ''), size, COALESCE(stream_video_id, '')
 		FROM files
 		WHERE trashed_at IS NOT NULL AND trashed_at < NOW() - INTERVAL '30 days'
-		LIMIT 100`
+		LIMIT 500`
 
 	rows, err := p.db.Query(ctx, query)
 	if err != nil {
@@ -109,48 +109,74 @@ func (p *Processor) HandleCleanupTrash(ctx context.Context, t *asynq.Task) error
 	}
 	defer rows.Close()
 
-	deleted := 0
+	var deletedFiles int
+	var totalSizeFreed int64
+	var errors int
 	for rows.Next() {
 		var id, userID uuid.UUID
 		var storageKey, thumbnailKey, streamVideoID string
 		var size int64
 
 		if err := rows.Scan(&id, &userID, &storageKey, &thumbnailKey, &size, &streamVideoID); err != nil {
-			slog.Error("scan trashed file", "error", err)
+			slog.Error("trash cleanup: failed to scan trashed file row", "error", err)
+			errors++
 			continue
 		}
 
-		// Delete from storage
+		// Delete file from S3 storage
 		if err := p.store.Delete(ctx, p.store.BucketFiles(), storageKey); err != nil {
-			slog.Error("delete file from storage", "key", storageKey, "error", err)
+			slog.Error("trash cleanup: failed to delete file from storage", "file_id", id, "key", storageKey, "error", err)
 		}
+
+		// Delete thumbnail from S3
 		if thumbnailKey != "" {
-			p.store.Delete(ctx, p.store.BucketThumbs(), thumbnailKey)
-		}
-		// Delete from Cloudflare Stream if applicable
-		if streamVideoID != "" && p.stream != nil {
-			if err := p.stream.DeleteVideo(ctx, streamVideoID); err != nil {
-				slog.Error("delete video from cloudflare stream", "video_uid", streamVideoID, "error", err)
+			if err := p.store.Delete(ctx, p.store.BucketThumbs(), thumbnailKey); err != nil {
+				slog.Error("trash cleanup: failed to delete thumbnail from storage", "file_id", id, "key", thumbnailKey, "error", err)
 			}
 		}
 
-		// Delete from DB
+		// Delete from Cloudflare Stream if applicable
+		if streamVideoID != "" && p.stream != nil {
+			if err := p.stream.DeleteVideo(ctx, streamVideoID); err != nil {
+				slog.Error("trash cleanup: failed to delete video from stream", "file_id", id, "video_uid", streamVideoID, "error", err)
+			}
+		}
+
+		// Delete file record from database
 		_, err := p.db.Exec(ctx, `DELETE FROM files WHERE id = $1`, id)
 		if err != nil {
-			slog.Error("delete file from db", "error", err)
+			slog.Error("trash cleanup: failed to delete file from database", "file_id", id, "error", err)
+			errors++
 			continue
 		}
 
-		// Update storage (user + global pool)
-		p.db.Exec(ctx, `UPDATE users SET storage_used = storage_used - $1 WHERE id = $2`, size, userID)
-		p.db.Exec(ctx, `UPDATE storage_pool SET used_capacity = used_capacity - $1, updated_at = NOW() WHERE id = 1`, size)
-		deleted++
+		// Update user storage_used and global storage pool
+		if _, err := p.db.Exec(ctx, `UPDATE users SET storage_used = GREATEST(storage_used - $1, 0) WHERE id = $2`, size, userID); err != nil {
+			slog.Error("trash cleanup: failed to update user storage_used", "user_id", userID, "error", err)
+		}
+		if _, err := p.db.Exec(ctx, `UPDATE storage_pool SET used_capacity = GREATEST(used_capacity - $1, 0), updated_at = NOW() WHERE id = 1`, size); err != nil {
+			slog.Error("trash cleanup: failed to update storage pool", "error", err)
+		}
+
+		deletedFiles++
+		totalSizeFreed += size
 	}
 
 	// Also delete trashed folders older than 30 days
-	p.db.Exec(ctx, `DELETE FROM folders WHERE trashed_at IS NOT NULL AND trashed_at < NOW() - INTERVAL '30 days'`)
+	folderResult, err := p.db.Exec(ctx, `DELETE FROM folders WHERE trashed_at IS NOT NULL AND trashed_at < NOW() - INTERVAL '30 days'`)
+	var deletedFolders int64
+	if err != nil {
+		slog.Error("trash cleanup: failed to delete expired folders", "error", err)
+	} else {
+		deletedFolders = folderResult.RowsAffected()
+	}
 
-	slog.Info("trash cleanup complete", "deleted", deleted)
+	slog.Info("trash cleanup complete",
+		"deleted_files", deletedFiles,
+		"deleted_folders", deletedFolders,
+		"size_freed_bytes", totalSizeFreed,
+		"errors", errors,
+	)
 	return nil
 }
 

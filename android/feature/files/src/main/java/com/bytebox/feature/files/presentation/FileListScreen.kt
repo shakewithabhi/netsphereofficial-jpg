@@ -287,6 +287,11 @@ fun FileListScreen(
                             label = "Upload",
                             onClick = { onNavigateToUpload(uiState.currentFolderId) },
                         ),
+                        SpeedDialItem(
+                            icon = Icons.Default.Link,
+                            label = "Remote Upload",
+                            onClick = viewModel::showRemoteUploadDialog,
+                        ),
                     ),
                 )
             }
@@ -805,6 +810,131 @@ fun FileListScreen(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.md))
                     Text("Creating share link...")
+                }
+            }
+        }
+    }
+
+    // Remote Upload dialog
+    var remoteUploadUrl by remember { mutableStateOf("") }
+    var remoteUploadFileName by remember { mutableStateOf("") }
+
+    if (uiState.showRemoteUploadDialog) {
+        Dialog(onDismissRequest = {
+            if (!uiState.isRemoteUploading) viewModel.hideRemoteUploadDialog()
+        }) {
+            Card(
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(ByteBoxTheme.spacing.xl)) {
+                    Text("Upload from URL", style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+                    Text(
+                        "Download a file from the web directly to your ByteBox",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+
+                    com.bytebox.core.ui.components.ByteBoxTextField(
+                        value = remoteUploadUrl,
+                        onValueChange = { remoteUploadUrl = it },
+                        label = "URL",
+                        placeholder = "https://example.com/file.zip",
+                        enabled = !uiState.isRemoteUploading,
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+
+                    com.bytebox.core.ui.components.ByteBoxTextField(
+                        value = remoteUploadFileName,
+                        onValueChange = { remoteUploadFileName = it },
+                        label = "File name (optional)",
+                        placeholder = "Auto-detect from URL",
+                        enabled = !uiState.isRemoteUploading,
+                    )
+
+                    if (uiState.remoteUploadError != null) {
+                        Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+                        Text(
+                            text = uiState.remoteUploadError!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+
+                    if (uiState.isRemoteUploading) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.sm))
+                            Text("Downloading file...", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            TextButton(onClick = {
+                                viewModel.hideRemoteUploadDialog()
+                                remoteUploadUrl = ""
+                                remoteUploadFileName = ""
+                            }) { Text("Cancel") }
+                            Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                            TextButton(
+                                onClick = {
+                                    viewModel.remoteUpload(remoteUploadUrl, remoteUploadFileName)
+                                },
+                                enabled = remoteUploadUrl.isNotBlank(),
+                            ) { Text("Download to ByteBox") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Reset fields when dialog closes after success
+    if (!uiState.showRemoteUploadDialog && remoteUploadUrl.isNotEmpty()) {
+        remoteUploadUrl = ""
+        remoteUploadFileName = ""
+    }
+
+    // Remote upload success snackbar
+    uiState.remoteUploadSuccess?.let { fileName ->
+        Dialog(onDismissRequest = { viewModel.clearRemoteUploadSuccess() }) {
+            Card(
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(
+                    modifier = Modifier.padding(ByteBoxTheme.spacing.xl),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp),
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                    Text("File saved!", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+                    TextButton(onClick = { viewModel.clearRemoteUploadSuccess() }) {
+                        Text("OK")
+                    }
                 }
             }
         }

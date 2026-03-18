@@ -86,6 +86,19 @@ final class FileService {
         return try await api.request("POST", path: "/files/\(fileId)/copy", body: body)
     }
 
+    // MARK: - Remote Upload
+
+    func remoteUpload(url: String, folderId: String? = nil, fileName: String? = nil) async throws -> FileItem {
+        var body: [String: Any] = ["url": url]
+        if let folderId = folderId {
+            body["folder_id"] = folderId
+        }
+        if let fileName = fileName {
+            body["file_name"] = fileName
+        }
+        return try await api.request("POST", path: "/files/remote-upload", body: body)
+    }
+
     // MARK: - Star Operations
 
     func starFile(fileId: String) async throws {

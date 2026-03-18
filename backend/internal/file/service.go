@@ -7,8 +7,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"mime/multipart"
+	"net/http"
+	"net/url"
+	"path"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
@@ -208,6 +213,207 @@ func (s *Service) Upload(ctx context.Context, claims *auth.TokenClaims, header *
 	return &resp, nil
 }
 
+func (s *Service) RemoteUpload(ctx context.Context, claims *auth.TokenClaims, req RemoteUploadRequest) (*FileResponse, error) {
+	// 1. Validate URL (must be http/https)
+	parsedURL, err := url.Parse(req.URL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+		return nil, common.ErrBadRequest("invalid URL, must be http or https")
+	}
+
+	// 2. HEAD request to get file size and content type
+	headCtx, headCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer headCancel()
+
+	headReq, err := http.NewRequestWithContext(headCtx, http.MethodHead, req.URL, nil)
+	if err != nil {
+		return nil, common.ErrBadRequest("invalid URL")
+	}
+	headReq.Header.Set("User-Agent", "ByteBox/1.0")
+
+	client := &http.Client{Timeout: 5 * time.Minute}
+	headResp, err := client.Do(headReq)
+	if err != nil {
+		slog.Error("failed HEAD request for remote upload", "url", req.URL, "error", err)
+		return nil, common.ErrBadRequest("unable to reach the provided URL")
+	}
+	headResp.Body.Close()
+
+	if headResp.StatusCode < 200 || headResp.StatusCode >= 400 {
+		return nil, common.ErrBadRequest(fmt.Sprintf("remote server returned status %d", headResp.StatusCode))
+	}
+
+	fileSize := headResp.ContentLength
+	contentType := headResp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	// Clean content type (remove parameters like charset)
+	if mediaType, _, err := mime.ParseMediaType(contentType); err == nil {
+		contentType = mediaType
+	}
+
+	// 3. Determine filename
+	fileName := req.FileName
+	if fileName == "" {
+		// Try Content-Disposition header
+		if cd := headResp.Header.Get("Content-Disposition"); cd != "" {
+			if _, params, err := mime.ParseMediaType(cd); err == nil {
+				if fn, ok := params["filename"]; ok {
+					fileName = fn
+				}
+			}
+		}
+		// Fallback: extract from URL path
+		if fileName == "" {
+			fileName = path.Base(parsedURL.Path)
+			if fileName == "" || fileName == "." || fileName == "/" {
+				fileName = "downloaded_file"
+			}
+		}
+	}
+
+	// 4. Check file size against max upload size (if size known)
+	if fileSize > 0 && fileSize > s.maxUploadSize {
+		return nil, common.ErrTooLarge(fmt.Sprintf("file too large, max %dMB", s.maxUploadSize/(1024*1024)))
+	}
+
+	// 5. Check storage quota (if size known)
+	if fileSize > 0 {
+		check, err := s.quota.CheckUpload(ctx, claims.UserID, fileSize)
+		if err != nil {
+			slog.Error("failed to check quota for remote upload", "error", err)
+			return nil, common.ErrInternal("failed to check storage quota")
+		}
+		if !check.Allowed {
+			return nil, common.ErrTooLarge(check.WarningMsg)
+		}
+	}
+
+	// 6. Download file from URL (stream to S3)
+	dlCtx, dlCancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer dlCancel()
+
+	dlReq, err := http.NewRequestWithContext(dlCtx, http.MethodGet, req.URL, nil)
+	if err != nil {
+		return nil, common.ErrInternal("failed to create download request")
+	}
+	dlReq.Header.Set("User-Agent", "ByteBox/1.0")
+
+	dlResp, err := client.Do(dlReq)
+	if err != nil {
+		slog.Error("failed to download remote file", "url", req.URL, "error", err)
+		return nil, common.ErrInternal("failed to download file from URL")
+	}
+	defer dlResp.Body.Close()
+
+	if dlResp.StatusCode < 200 || dlResp.StatusCode >= 400 {
+		return nil, common.ErrBadRequest(fmt.Sprintf("remote server returned status %d", dlResp.StatusCode))
+	}
+
+	// Use actual content length from GET if HEAD didn't provide it
+	actualSize := dlResp.ContentLength
+	if fileSize <= 0 && actualSize > 0 {
+		fileSize = actualSize
+		if fileSize > s.maxUploadSize {
+			return nil, common.ErrTooLarge(fmt.Sprintf("file too large, max %dMB", s.maxUploadSize/(1024*1024)))
+		}
+		// Check quota with actual size
+		check, err := s.quota.CheckUpload(ctx, claims.UserID, fileSize)
+		if err != nil {
+			slog.Error("failed to check quota for remote upload", "error", err)
+			return nil, common.ErrInternal("failed to check storage quota")
+		}
+		if !check.Allowed {
+			return nil, common.ErrTooLarge(check.WarningMsg)
+		}
+	}
+
+	// Limit download body to maxUploadSize
+	limitedBody := io.LimitReader(dlResp.Body, s.maxUploadSize+1)
+
+	// 7. Compute SHA-256 hash while streaming
+	hasher := sha256.New()
+	tee := io.TeeReader(limitedBody, hasher)
+
+	// Generate storage key
+	fileID := uuid.New()
+	prefix := claims.UserID.String()[:2]
+	storageKey := fmt.Sprintf("files/%s/%s/%s/%s", prefix, claims.UserID, fileID, fileName)
+
+	// Upload to storage (streaming through TeeReader)
+	uploadSize := fileSize
+	if uploadSize <= 0 {
+		// Unknown size, use max as upper bound for the upload call
+		uploadSize = s.maxUploadSize
+	}
+	if err := s.store.Upload(ctx, s.store.BucketFiles(), storageKey, tee, contentType, uploadSize); err != nil {
+		slog.Error("failed to upload remote file to storage", "error", err)
+		return nil, common.ErrInternal("failed to upload file to storage")
+	}
+
+	contentHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// 8. Create file record
+	isVideo := strings.HasPrefix(contentType, "video/")
+	file := &File{
+		ID:          fileID,
+		UserID:      claims.UserID,
+		FolderID:    req.FolderID,
+		Name:        fileName,
+		StorageKey:  storageKey,
+		Size:        fileSize,
+		MimeType:    contentType,
+		ContentHash: contentHash,
+		IsVideo:     isVideo,
+	}
+
+	if err := s.repo.Create(ctx, file); err != nil {
+		s.store.Delete(ctx, s.store.BucketFiles(), storageKey)
+		if strings.Contains(err.Error(), "duplicate key") {
+			return nil, common.ErrConflict("file with this name already exists in this folder")
+		}
+		slog.Error("failed to create file record for remote upload", "error", err)
+		return nil, common.ErrInternal("failed to save file")
+	}
+
+	// 9. Update storage used
+	if fileSize > 0 {
+		if err := s.quota.UpdateUsage(ctx, claims.UserID, fileSize); err != nil {
+			slog.Error("failed to update storage used for remote upload", "error", err)
+		}
+	}
+
+	// 10. Enqueue thumbnail generation and virus scan
+	if s.queue != nil {
+		task, err := media.NewThumbnailTask(file.ID, file.UserID, file.StorageKey, file.MimeType)
+		if err == nil {
+			if _, err := s.queue.Enqueue(task); err != nil {
+				slog.Error("failed to enqueue thumbnail task for remote upload", "error", err)
+			}
+		}
+
+		scanTask, err := media.NewVirusScanTask(file.ID, file.StorageKey)
+		if err == nil {
+			if _, err := s.queue.Enqueue(scanTask); err != nil {
+				slog.Error("failed to enqueue virus scan task for remote upload", "error", err)
+			}
+		}
+
+		if isVideo {
+			transcodeTask, err := media.NewTranscodeVideoTask(file.ID, file.UserID, file.StorageKey, file.Name)
+			if err == nil {
+				if _, err := s.queue.Enqueue(transcodeTask); err != nil {
+					slog.Error("failed to enqueue transcode task for remote upload", "error", err)
+				}
+			}
+		}
+	}
+
+	slog.Info("remote upload complete", "file_id", file.ID, "url", req.URL, "size", fileSize)
+	resp := file.ToResponse()
+	return &resp, nil
+}
+
 func (s *Service) GetByID(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) (*FileResponse, error) {
 	file, err := s.repo.GetByID(ctx, id, claims.UserID)
 	if err != nil {
@@ -221,20 +427,36 @@ func (s *Service) GetByID(ctx context.Context, claims *auth.TokenClaims, id uuid
 	return &resp, nil
 }
 
-func (s *Service) Download(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) (*DownloadResponse, error) {
+func (s *Service) Download(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID, proxyBaseURL string) (*DownloadResponse, error) {
 	file, err := s.repo.GetByID(ctx, id, claims.UserID)
 	if err != nil || file == nil || file.TrashedAt != nil {
 		return nil, common.ErrNotFound("file not found")
 	}
 
-	url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), file.StorageKey, s.store.PresignExpiry())
+	// For free users, return a proxied download URL that goes through our backend with throttling
+	if claims.Plan == "" || claims.Plan == "free" {
+		proxyURL := fmt.Sprintf("%s/api/v1/files/%s/download-proxy", proxyBaseURL, id.String())
+		resp := &DownloadResponse{
+			URL:     proxyURL,
+			Proxied: true,
+		}
+		if file.IsVideo {
+			resp.IsVideo = true
+			resp.HLSURL = file.HLSURL
+			resp.VideoThumbnailURL = file.VideoThumbnailURL
+		}
+		return resp, nil
+	}
+
+	// For paid users (pro/premium), return presigned S3 URL directly (fast, no throttling)
+	presignedURL, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), file.StorageKey, s.store.PresignExpiry())
 	if err != nil {
 		slog.Error("failed to generate download URL", "error", err)
 		return nil, common.ErrInternal("failed to generate download URL")
 	}
 
 	resp := &DownloadResponse{
-		URL:       url,
+		URL:       presignedURL,
 		ExpiresIn: int64(s.store.PresignExpiry().Seconds()),
 	}
 
@@ -246,6 +468,35 @@ func (s *Service) Download(ctx context.Context, claims *auth.TokenClaims, id uui
 	}
 
 	return resp, nil
+}
+
+// DownloadProxy streams a file from S3 through the backend with optional speed throttling.
+// Used for free-tier users to enforce download speed limits.
+func (s *Service) DownloadProxy(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) (*File, io.ReadCloser, error) {
+	file, err := s.repo.GetByID(ctx, id, claims.UserID)
+	if err != nil || file == nil || file.TrashedAt != nil {
+		return nil, nil, common.ErrNotFound("file not found")
+	}
+
+	// Get the file from S3 via presigned URL and stream it
+	presignedURL, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), file.StorageKey, s.store.PresignExpiry())
+	if err != nil {
+		slog.Error("failed to generate presigned URL for proxy download", "error", err)
+		return nil, nil, common.ErrInternal("failed to generate download URL")
+	}
+
+	resp, err := http.Get(presignedURL)
+	if err != nil {
+		slog.Error("failed to fetch file from storage for proxy", "error", err)
+		return nil, nil, common.ErrInternal("failed to fetch file from storage")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, nil, common.ErrInternal("failed to fetch file from storage")
+	}
+
+	return file, resp.Body, nil
 }
 
 func (s *Service) GetStreamInfo(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) (*DownloadResponse, error) {

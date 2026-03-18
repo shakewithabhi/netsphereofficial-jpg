@@ -14,6 +14,7 @@ struct FilesView: View {
     @State private var commentFile: FileItem?
     @State private var shareURL: URL?
     @State private var showShareSheet = false
+    @State private var showRemoteUploadSheet = false
 
     private let brandBlue = Color(red: 0.231, green: 0.510, blue: 0.965)
     private let columns = [
@@ -73,6 +74,12 @@ struct FilesView: View {
                         }
 
                         Button {
+                            showRemoteUploadSheet = true
+                        } label: {
+                            Image(systemName: "link")
+                        }
+
+                        Button {
                             viewModel.showCreateFolder = true
                         } label: {
                             Image(systemName: "folder.badge.plus")
@@ -122,7 +129,21 @@ struct FilesView: View {
                 Button("Browse Files") {
                     showDocumentPicker = true
                 }
+                Button("Upload from URL") {
+                    showRemoteUploadSheet = true
+                }
                 Button("Cancel", role: .cancel) {}
+            }
+            .sheet(isPresented: $showRemoteUploadSheet) {
+                RemoteUploadSheet(viewModel: viewModel, isPresented: $showRemoteUploadSheet)
+            }
+            .alert("File Saved!", isPresented: Binding(
+                get: { viewModel.remoteUploadSuccessName != nil },
+                set: { if !$0 { viewModel.remoteUploadSuccessName = nil } }
+            )) {
+                Button("OK") { viewModel.remoteUploadSuccessName = nil }
+            } message: {
+                Text("\(viewModel.remoteUploadSuccessName ?? "File") has been saved to your ByteBox.")
             }
             .photosPicker(
                 isPresented: $showPhotoPicker,
@@ -386,6 +407,78 @@ struct FilesView: View {
             "zip": "application/zip", "json": "application/json"
         ]
         return mimeTypes[ext] ?? "application/octet-stream"
+    }
+}
+
+// MARK: - Remote Upload Sheet
+
+struct RemoteUploadSheet: View {
+    @ObservedObject var viewModel: FilesViewModel
+    @Binding var isPresented: Bool
+
+    private let brandBlue = Color(red: 0.231, green: 0.510, blue: 0.965)
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("https://example.com/file.zip", text: $viewModel.remoteUploadUrl)
+                        .keyboardType(.URL)
+                        .textContentType(.URL)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .disabled(viewModel.isRemoteUploading)
+                } header: {
+                    Text("URL")
+                } footer: {
+                    Text("Enter the direct download link of the file.")
+                }
+
+                Section {
+                    TextField("Auto-detect from URL", text: $viewModel.remoteUploadFileName)
+                        .disabled(viewModel.isRemoteUploading)
+                } header: {
+                    Text("File Name (Optional)")
+                }
+
+                if viewModel.isRemoteUploading {
+                    Section {
+                        HStack {
+                            ProgressView()
+                                .padding(.trailing, 8)
+                            Text("Downloading file...")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Upload from URL")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        viewModel.remoteUploadUrl = ""
+                        viewModel.remoteUploadFileName = ""
+                        isPresented = false
+                    }
+                    .disabled(viewModel.isRemoteUploading)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Download") {
+                        Task {
+                            await viewModel.remoteUpload()
+                            if viewModel.remoteUploadSuccessName != nil {
+                                isPresented = false
+                            }
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(viewModel.remoteUploadUrl.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isRemoteUploading)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 
