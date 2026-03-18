@@ -166,7 +166,7 @@ func main() {
 
 	// Admin module
 	adminRepo := admin.NewRepository(db)
-	adminHandler := admin.NewHandler(adminRepo, quotaService)
+	adminHandler := admin.NewHandler(adminRepo, quotaService, rdb, store)
 
 	// Rate limiter
 	rateLimiter := middleware.NewRateLimiter(rdb)

@@ -2,14 +2,17 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Table, Input, Tag, Button, Space, Typography, message, Modal,
   Form, Select, InputNumber, Switch, Tooltip, Card, DatePicker, Drawer,
-  Timeline, Dropdown,
+  Timeline, Dropdown, Progress, Spin,
 } from 'antd';
 import {
   SearchOutlined, StopOutlined, EditOutlined, DownloadOutlined,
-  EyeOutlined, MoreOutlined,
+  EyeOutlined, MoreOutlined, PieChartOutlined,
 } from '@ant-design/icons';
+import {
+  PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer,
+} from 'recharts';
 import type { ColumnsType } from 'antd/es/table';
-import { adminApi, type AdminUser, type UpdateUserPayload, type AuditLogEntry } from '../../api/admin';
+import { adminApi, type AdminUser, type UpdateUserPayload, type AuditLogEntry, type UserStorageBreakdown } from '../../api/admin';
 import { formatBytes, formatDate, formatRelative, planLabel } from '../../utils/format';
 import { exportToCSV } from '../../utils/export';
 import { usePolling } from '../../hooks/usePolling';
@@ -36,6 +39,9 @@ export default function UsersPage() {
   const [activityUser, setActivityUser] = useState<AdminUser | null>(null);
   const [activityLogs, setActivityLogs] = useState<AuditLogEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
+
+  // Storage breakdown
+  const [storageBreakdown, setStorageBreakdown] = useState<UserStorageBreakdown | null>(null);
 
   const pageSize = 20;
 
@@ -79,9 +85,19 @@ export default function UsersPage() {
   const fetchActivity = async (user: AdminUser) => {
     setActivityUser(user);
     setActivityLoading(true);
+    setStorageBreakdown(null);
     try {
-      const { data } = await adminApi.userActivity(user.id, { limit: 50 });
-      setActivityLogs(data.logs || []);
+      const [activityRes, storageRes] = await Promise.allSettled([
+        adminApi.userActivity(user.id, { limit: 50 }),
+        adminApi.getUserStorageBreakdown(user.id),
+      ]);
+      if (activityRes.status === 'fulfilled') {
+        setActivityLogs(activityRes.value.data.logs || []);
+      }
+      if (storageRes.status === 'fulfilled') {
+        const sd = (storageRes.value.data as any)?.data ?? storageRes.value.data;
+        setStorageBreakdown(sd);
+      }
     } catch {
       message.error('Failed to load user activity');
     } finally {
@@ -410,6 +426,54 @@ export default function UsersPage() {
             </Card>
           </div>
         )}
+        {storageBreakdown && (
+          <div style={{ marginBottom: 24 }}>
+            <Card size="small" title="Storage Breakdown">
+              <div style={{ marginBottom: 12 }}>
+                <Text strong>Usage: </Text>
+                <Text>{formatBytes(storageBreakdown.total_used ?? 0)} / {formatBytes(storageBreakdown.storage_limit ?? 0)}</Text>
+                <Progress
+                  percent={storageBreakdown.storage_limit > 0 ? Math.round((storageBreakdown.total_used / storageBreakdown.storage_limit) * 100) : 0}
+                  size="small"
+                  status={storageBreakdown.storage_limit > 0 && (storageBreakdown.total_used / storageBreakdown.storage_limit) >= 0.9 ? 'exception' : 'active'}
+                  style={{ marginTop: 4 }}
+                />
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Images', value: storageBreakdown.images?.size ?? 0, count: storageBreakdown.images?.count ?? 0 },
+                      { name: 'Videos', value: storageBreakdown.videos?.size ?? 0, count: storageBreakdown.videos?.count ?? 0 },
+                      { name: 'Audio', value: storageBreakdown.audio?.size ?? 0, count: storageBreakdown.audio?.count ?? 0 },
+                      { name: 'Docs', value: storageBreakdown.docs?.size ?? 0, count: storageBreakdown.docs?.count ?? 0 },
+                      { name: 'Other', value: storageBreakdown.other?.size ?? 0, count: storageBreakdown.other?.count ?? 0 },
+                    ].filter((d) => d.value > 0)}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={70}
+                    label={(e) => `${e.name}: ${formatBytes(e.value)}`}
+                  >
+                    {['#1677ff', '#722ed1', '#13c2c2', '#52c41a', '#faad14'].map((color, i) => (
+                      <Cell key={i} fill={color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip formatter={(v: number) => formatBytes(v)} />
+                </PieChart>
+              </ResponsiveContainer>
+              <Space direction="vertical" size={2} style={{ width: '100%', marginTop: 8 }}>
+                <Text style={{ fontSize: 12 }}>Images: {storageBreakdown.images?.count ?? 0} files ({formatBytes(storageBreakdown.images?.size ?? 0)})</Text>
+                <Text style={{ fontSize: 12 }}>Videos: {storageBreakdown.videos?.count ?? 0} files ({formatBytes(storageBreakdown.videos?.size ?? 0)})</Text>
+                <Text style={{ fontSize: 12 }}>Audio: {storageBreakdown.audio?.count ?? 0} files ({formatBytes(storageBreakdown.audio?.size ?? 0)})</Text>
+                <Text style={{ fontSize: 12 }}>Docs: {storageBreakdown.docs?.count ?? 0} files ({formatBytes(storageBreakdown.docs?.size ?? 0)})</Text>
+                <Text style={{ fontSize: 12 }}>Other: {storageBreakdown.other?.count ?? 0} files ({formatBytes(storageBreakdown.other?.size ?? 0)})</Text>
+              </Space>
+            </Card>
+          </div>
+        )}
+
         {activityLoading ? (
           <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
         ) : (

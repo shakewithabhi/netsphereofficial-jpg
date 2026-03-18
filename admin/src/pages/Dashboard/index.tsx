@@ -3,7 +3,7 @@ import { Card, Col, Row, Statistic, Spin, Typography } from 'antd';
 import {
   UserOutlined, FileOutlined, CloudOutlined, ShareAltOutlined,
   TeamOutlined, RiseOutlined, DeleteOutlined, UploadOutlined,
-  CommentOutlined, StarOutlined, BellOutlined,
+  CommentOutlined, StarOutlined, BellOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -57,6 +57,7 @@ export default function DashboardPage() {
     { title: 'Total Stars', value: s.total_stars ?? 0, icon: <StarOutlined />, color: '#fadb14' },
     { title: 'Notifications Sent', value: s.total_notifications ?? 0, icon: <BellOutlined />, color: '#597ef7' },
     { title: 'Unread Notifications', value: s.unread_notifications ?? 0, icon: <BellOutlined />, color: '#ff7a45' },
+    { title: 'Total Posts', value: s.total_posts ?? 0, icon: <VideoCameraOutlined />, color: '#9254de' },
   ];
 
   const signupData = signupTrends.map((d) => ({

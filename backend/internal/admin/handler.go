@@ -1,24 +1,36 @@
 package admin
 
 import (
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/bytebox/backend/internal/common"
 	"github.com/bytebox/backend/internal/quota"
+	"github.com/bytebox/backend/internal/storage"
 )
 
+var startTime = time.Now()
+
 type Handler struct {
-	repo  *Repository
-	quota *quota.Service
+	repo    *Repository
+	quota   *quota.Service
+	rdb     *redis.Client
+	storage *storage.Client
 }
 
-func NewHandler(repo *Repository, quotaSvc *quota.Service) *Handler {
-	return &Handler{repo: repo, quota: quotaSvc}
+func NewHandler(repo *Repository, quotaSvc *quota.Service, rdb *redis.Client, store *storage.Client) *Handler {
+	return &Handler{repo: repo, quota: quotaSvc, rdb: rdb, storage: store}
 }
 
 func (h *Handler) Routes() chi.Router {
@@ -57,6 +69,34 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/ad-settings", h.GetAdSettings)
 	r.Put("/ad-settings", h.UpdateAdSettings)
 	r.Get("/ad-analytics", h.AdAnalytics)
+
+	// Post moderation
+	r.Get("/posts", h.ListPosts)
+	r.Delete("/posts/{id}", h.DeleteAdminPost)
+	r.Put("/posts/{id}/status", h.UpdatePostStatus)
+
+	// Per-user storage breakdown
+	r.Get("/users/{id}/storage", h.GetUserStorageBreakdown)
+	r.Get("/storage/top-users", h.GetTopStorageUsers)
+
+	// Notification management
+	r.Get("/notifications", h.ListNotifications)
+	r.Post("/notifications/send", h.SendNotification)
+	r.Delete("/notifications/{id}", h.DeleteNotification)
+
+	// Revenue dashboard
+	r.Get("/revenue", h.GetRevenueStats)
+
+	// System health
+	r.Get("/health", h.SystemHealth)
+
+	// Export reports
+	r.Get("/export/users", h.ExportUsers)
+	r.Get("/export/files", h.ExportFiles)
+	r.Get("/export/posts", h.ExportPosts)
+	r.Get("/export/notifications", h.ExportNotifications)
+	r.Get("/export/revenue", h.ExportRevenue)
+	r.Get("/export/analytics", h.ExportAnalytics)
 
 	return r
 }
@@ -561,4 +601,446 @@ func (h *Handler) UpdateAdSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, current)
+}
+
+// ── 1. Post Moderation ──
+
+func (h *Handler) ListPosts(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+	search := r.URL.Query().Get("search")
+	status := r.URL.Query().Get("status")
+
+	posts, total, err := h.repo.ListPosts(r.Context(), limit, offset, search, status)
+	if err != nil {
+		slog.Error("failed to list posts", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to list posts"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{
+		"posts":  posts,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+func (h *Handler) DeleteAdminPost(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid post id"))
+		return
+	}
+
+	if err := h.repo.DeletePost(r.Context(), id); err != nil {
+		slog.Error("failed to delete post", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to delete post"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "post deleted"})
+}
+
+func (h *Handler) UpdatePostStatus(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid post id"))
+		return
+	}
+
+	var req UpdatePostStatusRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	if err := h.repo.UpdatePostStatus(r.Context(), id, req.Status); err != nil {
+		slog.Error("failed to update post status", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to update post status"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "post status updated"})
+}
+
+// ── 2. Per-User Storage Breakdown ──
+
+func (h *Handler) GetUserStorageBreakdown(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid user id"))
+		return
+	}
+
+	breakdown, err := h.repo.GetUserStorageBreakdown(r.Context(), id)
+	if err != nil {
+		slog.Error("failed to get user storage breakdown", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get user storage breakdown"))
+		return
+	}
+	if breakdown == nil {
+		common.JSONError(w, common.ErrNotFound("user not found"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, breakdown)
+}
+
+func (h *Handler) GetTopStorageUsers(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	users, err := h.repo.GetTopStorageUsers(r.Context(), limit)
+	if err != nil {
+		slog.Error("failed to get top storage users", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get top storage users"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, users)
+}
+
+// ── 3. Notification Management ──
+
+func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	if offset < 0 {
+		offset = 0
+	}
+	userID := r.URL.Query().Get("user_id")
+	notifType := r.URL.Query().Get("type")
+
+	notifs, total, err := h.repo.ListNotifications(r.Context(), limit, offset, userID, notifType)
+	if err != nil {
+		slog.Error("failed to list notifications", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to list notifications"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]any{
+		"notifications": notifs,
+		"total":         total,
+		"limit":         limit,
+		"offset":        offset,
+	})
+}
+
+func (h *Handler) SendNotification(w http.ResponseWriter, r *http.Request) {
+	var req SendNotificationRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	if req.UserID == nil {
+		// Broadcast to all active users
+		count, err := h.repo.SendBroadcastNotification(r.Context(), req.Type, req.Title, req.Message)
+		if err != nil {
+			slog.Error("failed to send broadcast notification", "error", err)
+			common.JSONError(w, common.ErrInternal("failed to send broadcast notification"))
+			return
+		}
+		common.JSON(w, http.StatusOK, map[string]any{"message": "broadcast notification sent", "recipients": count})
+		return
+	}
+
+	if err := h.repo.SendUserNotification(r.Context(), *req.UserID, req.Type, req.Title, req.Message); err != nil {
+		slog.Error("failed to send user notification", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to send notification"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "notification sent"})
+}
+
+func (h *Handler) DeleteNotification(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("invalid notification id"))
+		return
+	}
+
+	if err := h.repo.DeleteNotification(r.Context(), id); err != nil {
+		slog.Error("failed to delete notification", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to delete notification"))
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "notification deleted"})
+}
+
+// ── 4. Revenue Dashboard ──
+
+func (h *Handler) GetRevenueStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.repo.GetRevenueStats(r.Context())
+	if err != nil {
+		slog.Error("failed to get revenue stats", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to get revenue stats"))
+		return
+	}
+	common.JSON(w, http.StatusOK, stats)
+}
+
+// ── 5. System Health ──
+
+func (h *Handler) SystemHealth(w http.ResponseWriter, r *http.Request) {
+	health := SystemHealth{
+		Status:        "healthy",
+		Uptime:        int64(time.Since(startTime).Seconds()),
+		GoVersion:     runtime.Version(),
+		NumGoroutines: runtime.NumGoroutine(),
+	}
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	health.MemoryUsed = int64(memStats.Sys)
+	health.MemoryAlloc = int64(memStats.Alloc)
+
+	// Check DB health
+	activeConns, maxConns, dbLatency, err := h.repo.CheckDBHealth(r.Context())
+	if err != nil {
+		health.Status = "degraded"
+		health.Components = append(health.Components, ComponentHealth{Name: "database", Status: "down", Latency: 0})
+	} else {
+		health.DBConnections = activeConns
+		health.DBMaxConns = maxConns
+		health.Components = append(health.Components, ComponentHealth{Name: "database", Status: "up", Latency: dbLatency})
+	}
+
+	// Check Redis health
+	if h.rdb != nil {
+		start := time.Now()
+		err := h.rdb.Ping(r.Context()).Err()
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			health.Status = "degraded"
+			health.Components = append(health.Components, ComponentHealth{Name: "redis", Status: "down", Latency: 0})
+		} else {
+			health.Components = append(health.Components, ComponentHealth{Name: "redis", Status: "up", Latency: latency})
+		}
+	}
+
+	// Check S3/MinIO health
+	if h.storage != nil {
+		start := time.Now()
+		err := h.storage.HeadBucket(r.Context(), h.storage.BucketFiles())
+		latency := time.Since(start).Milliseconds()
+		if err != nil {
+			health.Status = "degraded"
+			health.Components = append(health.Components, ComponentHealth{Name: "storage", Status: "down", Latency: 0})
+		} else {
+			health.Components = append(health.Components, ComponentHealth{Name: "storage", Status: "up", Latency: latency})
+		}
+	}
+
+	// If any component is down, mark overall status
+	for _, c := range health.Components {
+		if c.Status == "down" {
+			health.Status = "degraded"
+			break
+		}
+	}
+
+	common.JSON(w, http.StatusOK, health)
+}
+
+// ── 6. Export Reports ──
+
+func (h *Handler) ExportUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.repo.ExportAllUsers(r.Context())
+	if err != nil {
+		slog.Error("failed to export users", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to export users"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=users_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	writer.Write([]string{"id", "email", "display_name", "plan", "storage_used", "storage_limit", "file_count", "is_active", "is_admin", "email_verified", "approval_status", "last_login_at", "created_at"})
+
+	for _, u := range users {
+		lastLogin := ""
+		if u.LastLoginAt != nil {
+			lastLogin = u.LastLoginAt.Format(time.RFC3339)
+		}
+		writer.Write([]string{
+			u.ID.String(), u.Email, u.DisplayName, u.Plan,
+			strconv.FormatInt(u.StorageUsed, 10), strconv.FormatInt(u.StorageLimit, 10),
+			strconv.FormatInt(u.FileCount, 10),
+			strconv.FormatBool(u.IsActive), strconv.FormatBool(u.IsAdmin), strconv.FormatBool(u.EmailVerified),
+			u.ApprovalStatus, lastLogin, u.CreatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+func (h *Handler) ExportFiles(w http.ResponseWriter, r *http.Request) {
+	files, err := h.repo.ExportAllFiles(r.Context())
+	if err != nil {
+		slog.Error("failed to export files", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to export files"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=files_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	writer.Write([]string{"id", "user_id", "user_email", "name", "mime_type", "size", "folder_id", "trashed_at", "created_at"})
+
+	for _, f := range files {
+		folderID := ""
+		if f.FolderID != nil {
+			folderID = f.FolderID.String()
+		}
+		trashedAt := ""
+		if f.TrashedAt != nil {
+			trashedAt = f.TrashedAt.Format(time.RFC3339)
+		}
+		writer.Write([]string{
+			f.ID.String(), f.UserID.String(), f.UserEmail, f.Name, f.MimeType,
+			strconv.FormatInt(f.Size, 10), folderID, trashedAt, f.CreatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+func (h *Handler) ExportPosts(w http.ResponseWriter, r *http.Request) {
+	posts, err := h.repo.ExportAllPosts(r.Context())
+	if err != nil {
+		slog.Error("failed to export posts", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to export posts"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=posts_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	writer.Write([]string{"id", "user_id", "user_email", "user_name", "caption", "tags", "view_count", "like_count", "status", "file_name", "mime_type", "created_at"})
+
+	for _, p := range posts {
+		writer.Write([]string{
+			p.ID.String(), p.UserID.String(), p.UserEmail, p.UserName, p.Caption,
+			strings.Join(p.Tags, ";"),
+			strconv.FormatInt(p.ViewCount, 10), strconv.FormatInt(p.LikeCount, 10),
+			p.Status, p.FileName, p.MimeType, p.CreatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+func (h *Handler) ExportNotifications(w http.ResponseWriter, r *http.Request) {
+	notifs, _, err := h.repo.ListNotifications(r.Context(), 100000, 0, "", "")
+	if err != nil {
+		slog.Error("failed to export notifications", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to export notifications"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=notifications_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	writer.Write([]string{"id", "user_id", "user_email", "type", "title", "message", "is_read", "created_at"})
+
+	for _, n := range notifs {
+		writer.Write([]string{
+			n.ID.String(), n.UserID.String(), n.UserEmail, n.Type, n.Title, n.Message,
+			strconv.FormatBool(n.IsRead), n.CreatedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+func (h *Handler) ExportRevenue(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.repo.GetRevenueStats(r.Context())
+	if err != nil {
+		slog.Error("failed to export revenue", "error", err)
+		common.JSONError(w, common.ErrInternal("failed to export revenue"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=revenue_export.csv")
+
+	writer := csv.NewWriter(w)
+	defer writer.Flush()
+
+	writer.Write([]string{"metric", "value"})
+	writer.Write([]string{"total_paid_users", strconv.FormatInt(stats.TotalPaidUsers, 10)})
+	writer.Write([]string{"monthly_revenue", fmt.Sprintf("%.2f", stats.MonthlyRevenue)})
+	writer.Write([]string{"churn_rate", fmt.Sprintf("%.2f", stats.ChurnRate)})
+
+	writer.Write([]string{})
+	writer.Write([]string{"plan", "user_count", "price_per_month", "revenue"})
+	for _, pr := range stats.PlanRevenue {
+		writer.Write([]string{
+			pr.Plan, strconv.FormatInt(pr.UserCount, 10),
+			fmt.Sprintf("%.2f", pr.PriceMonth), fmt.Sprintf("%.2f", pr.Revenue),
+		})
+	}
+
+	writer.Write([]string{})
+	writer.Write([]string{"user_id", "email", "old_plan", "new_plan", "changed_at"})
+	for _, pc := range stats.RecentUpgrades {
+		writer.Write([]string{
+			pc.UserID.String(), pc.Email, pc.OldPlan, pc.NewPlan, pc.ChangedAt.Format(time.RFC3339),
+		})
+	}
+}
+
+func (h *Handler) ExportAnalytics(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	report := make(map[string]any)
+
+	if dashStats, err := h.repo.GetDashboardStats(ctx); err == nil {
+		report["dashboard"] = dashStats
+	}
+	if revenueStats, err := h.repo.GetRevenueStats(ctx); err == nil {
+		report["revenue"] = revenueStats
+	}
+	if storageStats, err := h.repo.GetStorageStats(ctx); err == nil {
+		report["storage"] = storageStats
+	}
+	if adAnalytics, err := h.repo.GetAdAnalytics(ctx); err == nil {
+		report["ad_analytics"] = adAnalytics
+	}
+
+	// Top storage users
+	if topUsers, err := h.repo.GetTopStorageUsers(ctx, 20); err == nil {
+		report["top_storage_users"] = topUsers
+	}
+
+	report["generated_at"] = time.Now().Format(time.RFC3339)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=analytics_export.json")
+	w.WriteHeader(http.StatusOK)
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(report); err != nil {
+		slog.Error("failed to encode analytics export", "error", err)
+	}
 }

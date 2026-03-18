@@ -140,6 +140,78 @@ export interface AdSettings {
   ad_frequency: number;
 }
 
+export interface AdminPost {
+  id: string;
+  user_id: string;
+  user_email: string;
+  caption: string;
+  tags: string[];
+  views: number;
+  likes: number;
+  status: 'active' | 'hidden' | 'removed';
+  created_at: string;
+}
+
+export interface UserStorageBreakdown {
+  images: { count: number; size: number };
+  videos: { count: number; size: number };
+  audio: { count: number; size: number };
+  docs: { count: number; size: number };
+  other: { count: number; size: number };
+  total_used: number;
+  storage_limit: number;
+}
+
+export interface TopStorageUser {
+  user_id: string;
+  email: string;
+  display_name: string;
+  plan: string;
+  storage_used: number;
+  storage_limit: number;
+  usage_percent: number;
+  file_count: number;
+}
+
+export interface AdminNotification {
+  id: string;
+  user_id: string;
+  user_email: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface SendNotificationPayload {
+  recipient: 'all' | 'user';
+  user_email?: string;
+  type: 'info' | 'warning' | 'promo' | 'system';
+  title: string;
+  message: string;
+}
+
+export interface RevenueStats {
+  total_paid_users: number;
+  monthly_revenue: number;
+  avg_revenue_per_user: number;
+  plan_distribution: { plan: string; user_count: number; price_per_month: number; monthly_revenue: number }[];
+  recent_plan_changes: { user_email: string; old_plan: string; new_plan: string; changed_at: string }[];
+  revenue_projection: { month: string; projected_revenue: number }[];
+}
+
+export interface SystemHealth {
+  status: 'healthy' | 'degraded' | 'down';
+  uptime: string;
+  goroutines: number;
+  memory_used: number;
+  memory_total: number;
+  db_connections: number;
+  go_version: string;
+  components: { name: string; status: 'up' | 'down'; latency_ms: number }[];
+}
+
 export const adminApi = {
   // Dashboard
   dashboard: () =>
@@ -237,4 +309,58 @@ export const adminApi = {
 
   updateAdSettings: (settings: AdSettings) =>
     client.put<AdSettings>('/admin/ad-settings', settings),
+
+  // Posts
+  listPosts: (params: { limit?: number; offset?: number; search?: string; status?: string }) =>
+    client.get<{ posts: AdminPost[]; total: number }>('/admin/posts', { params }),
+
+  deletePost: (id: string) =>
+    client.delete<{ message: string }>(`/admin/posts/${id}`),
+
+  updatePostStatus: (id: string, status: string) =>
+    client.put<{ message: string }>(`/admin/posts/${id}/status`, { status }),
+
+  // User storage breakdown
+  getUserStorageBreakdown: (userId: string) =>
+    client.get<UserStorageBreakdown>(`/admin/users/${userId}/storage-breakdown`),
+
+  getTopStorageUsers: () =>
+    client.get<{ users: TopStorageUser[] }>('/admin/storage/top-users'),
+
+  // Notifications
+  listAdminNotifications: (params: { limit?: number; offset?: number; type?: string; user_email?: string }) =>
+    client.get<{ notifications: AdminNotification[]; total: number }>('/admin/notifications', { params }),
+
+  deleteNotification: (id: string) =>
+    client.delete<{ message: string }>(`/admin/notifications/${id}`),
+
+  sendNotification: (data: SendNotificationPayload) =>
+    client.post<{ message: string }>('/admin/notifications/send', data),
+
+  // Revenue
+  getRevenueStats: () =>
+    client.get<RevenueStats>('/admin/revenue'),
+
+  // System health
+  getSystemHealth: () =>
+    client.get<SystemHealth>('/admin/system/health'),
+
+  // Exports
+  exportUsers: () =>
+    client.get('/admin/export/users', { responseType: 'blob' }),
+
+  exportFiles: () =>
+    client.get('/admin/export/files', { responseType: 'blob' }),
+
+  exportPosts: () =>
+    client.get('/admin/export/posts', { responseType: 'blob' }),
+
+  exportNotifications: () =>
+    client.get('/admin/export/notifications', { responseType: 'blob' }),
+
+  exportRevenue: () =>
+    client.get('/admin/export/revenue', { responseType: 'blob' }),
+
+  exportAnalytics: () =>
+    client.get('/admin/export/analytics', { responseType: 'blob' }),
 };

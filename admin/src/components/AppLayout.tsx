@@ -3,7 +3,8 @@ import {
   DashboardOutlined, TeamOutlined, CloudOutlined, LogoutOutlined,
   CloudServerOutlined, AuditOutlined, CheckCircleOutlined,
   SettingOutlined, FolderOutlined, CommentOutlined, DollarOutlined,
-  BarChartOutlined,
+  BarChartOutlined, PlayCircleOutlined, BellOutlined, HeartOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -20,7 +21,12 @@ const menuItems = [
   { key: '/comments', icon: <CommentOutlined />, label: 'Comments' },
   { key: '/audit-logs', icon: <AuditOutlined />, label: 'Audit Logs' },
   { key: '/ad-analytics', icon: <BarChartOutlined />, label: 'Ad Analytics' },
+  { key: '/posts', icon: <PlayCircleOutlined />, label: 'Posts' },
+  { key: '/notifications', icon: <BellOutlined />, label: 'Notifications' },
   { key: '/ad-settings', icon: <DollarOutlined />, label: 'Ad Settings' },
+  { key: '/revenue', icon: <DollarOutlined />, label: 'Revenue' },
+  { key: '/system-health', icon: <HeartOutlined />, label: 'System Health' },
+  { key: '/reports', icon: <DownloadOutlined />, label: 'Reports' },
   { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
 ];
 

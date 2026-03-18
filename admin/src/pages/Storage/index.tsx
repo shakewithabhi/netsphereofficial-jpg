@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Card, Col, Row, Statistic, Table, Typography, Spin, Progress } from 'antd';
+import { Card, Col, Row, Statistic, Table, Typography, Spin, Progress, Tag } from 'antd';
 import { CloudOutlined, FileOutlined, DatabaseOutlined, HddOutlined } from '@ant-design/icons';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line, Legend,
 } from 'recharts';
-import { adminApi, type StorageStats, type StoragePool, type MimeTypeStat, type DailyUploadStat } from '../../api/admin';
+import { adminApi, type StorageStats, type StoragePool, type MimeTypeStat, type DailyUploadStat, type TopStorageUser } from '../../api/admin';
 import { formatBytes, planLabel } from '../../utils/format';
 
 const { Title } = Typography;
@@ -17,6 +17,7 @@ export default function StoragePage() {
   const [pool, setPool] = useState<StoragePool | null>(null);
   const [mimeStats, setMimeStats] = useState<MimeTypeStat[]>([]);
   const [uploadTrends, setUploadTrends] = useState<DailyUploadStat[]>([]);
+  const [topStorageUsers, setTopStorageUsers] = useState<TopStorageUser[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +25,10 @@ export default function StoragePage() {
     Promise.all([
       adminApi.storageStats().then((res) => setStats(unwrap(res))).catch(() => {}),
       adminApi.storagePool().then((res) => setPool(unwrap(res))).catch(() => {}),
+      adminApi.getTopStorageUsers().then((res) => {
+        const d = unwrap(res);
+        setTopStorageUsers(d.users ?? d ?? []);
+      }).catch(() => {}),
       adminApi.mimeTypeStats().then((res) => {
         const d = unwrap(res);
         setMimeStats(Array.isArray(d) ? d : []);
@@ -151,16 +156,28 @@ export default function StoragePage() {
         </Col>
       </Row>
 
-      <Card title="Top 10 Users" style={{ marginTop: 16 }}>
+      <Card title="Top 20 Users by Storage Usage" style={{ marginTop: 16 }}>
         <Table
-          dataSource={s.top_users || []}
+          dataSource={topStorageUsers.length > 0 ? topStorageUsers : (s.top_users || [])}
           rowKey={(r: any) => r.user_id ?? r.id ?? r.email}
           pagination={false}
+          size="small"
           columns={[
+            { title: 'User', dataIndex: 'display_name', render: (v: string) => v || '-', ellipsis: true },
             { title: 'Email', dataIndex: 'email', ellipsis: true },
-            { title: 'Name', dataIndex: 'display_name', render: (v) => v || '-' },
-            { title: 'Storage Used', dataIndex: 'storage_used', render: (v) => formatBytes(v) },
-            { title: 'Files', dataIndex: 'file_count' },
+            { title: 'Plan', dataIndex: 'plan', width: 90, render: (v: string) => v ? <Tag color={v === 'free' ? 'default' : v === 'pro' ? 'blue' : 'gold'}>{planLabel(v)}</Tag> : '-' },
+            { title: 'Storage Used', dataIndex: 'storage_used', width: 120, render: (v: number) => formatBytes(v) },
+            { title: 'Storage Limit', dataIndex: 'storage_limit', width: 120, render: (v: number) => v ? formatBytes(v) : '-' },
+            {
+              title: 'Usage %',
+              key: 'usage',
+              width: 160,
+              render: (_: unknown, r: any) => {
+                const pct = r.usage_percent ?? (r.storage_limit > 0 ? Math.round((r.storage_used / r.storage_limit) * 100) : 0);
+                return <Progress percent={pct} size="small" status={pct >= 90 ? 'exception' : 'active'} />;
+              },
+            },
+            { title: 'Files', dataIndex: 'file_count', width: 80 },
           ]}
         />
       </Card>

@@ -218,6 +218,16 @@ func (c *Client) AbortMultipartUpload(ctx context.Context, bucket, key, uploadID
 	return nil
 }
 
+func (c *Client) HeadBucket(ctx context.Context, bucket string) error {
+	_, err := c.s3.HeadBucket(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(bucket),
+	})
+	if err != nil {
+		return fmt.Errorf("head bucket: %w", err)
+	}
+	return nil
+}
+
 func (c *Client) BucketFiles() string  { return c.cfg.BucketFiles }
 func (c *Client) BucketThumbs() string { return c.cfg.BucketThumbs }
 func (c *Client) BucketTemp() string   { return c.cfg.BucketTemp }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -38,6 +39,7 @@ func (r *Repository) GetDashboardStats(ctx context.Context) (*DashboardStats, er
 		{`SELECT COUNT(*) FROM file_stars`, &stats.TotalStars},
 		{`SELECT COUNT(*) FROM notifications`, &stats.TotalNotifications},
 		{`SELECT COUNT(*) FROM notifications WHERE read_at IS NULL`, &stats.UnreadNotifications},
+		{`SELECT COUNT(*) FROM posts`, &stats.TotalPosts},
 	}
 
 	for _, q := range queries {
@@ -828,4 +830,436 @@ func (r *Repository) GetSignupTrends(ctx context.Context, days int) ([]DailySign
 		stats = append(stats, s)
 	}
 	return stats, nil
+}
+
+// ── Post Moderation ──
+
+func (r *Repository) ListPosts(ctx context.Context, limit, offset int, search, status string) ([]AdminPost, int64, error) {
+	var total int64
+	countQuery := `SELECT COUNT(*) FROM posts p JOIN users u ON u.id = p.user_id WHERE 1=1`
+	var countArgs []any
+	argIdx := 1
+
+	if status != "" {
+		countQuery += fmt.Sprintf(` AND p.status = $%d`, argIdx)
+		countArgs = append(countArgs, status)
+		argIdx++
+	}
+	if search != "" {
+		countQuery += fmt.Sprintf(` AND (p.caption ILIKE $%d OR u.email ILIKE $%d)`, argIdx, argIdx)
+		countArgs = append(countArgs, "%"+search+"%")
+		argIdx++
+	}
+
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count posts: %w", err)
+	}
+
+	query := `
+		SELECT p.id, p.user_id, u.email, u.display_name, p.caption,
+		       COALESCE(p.tags, '{}'), COALESCE(p.view_count, 0), COALESCE(p.like_count, 0),
+		       p.status, COALESCE(f.name, ''), COALESCE(f.mime_type, ''), p.created_at
+		FROM posts p
+		JOIN users u ON u.id = p.user_id
+		LEFT JOIN files f ON f.id = p.file_id
+		WHERE 1=1`
+	args := make([]any, 0)
+	argIdx = 1
+
+	if status != "" {
+		query += fmt.Sprintf(` AND p.status = $%d`, argIdx)
+		args = append(args, status)
+		argIdx++
+	}
+	if search != "" {
+		query += fmt.Sprintf(` AND (p.caption ILIKE $%d OR u.email ILIKE $%d)`, argIdx, argIdx)
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list posts: %w", err)
+	}
+	defer rows.Close()
+
+	var posts []AdminPost
+	for rows.Next() {
+		var p AdminPost
+		if err := rows.Scan(
+			&p.ID, &p.UserID, &p.UserEmail, &p.UserName, &p.Caption,
+			&p.Tags, &p.ViewCount, &p.LikeCount,
+			&p.Status, &p.FileName, &p.MimeType, &p.CreatedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan post: %w", err)
+		}
+		posts = append(posts, p)
+	}
+
+	return posts, total, nil
+}
+
+func (r *Repository) DeletePost(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM posts WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete post: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) UpdatePostStatus(ctx context.Context, id uuid.UUID, status string) error {
+	_, err := r.db.Exec(ctx, `UPDATE posts SET status = $1 WHERE id = $2`, status, id)
+	if err != nil {
+		return fmt.Errorf("update post status: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) GetPostsCount(ctx context.Context) (int64, error) {
+	var count int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM posts`).Scan(&count); err != nil {
+		return 0, fmt.Errorf("posts count: %w", err)
+	}
+	return count, nil
+}
+
+// ── Per-User Storage Breakdown ──
+
+func (r *Repository) GetUserStorageBreakdown(ctx context.Context, userID uuid.UUID) (*UserStorageBreakdown, error) {
+	breakdown := &UserStorageBreakdown{}
+
+	err := r.db.QueryRow(ctx, `
+		SELECT u.id, u.email, u.display_name, u.plan, u.storage_used, u.storage_limit,
+		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL)
+		FROM users u WHERE u.id = $1`, userID).Scan(
+		&breakdown.UserID, &breakdown.Email, &breakdown.DisplayName,
+		&breakdown.Plan, &breakdown.StorageUsed, &breakdown.StorageLimit,
+		&breakdown.FileCount,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get user storage breakdown: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			CASE
+				WHEN mime_type LIKE 'image/%' THEN 'images'
+				WHEN mime_type LIKE 'video/%' THEN 'videos'
+				WHEN mime_type LIKE 'audio/%' THEN 'audio'
+				WHEN mime_type LIKE 'application/pdf' OR mime_type LIKE 'application/msword%'
+				     OR mime_type LIKE 'application/vnd.openxmlformats%' OR mime_type LIKE 'text/%' THEN 'documents'
+				ELSE 'other'
+			END as category,
+			COUNT(*) as count,
+			COALESCE(SUM(size), 0) as total_size
+		FROM files
+		WHERE user_id = $1 AND trashed_at IS NULL
+		GROUP BY category
+		ORDER BY total_size DESC`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("user category usage: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var c UserCategoryUsage
+		if err := rows.Scan(&c.Category, &c.Count, &c.Size); err != nil {
+			return nil, fmt.Errorf("scan category usage: %w", err)
+		}
+		breakdown.Categories = append(breakdown.Categories, c)
+	}
+
+	return breakdown, nil
+}
+
+func (r *Repository) GetTopStorageUsers(ctx context.Context, limit int) ([]UserStorageBreakdown, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id, u.email, u.display_name, u.plan, u.storage_used, u.storage_limit,
+		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+		FROM users u
+		ORDER BY u.storage_used DESC
+		LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("top storage users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []UserStorageBreakdown
+	for rows.Next() {
+		var u UserStorageBreakdown
+		if err := rows.Scan(&u.UserID, &u.Email, &u.DisplayName, &u.Plan, &u.StorageUsed, &u.StorageLimit, &u.FileCount); err != nil {
+			return nil, fmt.Errorf("scan top storage user: %w", err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+// ── Notification Management ──
+
+func (r *Repository) ListNotifications(ctx context.Context, limit, offset int, userID string, notifType string) ([]AdminNotification, int64, error) {
+	var total int64
+	countQuery := `SELECT COUNT(*) FROM notifications n JOIN users u ON u.id = n.user_id WHERE 1=1`
+	var countArgs []any
+	argIdx := 1
+
+	if userID != "" {
+		countQuery += fmt.Sprintf(` AND n.user_id = $%d`, argIdx)
+		countArgs = append(countArgs, userID)
+		argIdx++
+	}
+	if notifType != "" {
+		countQuery += fmt.Sprintf(` AND n.type = $%d`, argIdx)
+		countArgs = append(countArgs, notifType)
+		argIdx++
+	}
+
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count notifications: %w", err)
+	}
+
+	query := `
+		SELECT n.id, n.user_id, u.email, n.type, n.title, n.message,
+		       CASE WHEN n.read_at IS NOT NULL THEN true ELSE false END as is_read,
+		       n.created_at
+		FROM notifications n
+		JOIN users u ON u.id = n.user_id
+		WHERE 1=1`
+	args := make([]any, 0)
+	argIdx = 1
+
+	if userID != "" {
+		query += fmt.Sprintf(` AND n.user_id = $%d`, argIdx)
+		args = append(args, userID)
+		argIdx++
+	}
+	if notifType != "" {
+		query += fmt.Sprintf(` AND n.type = $%d`, argIdx)
+		args = append(args, notifType)
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` ORDER BY n.created_at DESC LIMIT $%d OFFSET $%d`, argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list notifications: %w", err)
+	}
+	defer rows.Close()
+
+	var notifs []AdminNotification
+	for rows.Next() {
+		var n AdminNotification
+		if err := rows.Scan(&n.ID, &n.UserID, &n.UserEmail, &n.Type, &n.Title, &n.Message, &n.IsRead, &n.CreatedAt); err != nil {
+			return nil, 0, fmt.Errorf("scan notification: %w", err)
+		}
+		notifs = append(notifs, n)
+	}
+
+	return notifs, total, nil
+}
+
+func (r *Repository) DeleteNotification(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM notifications WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("delete notification: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) SendBroadcastNotification(ctx context.Context, notifType, title, message string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `
+		INSERT INTO notifications (id, user_id, type, title, message, created_at)
+		SELECT gen_random_uuid(), id, $1, $2, $3, NOW()
+		FROM users WHERE is_active = true`, notifType, title, message)
+	if err != nil {
+		return 0, fmt.Errorf("broadcast notification: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *Repository) SendUserNotification(ctx context.Context, userID uuid.UUID, notifType, title, message string) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO notifications (id, user_id, type, title, message, created_at)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`, userID, notifType, title, message)
+	if err != nil {
+		return fmt.Errorf("send user notification: %w", err)
+	}
+	return nil
+}
+
+// ── Revenue / Billing Dashboard ──
+
+func (r *Repository) GetRevenueStats(ctx context.Context) (*RevenueStats, error) {
+	stats := &RevenueStats{}
+
+	planPrices := map[string]float64{
+		"pro":     9.99,
+		"premium": 19.99,
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT plan, COUNT(*) FROM users
+		WHERE is_active = true AND plan != 'free'
+		GROUP BY plan ORDER BY plan`)
+	if err != nil {
+		return nil, fmt.Errorf("revenue plan stats: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pr PlanRevenue
+		if err := rows.Scan(&pr.Plan, &pr.UserCount); err != nil {
+			return nil, fmt.Errorf("scan plan revenue: %w", err)
+		}
+		pr.PriceMonth = planPrices[pr.Plan]
+		pr.Revenue = float64(pr.UserCount) * pr.PriceMonth
+		stats.TotalPaidUsers += pr.UserCount
+		stats.MonthlyRevenue += pr.Revenue
+		stats.PlanRevenue = append(stats.PlanRevenue, pr)
+	}
+
+	changeRows, err := r.db.Query(ctx, `
+		SELECT a.user_id, u.email,
+		       COALESCE(a.metadata->>'old_plan', ''), COALESCE(a.metadata->>'new_plan', ''),
+		       a.created_at
+		FROM audit_logs a
+		JOIN users u ON u.id = a.user_id
+		WHERE a.action = 'plan_change'
+		ORDER BY a.created_at DESC
+		LIMIT 20`)
+	if err != nil {
+		return nil, fmt.Errorf("recent upgrades: %w", err)
+	}
+	defer changeRows.Close()
+
+	for changeRows.Next() {
+		var pc PlanChange
+		if err := changeRows.Scan(&pc.UserID, &pc.Email, &pc.OldPlan, &pc.NewPlan, &pc.ChangedAt); err != nil {
+			return nil, fmt.Errorf("scan plan change: %w", err)
+		}
+		stats.RecentUpgrades = append(stats.RecentUpgrades, pc)
+	}
+
+	var churnedCount int64
+	err = r.db.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT user_id) FROM audit_logs
+		WHERE action = 'plan_change'
+		  AND metadata->>'new_plan' = 'free'
+		  AND created_at >= CURRENT_DATE - INTERVAL '30 days'`).Scan(&churnedCount)
+	if err == nil && stats.TotalPaidUsers > 0 {
+		stats.ChurnRate = float64(churnedCount) / float64(stats.TotalPaidUsers+churnedCount) * 100
+	}
+
+	return stats, nil
+}
+
+// ── System Health ──
+
+func (r *Repository) CheckDBHealth(ctx context.Context) (int, int, int64, error) {
+	start := time.Now()
+	if err := r.db.Ping(ctx); err != nil {
+		return 0, 0, 0, fmt.Errorf("db ping: %w", err)
+	}
+	latencyMs := time.Since(start).Milliseconds()
+
+	poolStats := r.db.Stat()
+	activeConns := int(poolStats.AcquiredConns())
+	maxConns := int(poolStats.MaxConns())
+
+	return activeConns, maxConns, latencyMs, nil
+}
+
+// ── Export helpers ──
+
+func (r *Repository) ExportAllUsers(ctx context.Context) ([]AdminUserResponse, error) {
+	query := `
+		SELECT u.id, u.email, u.display_name, u.storage_used, u.storage_limit,
+		       u.plan, u.is_active, u.is_admin, u.email_verified, u.approval_status, u.last_login_at, u.created_at,
+		       (SELECT COUNT(*) FROM files WHERE user_id = u.id AND trashed_at IS NULL) as file_count
+		FROM users u
+		ORDER BY u.created_at DESC`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("export users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []AdminUserResponse
+	for rows.Next() {
+		var u AdminUserResponse
+		if err := rows.Scan(
+			&u.ID, &u.Email, &u.DisplayName, &u.StorageUsed, &u.StorageLimit,
+			&u.Plan, &u.IsActive, &u.IsAdmin, &u.EmailVerified, &u.ApprovalStatus, &u.LastLoginAt, &u.CreatedAt,
+			&u.FileCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan export user: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+func (r *Repository) ExportAllFiles(ctx context.Context) ([]AdminFileResponse, error) {
+	query := `
+		SELECT f.id, f.user_id, u.email, f.name, f.mime_type, f.size, f.folder_id, f.trashed_at, f.created_at
+		FROM files f
+		JOIN users u ON u.id = f.user_id
+		ORDER BY f.created_at DESC`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("export files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []AdminFileResponse
+	for rows.Next() {
+		var f AdminFileResponse
+		if err := rows.Scan(&f.ID, &f.UserID, &f.UserEmail, &f.Name, &f.MimeType, &f.Size, &f.FolderID, &f.TrashedAt, &f.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan export file: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, nil
+}
+
+func (r *Repository) ExportAllPosts(ctx context.Context) ([]AdminPost, error) {
+	query := `
+		SELECT p.id, p.user_id, u.email, u.display_name, p.caption,
+		       COALESCE(p.tags, '{}'), COALESCE(p.view_count, 0), COALESCE(p.like_count, 0),
+		       p.status, COALESCE(f.name, ''), COALESCE(f.mime_type, ''), p.created_at
+		FROM posts p
+		JOIN users u ON u.id = p.user_id
+		LEFT JOIN files f ON f.id = p.file_id
+		ORDER BY p.created_at DESC`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("export posts: %w", err)
+	}
+	defer rows.Close()
+
+	var posts []AdminPost
+	for rows.Next() {
+		var p AdminPost
+		if err := rows.Scan(
+			&p.ID, &p.UserID, &p.UserEmail, &p.UserName, &p.Caption,
+			&p.Tags, &p.ViewCount, &p.LikeCount,
+			&p.Status, &p.FileName, &p.MimeType, &p.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan export post: %w", err)
+		}
+		posts = append(posts, p)
+	}
+	return posts, nil
 }

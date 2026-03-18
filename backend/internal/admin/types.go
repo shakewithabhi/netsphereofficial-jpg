@@ -21,6 +21,7 @@ type DashboardStats struct {
 	TotalStars           int64 `json:"total_stars"`
 	TotalNotifications   int64 `json:"total_notifications"`
 	UnreadNotifications  int64 `json:"unread_notifications"`
+	TotalPosts           int64 `json:"total_posts"`
 }
 
 // User management
@@ -197,4 +198,109 @@ type MostStarredFile struct {
 	MimeType   string    `json:"mime_type"`
 	OwnerEmail string    `json:"owner_email"`
 	StarCount  int64     `json:"star_count"`
+}
+
+// Post moderation
+
+type AdminPost struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserEmail string    `json:"user_email"`
+	UserName  string    `json:"user_name"`
+	Caption   string    `json:"caption"`
+	Tags      []string  `json:"tags"`
+	ViewCount int64     `json:"view_count"`
+	LikeCount int64     `json:"like_count"`
+	Status    string    `json:"status"`
+	FileName  string    `json:"file_name"`
+	MimeType  string    `json:"mime_type"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type UpdatePostStatusRequest struct {
+	Status string `json:"status" validate:"required,oneof=active hidden removed"`
+}
+
+// Per-user storage breakdown
+
+type UserStorageBreakdown struct {
+	UserID       uuid.UUID           `json:"user_id"`
+	Email        string              `json:"email"`
+	DisplayName  string              `json:"display_name"`
+	Plan         string              `json:"plan"`
+	StorageUsed  int64               `json:"storage_used"`
+	StorageLimit int64               `json:"storage_limit"`
+	FileCount    int64               `json:"file_count"`
+	Categories   []UserCategoryUsage `json:"categories"`
+}
+
+type UserCategoryUsage struct {
+	Category string `json:"category"`
+	Count    int64  `json:"count"`
+	Size     int64  `json:"size"`
+}
+
+// Notification management
+
+type AdminNotification struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserEmail string    `json:"user_email"`
+	Type      string    `json:"type"`
+	Title     string    `json:"title"`
+	Message   string    `json:"message"`
+	IsRead    bool      `json:"is_read"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type SendNotificationRequest struct {
+	UserID  *uuid.UUID `json:"user_id"`
+	Type    string     `json:"type" validate:"required"`
+	Title   string     `json:"title" validate:"required,max=255"`
+	Message string     `json:"message" validate:"required,max=2000"`
+}
+
+// Revenue / Billing dashboard
+
+type RevenueStats struct {
+	TotalPaidUsers int64         `json:"total_paid_users"`
+	MonthlyRevenue float64       `json:"monthly_revenue"`
+	PlanRevenue    []PlanRevenue `json:"plan_revenue"`
+	RecentUpgrades []PlanChange  `json:"recent_upgrades"`
+	ChurnRate      float64       `json:"churn_rate"`
+}
+
+type PlanRevenue struct {
+	Plan       string  `json:"plan"`
+	UserCount  int64   `json:"user_count"`
+	PriceMonth float64 `json:"price_per_month"`
+	Revenue    float64 `json:"revenue"`
+}
+
+type PlanChange struct {
+	UserID    uuid.UUID `json:"user_id"`
+	Email     string    `json:"email"`
+	OldPlan   string    `json:"old_plan"`
+	NewPlan   string    `json:"new_plan"`
+	ChangedAt time.Time `json:"changed_at"`
+}
+
+// System health monitoring
+
+type SystemHealth struct {
+	Status        string            `json:"status"`
+	Uptime        int64             `json:"uptime_seconds"`
+	GoVersion     string            `json:"go_version"`
+	NumGoroutines int               `json:"num_goroutines"`
+	MemoryUsed    int64             `json:"memory_used_bytes"`
+	MemoryAlloc   int64             `json:"memory_alloc_bytes"`
+	DBConnections int               `json:"db_connections"`
+	DBMaxConns    int               `json:"db_max_connections"`
+	Components    []ComponentHealth `json:"components"`
+}
+
+type ComponentHealth struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"`
+	Latency int64  `json:"latency_ms"`
 }

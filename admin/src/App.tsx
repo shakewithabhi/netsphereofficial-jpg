@@ -14,6 +14,11 @@ import FilesPage from './pages/Files';
 import CommentsPage from './pages/Comments';
 import AdAnalyticsPage from './pages/AdAnalytics';
 import AdSettingsPage from './pages/AdSettings';
+import PostsPage from './pages/Posts';
+import NotificationsPage from './pages/Notifications';
+import RevenuePage from './pages/Revenue';
+import SystemHealthPage from './pages/SystemHealth';
+import ReportsPage from './pages/Reports';
 
 export default function App() {
   return (
@@ -38,6 +43,11 @@ export default function App() {
             <Route path="/comments" element={<CommentsPage />} />
             <Route path="/ad-analytics" element={<AdAnalyticsPage />} />
             <Route path="/ad-settings" element={<AdSettingsPage />} />
+            <Route path="/posts" element={<PostsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/revenue" element={<RevenuePage />} />
+            <Route path="/system-health" element={<SystemHealthPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
