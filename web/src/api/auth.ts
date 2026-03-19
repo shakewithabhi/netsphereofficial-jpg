@@ -97,8 +97,8 @@ export async function changePassword(
   currentPassword: string,
   newPassword: string
 ): Promise<void> {
-  await client.put('/auth/password', {
-    current_password: currentPassword,
+  await client.post('/auth/change-password', {
+    old_password: currentPassword,
     new_password: newPassword,
   });
 }

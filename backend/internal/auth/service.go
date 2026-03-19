@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/bytebox/backend/internal/common"
 	"github.com/bytebox/backend/internal/platform/config"
+	"github.com/bytebox/backend/internal/storage"
 )
 
 // dummyHash is used for constant-time defense against user enumeration.
@@ -40,6 +42,7 @@ type Service struct {
 	audit             *common.AuditLogger
 	rdb               *redis.Client
 	email             *EmailSender
+	store             *storage.Client
 	bcryptCost        int
 	quotaSize         int64
 	googleClientID    string
@@ -66,6 +69,29 @@ func NewService(repo *Repository, jwt *JWTManager, audit *common.AuditLogger, rd
 // SetEmailSender sets the email sender for verification and password reset emails.
 func (s *Service) SetEmailSender(email *EmailSender) {
 	s.email = email
+}
+
+// SetStorage sets the storage client for avatar uploads.
+func (s *Service) SetStorage(store *storage.Client) {
+	s.store = store
+}
+
+// UploadAvatar uploads a user avatar to storage and updates the user's avatar_key.
+func (s *Service) UploadAvatar(ctx context.Context, claims *TokenClaims, file io.Reader, filename string, contentType string, size int64) (string, error) {
+	key := fmt.Sprintf("avatars/%s/%s", claims.UserID, filename)
+
+	if err := s.store.Upload(ctx, s.store.BucketFiles(), key, file, contentType, size); err != nil {
+		slog.Error("failed to upload avatar", "error", err)
+		return "", common.ErrInternal("failed to upload avatar")
+	}
+
+	if err := s.repo.UpdateAvatarKey(ctx, claims.UserID, key); err != nil {
+		slog.Error("failed to update avatar key", "error", err)
+		return "", common.ErrInternal("failed to update avatar")
+	}
+
+	avatarURL := fmt.Sprintf("%s/avatars/%s/%s", s.baseURL, claims.UserID, filename)
+	return avatarURL, nil
 }
 
 // validatePasswordStrength enforces strict password complexity.
@@ -629,9 +655,14 @@ func (s *Service) ForgotPassword(ctx context.Context, req ForgotPasswordRequest)
 
 	s.audit.Log(ctx, &user.ID, common.AuditPasswordResetRequested, "user", &user.ID, map[string]any{"email": email}, "")
 
-	// TODO: Send rawToken via email (e.g., s.emailService.SendPasswordReset(email, rawToken))
-	// Token is NOT returned in the API response for security
-	slog.Info("password reset token generated", "user_id", user.ID, "email", email)
+	// Send password reset email
+	if s.email != nil {
+		if err := s.email.SendPasswordResetEmail(email, rawToken); err != nil {
+			slog.Error("failed to send password reset email", "error", err, "email", email)
+		}
+	} else {
+		slog.Info("email sender not configured, password reset token generated", "user_id", user.ID, "email", email)
+	}
 
 	return map[string]any{
 		"message": "if that email exists, a reset link has been sent",

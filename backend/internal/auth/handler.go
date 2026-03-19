@@ -42,6 +42,7 @@ func (h *Handler) Routes() chi.Router {
 		r.Post("/logout", h.Logout)
 		r.Get("/me", h.GetProfile)
 		r.Put("/me", h.UpdateProfile)
+		r.Put("/profile/avatar", h.UploadAvatar)
 		r.Post("/change-password", h.ChangePassword)
 		r.Get("/sessions", h.ListSessions)
 		r.Delete("/sessions/{id}", h.RevokeSession)
@@ -215,6 +216,43 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	claims := GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	// Limit to 5MB for avatars
+	r.Body = http.MaxBytesReader(w, r.Body, 5*1024*1024+1024)
+
+	if err := r.ParseMultipartForm(5 * 1024 * 1024); err != nil {
+		common.JSONError(w, common.ErrTooLarge("avatar file too large, max 5MB"))
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+
+	file, header, err := r.FormFile("avatar")
+	if err != nil {
+		common.JSONError(w, common.ErrBadRequest("avatar file is required"))
+		return
+	}
+	defer file.Close()
+
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	avatarURL, err := h.service.UploadAvatar(r.Context(), claims, file, header.Filename, contentType, header.Size)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"avatar_url": avatarURL})
 }
 
 func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {

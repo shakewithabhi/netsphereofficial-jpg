@@ -97,6 +97,7 @@ func main() {
 	authService := auth.NewService(authRepo, jwtManager, auditLogger, rdb, cfg.App, cfg.Auth, cfg.Google.ClientID)
 	emailSender := auth.NewEmailSender(cfg.SMTP, cfg.App.BaseURL)
 	authService.SetEmailSender(emailSender)
+	authService.SetStorage(store)
 	authMiddleware := auth.NewMiddleware(jwtManager)
 	authHandler := auth.NewHandler(authService, authMiddleware)
 

@@ -548,9 +548,9 @@ func (r *Repository) AdminDeleteFile(ctx context.Context, fileID uuid.UUID) erro
 
 func (r *Repository) GetSettings(ctx context.Context) (*PlatformSettings, error) {
 	settings := &PlatformSettings{
-		DefaultStorageLimitFree:    5 * 1024 * 1024 * 1024,
-		DefaultStorageLimitPro:     50 * 1024 * 1024 * 1024,
-		DefaultStorageLimitPremium: 200 * 1024 * 1024 * 1024,
+		DefaultStorageLimitFree:    15 * 1024 * 1024 * 1024,
+		DefaultStorageLimitPro:     100 * 1024 * 1024 * 1024,
+		DefaultStorageLimitPremium: 1024 * 1024 * 1024 * 1024,
 		MaxUploadSizeMB:            500,
 		MaintenanceMode:            false,
 		RequireApproval:            false,

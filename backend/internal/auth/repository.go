@@ -514,6 +514,17 @@ func (r *Repository) VerifyEmail(ctx context.Context, userID uuid.UUID) error {
 	return nil
 }
 
+// Avatar operations
+
+func (r *Repository) UpdateAvatarKey(ctx context.Context, userID uuid.UUID, avatarKey string) error {
+	query := `UPDATE users SET avatar_key = $1, updated_at = NOW() WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, avatarKey, userID)
+	if err != nil {
+		return fmt.Errorf("update avatar key: %w", err)
+	}
+	return nil
+}
+
 // Approval status operations
 
 func (r *Repository) SetApprovalStatus(ctx context.Context, userID uuid.UUID, status string) error {
