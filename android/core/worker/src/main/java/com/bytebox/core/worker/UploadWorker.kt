@@ -116,7 +116,7 @@ class UploadWorker @AssistedInject constructor(
             Timber.d("Extracted serverFileId: $serverFileId")
             if (!serverFileId.isNullOrBlank()) {
                 uploadTaskDao.updateServerFileId(taskId, serverFileId)
-                createShareLink(taskId, serverFileId)
+                if (task.sharePublicly) createShareLink(taskId, serverFileId)
             }
             uploadTaskDao.updateProgress(taskId, "completed", 1f, 1)
             try { uri.path?.let { java.io.File(it).delete() } } catch (_: Exception) {}
@@ -222,7 +222,7 @@ class UploadWorker @AssistedInject constructor(
             val serverFileId = try { finalResp.body()?.id } catch (_: Exception) { null }
             if (serverFileId != null) {
                 uploadTaskDao.updateServerFileId(taskId, serverFileId)
-                createShareLink(taskId, serverFileId)
+                if (task.sharePublicly) createShareLink(taskId, serverFileId)
             }
             uploadTaskDao.updateProgress(taskId, "completed", 1f, totalChunks)
             try { uri.path?.let { java.io.File(it).delete() } } catch (_: Exception) {}

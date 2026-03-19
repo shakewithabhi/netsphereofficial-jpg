@@ -12,7 +12,9 @@ data class UploadTask(
     val totalChunks: Int,
     val errorMessage: String?,
     val serverFileId: String? = null,
-    val shareUrl: String? = null
+    val shareUrl: String? = null,
+    val localFileUri: String = "",
+    val sharePublicly: Boolean = false,
 )
 
 enum class UploadStatus {

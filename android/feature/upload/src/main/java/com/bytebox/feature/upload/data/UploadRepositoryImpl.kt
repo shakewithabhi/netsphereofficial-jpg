@@ -27,7 +27,8 @@ class UploadRepositoryImpl @Inject constructor(
         fileName: String,
         fileSize: Long,
         mimeType: String,
-        folderId: String?
+        folderId: String?,
+        sharePublicly: Boolean,
     ): Long {
         val entity = UploadTaskEntity(
             localFileUri = localFileUri,
@@ -36,7 +37,8 @@ class UploadRepositoryImpl @Inject constructor(
             mimeType = mimeType,
             folderId = folderId,
             uploadSessionId = null,
-            status = "pending"
+            status = "pending",
+            sharePublicly = sharePublicly,
         )
         val taskId = uploadTaskDao.insertTask(entity)
 
@@ -90,6 +92,8 @@ class UploadRepositoryImpl @Inject constructor(
         totalChunks = totalChunks,
         errorMessage = errorMessage,
         serverFileId = serverFileId,
-        shareUrl = shareUrl
+        shareUrl = shareUrl,
+        localFileUri = localFileUri,
+        sharePublicly = sharePublicly,
     )
 }

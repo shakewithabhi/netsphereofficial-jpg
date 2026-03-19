@@ -97,6 +97,12 @@ class ExploreViewModel @Inject constructor(
         }
     }
 
+    // Refresh without clearing existing items (called on screen resume to avoid visible flash)
+    fun refresh() {
+        if (_uiState.value.isLoading) return
+        loadInitialData()
+    }
+
     fun loadTrending() {
         viewModelScope.launch {
             exploreRepository.getTrendingFeed()

@@ -51,4 +51,5 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.coroutines.core)
     implementation(libs.work.runtime)
+    implementation(libs.coil.compose)
 }

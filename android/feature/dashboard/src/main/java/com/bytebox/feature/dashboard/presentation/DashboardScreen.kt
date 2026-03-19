@@ -3,6 +3,7 @@ package com.bytebox.feature.dashboard.presentation
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,7 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -147,7 +147,7 @@ fun DashboardScreen(
         floatingActionButton = { UploadFAB(onClick = onUploadClick) },
     ) { padding ->
         when {
-            uiState.isLoading -> FileListShimmer(
+            uiState.isLoading && uiState.recentFiles.isEmpty() && uiState.user == null -> FileListShimmer(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = padding.calculateTopPadding()),
@@ -293,6 +293,7 @@ fun DashboardScreen(
                                 }
                             }
                         }
+                        }
                     }
 
                     // ── Storage indicator (compact) ─────────────────────────
@@ -336,7 +337,7 @@ fun DashboardScreen(
 
                     // ── Category tiles ──────────────────────────────────────
                     item {
-                        CategoryScrollRow(
+                        CategoryGrid(
                             onFolderClick = onSeeAllFolders,
                             onFavoritesClick = onFavoritesClick,
                             onSharesClick = onSharesClick,
@@ -425,6 +426,7 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp)
                                     .padding(bottom = ByteBoxTheme.spacing.xs),
+                                thumbnailUrl = file.thumbnailUrl,
                             )
                         }
                     } else {
@@ -464,7 +466,7 @@ private data class CategoryTile(
 )
 
 @Composable
-private fun CategoryScrollRow(
+private fun CategoryGrid(
     onFolderClick: () -> Unit,
     onFavoritesClick: () -> Unit,
     onSharesClick: () -> Unit,
@@ -501,6 +503,7 @@ private fun CategoryScrollRow(
         CategoryTile("Shared", CoreR.drawable.ic_flat_shared, Color(0xFF06B6D4), Color(0xFF164E63)) {
             onSharesClick()
         },
+        CategoryTile("More", CoreR.drawable.ic_flat_more, Color(0xFF6D28D9), Color(0xFFEDE9FE)) {},
     )
 
     LazyRow(

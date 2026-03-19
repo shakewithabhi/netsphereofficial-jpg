@@ -11,7 +11,8 @@ interface UploadRepository {
         fileName: String,
         fileSize: Long,
         mimeType: String,
-        folderId: String?
+        folderId: String?,
+        sharePublicly: Boolean = false,
     ): Long
     suspend fun cancelUpload(taskId: Long)
     suspend fun retryUpload(taskId: Long)

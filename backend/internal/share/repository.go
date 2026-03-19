@@ -191,8 +191,10 @@ func (r *Repository) GetExploreItems(ctx context.Context, limit int, cursorTime 
 
 	query := `
 		SELECT s.id, s.code, f.name, f.size, f.mime_type,
-		       COALESCE(f.thumbnail_key, ''), COALESCE(f.video_thumbnail_url, ''),
-		       f.is_video, COALESCE(u.display_name, ''), s.download_count, s.created_at
+		       COALESCE(f.thumbnail_key, ''), COALESCE(f.storage_key, ''), COALESCE(f.video_thumbnail_url, ''), COALESCE(f.stream_video_id, ''),
+		       f.is_video, COALESCE(f.hls_url, ''), COALESCE(u.display_name, ''), s.download_count, s.created_at,
+		       (SELECT COUNT(*) FROM share_likes sl WHERE sl.share_id = s.id)::int AS like_count,
+		       (SELECT COUNT(*) FROM share_comments sc WHERE sc.share_id = s.id)::int AS comment_count
 		FROM shares s
 		JOIN files f ON f.id = s.file_id
 		JOIN users u ON u.id = s.user_id
@@ -228,14 +230,121 @@ func (r *Repository) GetExploreItems(ctx context.Context, limit int, cursorTime 
 		var item exploreRow
 		if err := rows.Scan(
 			&item.ShareID, &item.Code, &item.FileName, &item.FileSize, &item.MimeType,
-			&item.ThumbnailKey, &item.VideoThumbnailURL, &item.IsVideo,
-			&item.OwnerName, &item.DownloadCount, &item.CreatedAt,
+			&item.ThumbnailKey, &item.StorageKey, &item.VideoThumbnailURL, &item.StreamVideoID, &item.IsVideo,
+			&item.HLSURL, &item.OwnerName, &item.DownloadCount, &item.CreatedAt,
+			&item.LikeCount, &item.CommentCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan explore row: %w", err)
 		}
 		items = append(items, item)
 	}
 	return items, nil
+}
+
+// ToggleShareLike inserts or deletes a like row; returns new liked state and total count.
+func (r *Repository) ToggleShareLike(ctx context.Context, shareID, userID uuid.UUID) (liked bool, count int, err error) {
+	// Try to insert; if conflict, delete instead.
+	var existing bool
+	err = r.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM share_likes WHERE share_id=$1 AND user_id=$2)`,
+		shareID, userID,
+	).Scan(&existing)
+	if err != nil {
+		return false, 0, fmt.Errorf("toggle like check: %w", err)
+	}
+
+	if existing {
+		_, err = r.db.Exec(ctx, `DELETE FROM share_likes WHERE share_id=$1 AND user_id=$2`, shareID, userID)
+		liked = false
+	} else {
+		_, err = r.db.Exec(ctx, `INSERT INTO share_likes (share_id, user_id) VALUES ($1, $2)`, shareID, userID)
+		liked = true
+	}
+	if err != nil {
+		return false, 0, fmt.Errorf("toggle like exec: %w", err)
+	}
+
+	err = r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM share_likes WHERE share_id=$1`, shareID,
+	).Scan(&count)
+	if err != nil {
+		return liked, 0, fmt.Errorf("toggle like count: %w", err)
+	}
+	return liked, count, nil
+}
+
+// GetShareLikeInfo returns total like count and whether the given user has liked.
+func (r *Repository) GetShareLikeInfo(ctx context.Context, shareID uuid.UUID, userID *uuid.UUID) (count int, isLiked bool, err error) {
+	err = r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM share_likes WHERE share_id=$1`, shareID,
+	).Scan(&count)
+	if err != nil {
+		return 0, false, fmt.Errorf("get like count: %w", err)
+	}
+	if userID != nil {
+		err = r.db.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM share_likes WHERE share_id=$1 AND user_id=$2)`,
+			shareID, *userID,
+		).Scan(&isLiked)
+		if err != nil {
+			return count, false, fmt.Errorf("get is_liked: %w", err)
+		}
+	}
+	return count, isLiked, nil
+}
+
+// GetShareCommentCount returns the number of comments for a share.
+func (r *Repository) GetShareCommentCount(ctx context.Context, shareID uuid.UUID) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM share_comments WHERE share_id=$1`, shareID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("get comment count: %w", err)
+	}
+	return count, nil
+}
+
+// AddShareComment inserts a new share comment and returns the persisted record with user name.
+func (r *Repository) AddShareComment(ctx context.Context, shareID, userID uuid.UUID, content string) (*ShareComment, error) {
+	var c ShareComment
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO share_comments (share_id, user_id, content)
+		VALUES ($1, $2, $3)
+		RETURNING id, share_id, user_id, content, created_at`,
+		shareID, userID, content,
+	).Scan(&c.ID, &c.ShareID, &c.UserID, &c.Content, &c.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("add share comment: %w", err)
+	}
+	// Fetch user name
+	r.db.QueryRow(ctx, `SELECT COALESCE(display_name,'') FROM users WHERE id=$1`, userID).Scan(&c.UserName)
+	return &c, nil
+}
+
+// GetShareComments returns paginated comments for a share ordered oldest first.
+func (r *Repository) GetShareComments(ctx context.Context, shareID uuid.UUID, limit, offset int) ([]ShareComment, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT sc.id, sc.share_id, sc.user_id, COALESCE(u.display_name,''), sc.content, sc.created_at
+		FROM share_comments sc
+		JOIN users u ON u.id = sc.user_id
+		WHERE sc.share_id = $1
+		ORDER BY sc.created_at ASC
+		LIMIT $2 OFFSET $3`,
+		shareID, limit, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get share comments: %w", err)
+	}
+	defer rows.Close()
+
+	var comments []ShareComment
+	for rows.Next() {
+		var c ShareComment
+		if err := rows.Scan(&c.ID, &c.ShareID, &c.UserID, &c.UserName, &c.Content, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan comment: %w", err)
+		}
+		comments = append(comments, c)
+	}
+	return comments, nil
 }
 
 // CountFolderFiles returns the number of non-trashed files in a folder.

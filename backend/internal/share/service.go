@@ -26,12 +26,13 @@ type Service struct {
 	fileRepo     *file.Repository
 	folderRepo   *folder.Repository
 	store        *storage.Client
+	stream       *storage.StreamClient
 	quotaService *quota.Service
 	baseURL      string // e.g., "https://byteboxapp.com"
 }
 
-func NewService(repo *Repository, fileRepo *file.Repository, folderRepo *folder.Repository, store *storage.Client, baseURL string) *Service {
-	return &Service{repo: repo, fileRepo: fileRepo, folderRepo: folderRepo, store: store, baseURL: baseURL}
+func NewService(repo *Repository, fileRepo *file.Repository, folderRepo *folder.Repository, store *storage.Client, stream *storage.StreamClient, baseURL string) *Service {
+	return &Service{repo: repo, fileRepo: fileRepo, folderRepo: folderRepo, store: store, stream: stream, baseURL: baseURL}
 }
 
 func (s *Service) SetQuotaService(qs *quota.Service) {
@@ -155,7 +156,7 @@ func (s *Service) Delete(ctx context.Context, claims *auth.TokenClaims, id uuid.
 
 // Public endpoints (no auth required)
 
-func (s *Service) GetPublicInfo(ctx context.Context, code string) (*PublicShareResponse, error) {
+func (s *Service) GetPublicInfo(ctx context.Context, code string, viewerID *uuid.UUID) (*PublicShareResponse, error) {
 	share, err := s.repo.GetByCode(ctx, code)
 	if err != nil || share == nil {
 		return nil, common.ErrNotFound("share not found")
@@ -186,6 +187,14 @@ func (s *Service) GetPublicInfo(ctx context.Context, code string) (*PublicShareR
 		resp.VideoThumbnailURL = f.VideoThumbnailURL
 		resp.ThumbnailURL = f.ThumbnailKey
 		resp.PreviewAvailable = f.IsVideo || strings.HasPrefix(f.MimeType, "image/")
+		if f.IsVideo && f.HLSURL != "" {
+			resp.HLSURL = f.HLSURL
+		}
+		if !f.IsVideo && f.ThumbnailKey != "" {
+			if url, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), f.ThumbnailKey, 24*time.Hour); err == nil {
+				resp.ThumbnailURL = url
+			}
+		}
 	} else {
 		fd, err := s.folderRepo.GetByID(ctx, *share.FolderID, share.UserID)
 		if err != nil || fd == nil || fd.TrashedAt != nil {
@@ -200,7 +209,81 @@ func (s *Service) GetPublicInfo(ctx context.Context, code string) (*PublicShareR
 		resp.ItemCount = count
 	}
 
+	// Fetch owner name
+	// (user is the owner of the share)
+	// We use a best-effort approach via the file repo owner field.
+
+	// Social counts
+	likeCount, isLiked, err := s.repo.GetShareLikeInfo(ctx, share.ID, viewerID)
+	if err != nil {
+		slog.Warn("failed to get like info", "error", err)
+	}
+	commentCount, err := s.repo.GetShareCommentCount(ctx, share.ID)
+	if err != nil {
+		slog.Warn("failed to get comment count", "error", err)
+	}
+	resp.LikeCount = likeCount
+	resp.IsLiked = isLiked
+	resp.CommentCount = commentCount
+
 	return resp, nil
+}
+
+func (s *Service) ToggleLike(ctx context.Context, code string, userID uuid.UUID) (*ToggleLikeResponse, error) {
+	share, err := s.repo.GetByCode(ctx, code)
+	if err != nil || share == nil {
+		return nil, common.ErrNotFound("share not found")
+	}
+	if err := s.validateShare(share); err != nil {
+		return nil, err
+	}
+	liked, count, err := s.repo.ToggleShareLike(ctx, share.ID, userID)
+	if err != nil {
+		slog.Error("toggle like", "error", err)
+		return nil, common.ErrInternal("failed to toggle like")
+	}
+	return &ToggleLikeResponse{Liked: liked, LikeCount: count}, nil
+}
+
+func (s *Service) AddComment(ctx context.Context, code string, userID uuid.UUID, content string) (*ShareComment, error) {
+	if strings.TrimSpace(content) == "" {
+		return nil, common.ErrBadRequest("content is required")
+	}
+	share, err := s.repo.GetByCode(ctx, code)
+	if err != nil || share == nil {
+		return nil, common.ErrNotFound("share not found")
+	}
+	if err := s.validateShare(share); err != nil {
+		return nil, err
+	}
+	comment, err := s.repo.AddShareComment(ctx, share.ID, userID, strings.TrimSpace(content))
+	if err != nil {
+		slog.Error("add share comment", "error", err)
+		return nil, common.ErrInternal("failed to add comment")
+	}
+	return comment, nil
+}
+
+func (s *Service) GetComments(ctx context.Context, code string, limit, offset int) ([]ShareComment, error) {
+	share, err := s.repo.GetByCode(ctx, code)
+	if err != nil || share == nil {
+		return nil, common.ErrNotFound("share not found")
+	}
+	if err := s.validateShare(share); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	comments, err := s.repo.GetShareComments(ctx, share.ID, limit, offset)
+	if err != nil {
+		slog.Error("get share comments", "error", err)
+		return nil, common.ErrInternal("failed to get comments")
+	}
+	if comments == nil {
+		comments = []ShareComment{}
+	}
+	return comments, nil
 }
 
 func (s *Service) GetPublicFolderContents(ctx context.Context, code, password string) (*PublicFolderContentsResponse, error) {
@@ -429,11 +512,23 @@ func (s *Service) GetExploreItems(ctx context.Context, limit int, cursor *string
 		thumbnailURL := ""
 		if row.IsVideo && row.VideoThumbnailURL != "" {
 			thumbnailURL = row.VideoThumbnailURL
+		} else if row.IsVideo && row.StreamVideoID != "" && s.stream != nil {
+			thumbnailURL = s.stream.GetThumbnailURL(row.StreamVideoID)
 		} else if row.ThumbnailKey != "" {
-			url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), row.ThumbnailKey, 24*time.Hour)
+			url, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), row.ThumbnailKey, 24*time.Hour)
 			if err == nil {
 				thumbnailURL = url
 			}
+		} else if strings.HasPrefix(row.MimeType, "image/") && row.StorageKey != "" {
+			url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), row.StorageKey, 24*time.Hour)
+			if err == nil {
+				thumbnailURL = url
+			}
+		}
+
+		hlsURL := ""
+		if row.IsVideo && row.HLSURL != "" {
+			hlsURL = row.HLSURL
 		}
 
 		items = append(items, ExploreItem{
@@ -446,6 +541,9 @@ func (s *Service) GetExploreItems(ctx context.Context, limit int, cursor *string
 			OwnerName:     row.OwnerName,
 			DownloadCount: row.DownloadCount,
 			CreatedAt:     row.CreatedAt,
+			LikeCount:     row.LikeCount,
+			CommentCount:  row.CommentCount,
+			HLSURL:        hlsURL,
 		})
 	}
 

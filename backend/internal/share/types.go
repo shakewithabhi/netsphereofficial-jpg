@@ -8,6 +8,30 @@ import (
 	"github.com/bytebox/backend/internal/file"
 )
 
+// Social types
+
+type ShareComment struct {
+	ID        uuid.UUID `json:"id"`
+	ShareID   uuid.UUID `json:"share_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type AddCommentRequest struct {
+	Content string `json:"content"`
+}
+
+type ToggleLikeResponse struct {
+	Liked     bool `json:"liked"`
+	LikeCount int  `json:"like_count"`
+}
+
+type ShareCommentsResponse struct {
+	Comments []ShareComment `json:"comments"`
+}
+
 // Request types
 
 type CreateShareRequest struct {
@@ -72,22 +96,27 @@ type SaveToStorageRequest struct {
 }
 
 type PublicShareResponse struct {
-	ShareType             string     `json:"share_type"`
-	FileName              string     `json:"file_name,omitempty"`
-	FileSize              int64      `json:"file_size,omitempty"`
-	MimeType              string     `json:"mime_type,omitempty"`
-	FolderName            string     `json:"folder_name,omitempty"`
-	ItemCount             int        `json:"item_count,omitempty"`
-	HasPassword           bool       `json:"has_password"`
-	IsVideo               bool       `json:"is_video,omitempty"`
-	IsImage               bool       `json:"is_image,omitempty"`
-	PreviewAvailable      bool       `json:"preview_available"`
-	ThumbnailURL          string     `json:"thumbnail_url,omitempty"`
-	VideoThumbnailURL     string     `json:"video_thumbnail_url,omitempty"`
-	DownloadCount         int64      `json:"download_count"`
-	VideoDurationSeconds  int        `json:"video_duration_seconds,omitempty"`
-	AppDownloadURL        string     `json:"app_download_url"`
-	ExpiresAt             *time.Time `json:"expires_at,omitempty"`
+	ShareType            string     `json:"share_type"`
+	FileName             string     `json:"file_name,omitempty"`
+	FileSize             int64      `json:"file_size,omitempty"`
+	MimeType             string     `json:"mime_type,omitempty"`
+	FolderName           string     `json:"folder_name,omitempty"`
+	ItemCount            int        `json:"item_count,omitempty"`
+	HasPassword          bool       `json:"has_password"`
+	IsVideo              bool       `json:"is_video,omitempty"`
+	IsImage              bool       `json:"is_image,omitempty"`
+	PreviewAvailable     bool       `json:"preview_available"`
+	ThumbnailURL         string     `json:"thumbnail_url,omitempty"`
+	VideoThumbnailURL    string     `json:"video_thumbnail_url,omitempty"`
+	HLSURL               string     `json:"hls_url,omitempty"`
+	DownloadCount        int64      `json:"download_count"`
+	VideoDurationSeconds int        `json:"video_duration_seconds,omitempty"`
+	AppDownloadURL       string     `json:"app_download_url"`
+	ExpiresAt            *time.Time `json:"expires_at,omitempty"`
+	LikeCount            int        `json:"like_count"`
+	CommentCount         int        `json:"comment_count"`
+	IsLiked              bool       `json:"is_liked"`
+	OwnerName            string     `json:"owner_name,omitempty"`
 }
 
 type PreviewResponse struct {
@@ -130,6 +159,9 @@ type ExploreItem struct {
 	OwnerName     string    `json:"owner_name"`
 	DownloadCount int       `json:"download_count"`
 	CreatedAt     time.Time `json:"created_at"`
+	LikeCount     int       `json:"like_count"`
+	CommentCount  int       `json:"comment_count"`
+	HLSURL        string    `json:"hls_url,omitempty"`
 }
 
 type ExploreListResponse struct {
@@ -144,9 +176,14 @@ type exploreRow struct {
 	FileSize          int64
 	MimeType          string
 	ThumbnailKey      string
+	StorageKey        string
 	VideoThumbnailURL string
+	StreamVideoID     string
 	IsVideo           bool
+	HLSURL            string
 	OwnerName         string
 	DownloadCount     int
 	CreatedAt         time.Time
+	LikeCount         int
+	CommentCount      int
 }

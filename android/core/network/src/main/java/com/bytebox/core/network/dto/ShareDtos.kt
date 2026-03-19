@@ -87,10 +87,59 @@ data class ExploreItemDto(
     @Json(name = "owner_name") val ownerName: String = "",
     @Json(name = "download_count") val downloadCount: Int = 0,
     @Json(name = "created_at") val createdAt: String,
+    @Json(name = "like_count") val likeCount: Int = 0,
+    @Json(name = "comment_count") val commentCount: Int = 0,
+    @Json(name = "hls_url") val hlsUrl: String? = null,
 )
 
 @JsonClass(generateAdapter = true)
 data class ExploreResponse(
     val items: List<ExploreItemDto> = emptyList(),
     @Json(name = "next_cursor") val nextCursor: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
+data class PublicShareInfoDto(
+    @Json(name = "share_type") val shareType: String = "file",
+    @Json(name = "file_name") val fileName: String? = null,
+    @Json(name = "file_size") val fileSize: Long? = null,
+    @Json(name = "mime_type") val mimeType: String? = null,
+    @Json(name = "folder_name") val folderName: String? = null,
+    @Json(name = "item_count") val itemCount: Int = 0,
+    @Json(name = "has_password") val hasPassword: Boolean = false,
+    @Json(name = "is_video") val isVideo: Boolean = false,
+    @Json(name = "thumbnail_url") val thumbnailUrl: String? = null,
+    @Json(name = "video_thumbnail_url") val videoThumbnailUrl: String? = null,
+    @Json(name = "hls_url") val hlsUrl: String? = null,
+    @Json(name = "like_count") val likeCount: Int = 0,
+    @Json(name = "comment_count") val commentCount: Int = 0,
+    @Json(name = "is_liked") val isLiked: Boolean = false,
+    @Json(name = "owner_name") val ownerName: String = "",
+    @Json(name = "download_count") val downloadCount: Int = 0,
+)
+
+@JsonClass(generateAdapter = true)
+data class ToggleLikeDto(
+    val liked: Boolean = false,
+    @Json(name = "like_count") val likeCount: Int = 0,
+)
+
+@JsonClass(generateAdapter = true)
+data class ShareCommentDto(
+    val id: String,
+    @Json(name = "share_id") val shareId: String,
+    @Json(name = "user_id") val userId: String,
+    @Json(name = "user_name") val userName: String = "",
+    val content: String,
+    @Json(name = "created_at") val createdAt: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class ShareCommentsResponseDto(
+    val comments: List<ShareCommentDto> = emptyList(),
+)
+
+@JsonClass(generateAdapter = true)
+data class AddCommentRequest(
+    val content: String,
 )

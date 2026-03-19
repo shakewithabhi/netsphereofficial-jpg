@@ -43,12 +43,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.Card
@@ -71,6 +73,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -80,6 +83,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -106,15 +111,32 @@ private val categoryChips = listOf(
     CategoryChip("Comedy", "comedy", ""),
 )
 
+// Deterministic color for owner avatar based on name
+private fun avatarColor(name: String): Color {
+    val colors = listOf(
+        Color(0xFF2563EB), Color(0xFF059669), Color(0xFFDC2626),
+        Color(0xFF7C3AED), Color(0xFFD97706), Color(0xFF0891B2),
+    )
+    return colors[(name.hashCode() and 0x7FFFFFFF) % colors.size]
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
     onPostClick: (postId: String) -> Unit,
     onCreatePost: () -> Unit = {},
+    onUploadClick: () -> Unit = {},
     viewModel: ExploreViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isSearchVisible by remember { mutableStateOf(false) }
+
+    // Refresh feed whenever the screen resumes (e.g. after uploading a new file)
+    // Uses refresh() to avoid clearing existing items while new data loads
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose {}
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -813,6 +835,8 @@ private fun SearchResultCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val clipboardManager = LocalClipboardManager.current
+
     Card(
         modifier = modifier
             .fillMaxWidth()
