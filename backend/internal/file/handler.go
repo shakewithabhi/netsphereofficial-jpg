@@ -214,9 +214,9 @@ func (h *Handler) DownloadProxy(w http.ResponseWriter, r *http.Request) {
 	var speedLimit int64 // bytes per second; 0 = unlimited
 	switch plan {
 	case "free":
-		speedLimit = 1 * 1024 * 1024 // 1 MB/s
+		speedLimit = 2 * 1024 * 1024 // 2 MB/s
 	case "pro":
-		speedLimit = 10 * 1024 * 1024 // 10 MB/s
+		speedLimit = 0 // unlimited for pro
 	default:
 		speedLimit = 0 // unlimited for premium
 	}

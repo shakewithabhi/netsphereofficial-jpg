@@ -5,9 +5,9 @@ const (
 )
 
 var Plans = map[string]PlanConfig{
-	"free":    {Name: "Free", SoftStorageLimit: 10 * GB, PriceMonthly: 0, StripePriceID: ""},
-	"pro":     {Name: "Pro", SoftStorageLimit: 500 * GB, PriceMonthly: 499, StripePriceID: ""},
-	"premium": {Name: "Premium", SoftStorageLimit: 2048 * GB, PriceMonthly: 999, StripePriceID: ""},
+	"free":    {Name: "Free", SoftStorageLimit: 15 * GB, PriceMonthly: 0, StripePriceID: ""},
+	"pro":     {Name: "Pro", SoftStorageLimit: 100 * GB, PriceMonthly: 4900, StripePriceID: ""},
+	"premium": {Name: "Premium", SoftStorageLimit: 1024 * GB, PriceMonthly: 9900, StripePriceID: ""},
 }
 
 // SetStripePriceIDs sets the Stripe price IDs from configuration.
