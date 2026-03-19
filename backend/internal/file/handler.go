@@ -1,6 +1,7 @@
 package file
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -30,6 +31,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/search", h.Search)
 	r.Get("/trash", h.ListTrashed)
 	r.Get("/starred", h.ListStarred)
+	r.Get("/recent", h.ListRecent)
+	r.Post("/regenerate-thumbnails", h.RegenerateThumbnails)
 	r.Get("/categories/summary", h.CategorySummary)
 	r.Get("/category/{category}", h.ListByCategory)
 	r.Get("/{id}", h.GetByID)
@@ -660,4 +663,43 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, map[string]any{"files": files})
+}
+
+func (h *Handler) ListRecent(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+
+	limit := 20
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+
+	slog.Info("ListRecent called", "user_id", claims.UserID, "limit", limit)
+
+	files, err := h.service.ListRecent(r.Context(), claims.UserID, limit)
+	if err != nil {
+		slog.Error("ListRecent failed", "error", err, "user_id", claims.UserID)
+		common.JSONError(w, err)
+		return
+	}
+
+	slog.Info("ListRecent success", "user_id", claims.UserID, "file_count", len(files))
+	common.JSON(w, http.StatusOK, files)
+}
+
+func (h *Handler) RegenerateThumbnails(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+	count, err := h.service.RegenerateThumbnails(r.Context(), claims.UserID)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	common.JSON(w, http.StatusOK, map[string]int{"queued": count})
 }

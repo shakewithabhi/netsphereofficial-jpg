@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -190,7 +191,7 @@ func (r *Repository) GetExploreItems(ctx context.Context, limit int, cursorTime 
 	idx := 1
 
 	query := `
-		SELECT s.id, s.code, f.name, f.size, f.mime_type,
+		SELECT s.id::text, s.code, f.name, f.size, f.mime_type,
 		       COALESCE(f.thumbnail_key, ''), COALESCE(f.storage_key, ''), COALESCE(f.video_thumbnail_url, ''), COALESCE(f.stream_video_id, ''),
 		       f.is_video, COALESCE(f.hls_url, ''), COALESCE(u.display_name, ''), s.download_count, s.created_at,
 		       (SELECT COUNT(*) FROM share_likes sl WHERE sl.share_id = s.id)::int AS like_count,
@@ -235,6 +236,49 @@ func (r *Repository) GetExploreItems(ctx context.Context, limit int, cursorTime 
 			&item.LikeCount, &item.CommentCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan explore row: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// SearchExploreItems searches publicly shared files by name using ILIKE.
+func (r *Repository) SearchExploreItems(ctx context.Context, query string, limit int) ([]exploreRow, error) {
+	sqlQuery := `
+		SELECT s.id::text, s.code, f.name, f.size, f.mime_type,
+		       COALESCE(f.thumbnail_key, ''), COALESCE(f.storage_key, ''), COALESCE(f.video_thumbnail_url, ''), COALESCE(f.stream_video_id, ''),
+		       f.is_video, COALESCE(f.hls_url, ''), COALESCE(u.display_name, ''), s.download_count, s.created_at,
+		       (SELECT COUNT(*) FROM share_likes sl WHERE sl.share_id = s.id)::int AS like_count,
+		       (SELECT COUNT(*) FROM share_comments sc WHERE sc.share_id = s.id)::int AS comment_count
+		FROM shares s
+		JOIN files f ON f.id = s.file_id
+		JOIN users u ON u.id = s.user_id
+		WHERE s.is_active = true
+		  AND s.password_hash = ''
+		  AND s.share_type = 'file'
+		  AND (s.expires_at IS NULL OR s.expires_at > NOW())
+		  AND f.trashed_at IS NULL
+		  AND f.name ILIKE $1
+		ORDER BY s.download_count DESC, s.created_at DESC
+		LIMIT $2`
+
+	pattern := "%" + query + "%"
+	rows, err := r.db.Query(ctx, sqlQuery, pattern, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search explore items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []exploreRow
+	for rows.Next() {
+		var item exploreRow
+		if err := rows.Scan(
+			&item.ShareID, &item.Code, &item.FileName, &item.FileSize, &item.MimeType,
+			&item.ThumbnailKey, &item.StorageKey, &item.VideoThumbnailURL, &item.StreamVideoID, &item.IsVideo,
+			&item.HLSURL, &item.OwnerName, &item.DownloadCount, &item.CreatedAt,
+			&item.LikeCount, &item.CommentCount,
+		); err != nil {
+			return nil, fmt.Errorf("scan search row: %w", err)
 		}
 		items = append(items, item)
 	}
@@ -368,6 +412,7 @@ func (r *Repository) scanShare(row pgx.Row) (*Share, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
+		slog.Error("scanShare failed", "error", err)
 		return nil, fmt.Errorf("scan share: %w", err)
 	}
 	return s, nil

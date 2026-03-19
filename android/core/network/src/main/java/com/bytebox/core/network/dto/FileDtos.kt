@@ -15,7 +15,8 @@ data class FileDto(
     @Json(name = "trashed_at") val trashedAt: String?,
     @Json(name = "created_at") val createdAt: String,
     @Json(name = "updated_at") val updatedAt: String,
-    @Json(name = "is_starred") val isStarred: Boolean = false
+    @Json(name = "is_starred") val isStarred: Boolean = false,
+    @Json(name = "share_code") val shareCode: String? = null,
 )
 
 @JsonClass(generateAdapter = true)

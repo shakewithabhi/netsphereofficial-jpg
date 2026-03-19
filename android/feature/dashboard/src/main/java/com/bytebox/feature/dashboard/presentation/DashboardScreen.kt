@@ -24,10 +24,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -55,6 +58,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -100,11 +105,14 @@ fun DashboardScreen(
     onFavoritesClick: () -> Unit = {},
     onSharesClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
     var selectedFilter by remember { mutableStateOf<Set<FileCategory>?>(null) }
+    var contextMenuFileId by remember { mutableStateOf<String?>(null) }
 
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = when (hour) {
@@ -118,10 +126,13 @@ fun DashboardScreen(
         onPauseOrDispose {}
     }
 
-    val displayFiles = remember(uiState.recentFiles, selectedTab, selectedFilter) {
-        if (selectedTab == 1) emptyList()
-        else if (selectedFilter == null) uiState.recentFiles
-        else uiState.recentFiles.filter { it.category in selectedFilter!! }
+    val publicFiles = remember(uiState.recentFiles) {
+        uiState.recentFiles.filter { it.isSharedToExplore }
+    }
+    val displayFiles = remember(uiState.recentFiles, publicFiles, selectedTab, selectedFilter) {
+        val source = if (selectedTab == 1) publicFiles else uiState.recentFiles
+        if (selectedFilter == null) source
+        else source.filter { it.category in selectedFilter!! }
     }
 
     Scaffold(
@@ -184,42 +195,57 @@ fun DashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
+                                    // Bell icon
                                     Box {
-                                        IconButton(onClick = {}) {
+                                        IconButton(onClick = onNotificationsClick) {
                                             Icon(
                                                 imageVector = Icons.Default.Notifications,
                                                 contentDescription = "Notifications",
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
-                                        // Notification badge
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .align(Alignment.TopEnd)
-                                                .padding(end = 10.dp, top = 10.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(0xFFEF4444)),
-                                        )
+                                        // Show badge only when there are active uploads
+                                        val hasActiveUploads = uiState.recentFiles.isNotEmpty()
+                                                && uiState.recentFiles.any { it.shareCode != null }
+                                        if (hasActiveUploads) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(end = 10.dp, top = 10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFEF4444)),
+                                            )
+                                        }
                                     }
-                                    val initials = (uiState.user?.displayName
-                                        ?: uiState.user?.email ?: "B")
+                                    // Profile avatar — dynamic from user name/email
+                                    val user = uiState.user
+                                    val initials = (user?.displayName ?: user?.email ?: "B")
                                         .split(" ")
                                         .take(2)
                                         .mapNotNull { it.firstOrNull()?.uppercaseChar() }
                                         .joinToString("")
                                         .take(2)
                                         .ifEmpty { "B" }
+                                    val avatarBg = remember(initials) {
+                                        val colors = listOf(
+                                            Color(0xFF2563EB), Color(0xFF059669),
+                                            Color(0xFFDC2626), Color(0xFF7C3AED),
+                                            Color(0xFFD97706), Color(0xFF0891B2),
+                                        )
+                                        colors[(initials.hashCode() and 0x7FFFFFFF) % colors.size]
+                                    }
                                     Box(
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(36.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF2563EB)),
+                                            .background(avatarBg)
+                                            .clickable(onClick = onProfileClick),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
                                             text = initials,
-                                            fontSize = 14.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White,
                                         )
@@ -278,7 +304,7 @@ fun DashboardScreen(
                     item {
                         CategoryGrid(
                             onFolderClick = onSeeAllFolders,
-                            onFavoritesClick = onFavoritesClick,
+                            onPublicClick = { selectedTab = 1 },
                             onSharesClick = onSharesClick,
                             onCategoryFilter = { cats -> selectedFilter = cats },
                         )
@@ -299,7 +325,7 @@ fun DashboardScreen(
                             contentColor = MaterialTheme.colorScheme.primary,
                             divider = {},
                         ) {
-                            listOf("Recent", "Starred").forEachIndexed { index, label ->
+                            listOf("Recent", "Public").forEachIndexed { index, label ->
                                 Tab(
                                     selected = selectedTab == index,
                                     onClick = { selectedTab = index },
@@ -343,6 +369,7 @@ fun DashboardScreen(
                                     file.createdAt.toLocalDateTime().toRelativeTime()
                                 } catch (_: Exception) { "" },
                                 onClick = { onFileClick(file.id, file.mimeType) },
+                                onMoreClick = { contextMenuFileId = file.id },
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp)
                                     .padding(bottom = ByteBoxTheme.spacing.xs),
@@ -352,13 +379,50 @@ fun DashboardScreen(
                     } else {
                         item {
                             EmptyState(
-                                icon = if (selectedTab == 1) Icons.Default.Star else Icons.Default.FolderOpen,
-                                title = if (selectedTab == 1) "No starred files" else "No files yet",
-                                subtitle = if (selectedTab == 1) "Star files to see them here" else "Upload files to get started",
+                                icon = if (selectedTab == 1) Icons.Default.Public else Icons.Default.FolderOpen,
+                                title = if (selectedTab == 1) "No public files" else "No files yet",
+                                subtitle = if (selectedTab == 1) "Share files to Explore to see them here" else "Upload files to get started",
                             )
                         }
                     }
 
+                }
+            }
+        }
+    }
+
+    // File context menu
+    contextMenuFileId?.let { fileId ->
+        val file = uiState.recentFiles.find { it.id == fileId }
+        if (file != null) {
+            Dialog(onDismissRequest = { contextMenuFileId = null }) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            text = file.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                        ListItem(
+                            headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                contextMenuFileId = null
+                                viewModel.trashFile(fileId)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -378,7 +442,7 @@ private data class CategoryTile(
 @Composable
 private fun CategoryGrid(
     onFolderClick: () -> Unit,
-    onFavoritesClick: () -> Unit,
+    onPublicClick: () -> Unit,
     onSharesClick: () -> Unit,
     onCategoryFilter: (Set<FileCategory>?) -> Unit,
 ) {
@@ -405,8 +469,8 @@ private fun CategoryGrid(
         CategoryTile("Folders", CoreR.drawable.ic_flat_folder, Color(0xFFD97706), Color(0xFFFFFBEB)) {
             onFolderClick()
         },
-        CategoryTile("Starred", CoreR.drawable.ic_flat_starred, Color(0xFFB45309), Color(0xFFFEF3C7)) {
-            onFavoritesClick()
+        CategoryTile("Public", CoreR.drawable.ic_flat_shared, Color(0xFF0D9488), Color(0xFFF0FDFA)) {
+            onPublicClick()
         },
         CategoryTile("Shared", CoreR.drawable.ic_flat_shared, Color(0xFF0891B2), Color(0xFFECFEFF)) {
             onSharesClick()
@@ -416,12 +480,12 @@ private fun CategoryGrid(
 
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         tiles.chunked(4).forEach { rowTiles ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 rowTiles.forEach { tile ->
                     Column(
@@ -429,27 +493,25 @@ private fun CategoryGrid(
                             .weight(1f)
                             .clickable(onClick = tile.onClick),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 10.dp)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(18.dp))
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(tile.bgColor),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 painter = painterResource(tile.iconRes),
                                 contentDescription = tile.label,
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(24.dp),
                                 tint = Color.Unspecified,
                             )
                         }
                         Text(
                             text = tile.label,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onBackground,
                         )

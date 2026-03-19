@@ -27,6 +27,12 @@ interface ShareApi {
         @Query("limit") limit: Int = 50
     ): Response<ShareListResponse>
 
+    @GET("explore/search")
+    suspend fun searchExploreItems(
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 20,
+    ): Response<ExploreResponse>
+
     @GET("explore")
     suspend fun getExploreItems(
         @Query("cursor") cursor: String? = null,

@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
@@ -115,6 +117,15 @@ fun FileListScreen(
     viewModel: FileListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Show toast when file is shared to Explore
+    LaunchedEffect(uiState.exploreShareSuccess) {
+        if (uiState.exploreShareSuccess) {
+            android.widget.Toast.makeText(context, "File is now visible in Explore!", android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.clearExploreShareSuccess()
+        }
+    }
 
     LifecycleResumeEffect(Unit) {
         viewModel.loadContents()
@@ -425,7 +436,7 @@ fun FileListScreen(
                     )
                 }
                 uiState.viewMode == ViewMode.LIST -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
                         items(displayFolders, key = { it.id }) { folder ->
                             FolderItem(
                                 folder = folder,
@@ -653,6 +664,27 @@ fun FileListScreen(
                                 viewModel.shareFile(fileId)
                             },
                         )
+                        if (file.isSharedToExplore) {
+                            ListItem(
+                                headlineContent = { Text("Remove from Explore") },
+                                supportingContent = { Text("No longer visible to other users", style = MaterialTheme.typography.bodySmall) },
+                                leadingContent = { Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                modifier = Modifier.clickable {
+                                    contextMenuFileId = null
+                                    viewModel.unshareFromExplore(fileId, file.shareCode!!)
+                                },
+                            )
+                        } else {
+                            ListItem(
+                                headlineContent = { Text("Share to Explore") },
+                                supportingContent = { Text("Make visible to all users", style = MaterialTheme.typography.bodySmall) },
+                                leadingContent = { Icon(Icons.Default.Explore, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                modifier = Modifier.clickable {
+                                    contextMenuFileId = null
+                                    viewModel.shareToExplore(fileId)
+                                },
+                            )
+                        }
                         ListItem(
                             headlineContent = { Text("Copy") },
                             leadingContent = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
@@ -732,7 +764,6 @@ fun FileListScreen(
     }
 
     // Share dialog
-    val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     uiState.shareUrl?.let { shareUrl ->
         Dialog(onDismissRequest = { viewModel.clearShareUrl() }) {

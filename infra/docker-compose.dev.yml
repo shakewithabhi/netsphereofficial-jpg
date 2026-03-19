@@ -61,7 +61,7 @@ services:
       DB_SSL_MODE: disable
       REDIS_HOST: redis
       STORAGE_ENDPOINT: http://minio:9000
-      STORAGE_PUBLIC_ENDPOINT: http://192.168.1.4:9002
+      STORAGE_PUBLIC_ENDPOINT: http://192.168.1.2:9002
       STORAGE_ACCESS_KEY_ID: minioadmin
       STORAGE_SECRET_ACCESS_KEY: minioadmin
       CLAMAV_ENABLED: "false"

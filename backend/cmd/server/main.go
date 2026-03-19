@@ -188,6 +188,7 @@ func main() {
 		// Public share routes: 30 req/min by IP
 		r.Group(func(r chi.Router) {
 			r.Use(rateLimiter.Limit(30, time.Minute, middleware.ByIP))
+			r.Use(authMiddleware.OptionalAuth)
 			r.Mount("/s", shareHandler.PublicRoutes())
 			r.Mount("/explore", shareHandler.ExploreRoutes())
 		})

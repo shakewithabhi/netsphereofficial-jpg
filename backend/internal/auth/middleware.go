@@ -45,6 +45,24 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// OptionalAuth parses the token if present but allows unauthenticated requests through.
+func (m *Middleware) OptionalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := r.Header.Get("Authorization")
+		if header != "" {
+			parts := strings.SplitN(header, " ", 2)
+			if len(parts) == 2 && strings.EqualFold(parts[0], "bearer") {
+				if claims, err := m.jwt.ValidateAccessToken(parts[1]); err == nil {
+					ctx := context.WithValue(r.Context(), claimsKey, claims)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (m *Middleware) RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims := GetClaims(r.Context())

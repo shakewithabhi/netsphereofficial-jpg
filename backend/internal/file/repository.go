@@ -140,6 +140,70 @@ func (r *Repository) ListByFolder(ctx context.Context, userID uuid.UUID, folderI
 	return files, hasMore, nil
 }
 
+// GetShareCodes returns a map of fileID -> shareCode for files that have active public shares.
+func (r *Repository) GetShareCodes(ctx context.Context, userID uuid.UUID, fileIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+	if len(fileIDs) == 0 {
+		return map[uuid.UUID]string{}, nil
+	}
+	query := `
+		SELECT DISTINCT ON (file_id) file_id, code
+		FROM shares
+		WHERE user_id = $1 AND file_id = ANY($2)
+		  AND is_active = true AND password_hash = '' AND share_type = 'file'
+		ORDER BY file_id, created_at DESC`
+
+	rows, err := r.db.Query(ctx, query, userID, fileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get share codes: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]string)
+	for rows.Next() {
+		var fid uuid.UUID
+		var code string
+		if err := rows.Scan(&fid, &code); err != nil {
+			return nil, fmt.Errorf("scan share code: %w", err)
+		}
+		result[fid] = code
+	}
+	return result, nil
+}
+
+func (r *Repository) ListRecent(ctx context.Context, userID uuid.UUID, limit int) ([]File, error) {
+	query := `
+		SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),
+		       size, mime_type, COALESCE(content_hash, ''), scan_status, current_version,
+		       is_video, COALESCE(stream_video_id, ''), COALESCE(stream_status, ''),
+		       COALESCE(hls_url, ''), COALESCE(video_thumbnail_url, ''),
+		       trashed_at, created_at, updated_at
+		FROM files
+		WHERE user_id = $1 AND trashed_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT $2`
+
+	rows, err := r.db.Query(ctx, query, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list recent files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var f File
+		if err := rows.Scan(
+			&f.ID, &f.UserID, &f.FolderID, &f.Name, &f.StorageKey, &f.ThumbnailKey,
+			&f.Size, &f.MimeType, &f.ContentHash, &f.ScanStatus, &f.CurrentVersion,
+			&f.IsVideo, &f.StreamVideoID, &f.StreamStatus, &f.HLSURL, &f.VideoThumbnailURL,
+			&f.TrashedAt, &f.CreatedAt, &f.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan recent file: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, nil
+}
+
 func (r *Repository) ListTrashed(ctx context.Context, userID uuid.UUID) ([]File, error) {
 	query := `
 		SELECT id, user_id, folder_id, name, storage_key, COALESCE(thumbnail_key, ''),

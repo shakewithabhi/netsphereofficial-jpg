@@ -59,9 +59,8 @@ fun UploadScreen(
     // Privacy toggle state — pre-set from nav argument
     var sharePubliclyState by remember { mutableStateOf(sharePublicly) }
 
-    val filePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris: List<Uri> ->
+    // Handles URIs from any picker contract
+    fun processPickedUris(uris: List<Uri>) {
         uris.forEach { uri ->
             val cursor = context.contentResolver.query(uri, null, null, null, null)
             cursor?.use {
@@ -83,6 +82,16 @@ fun UploadScreen(
             }
         }
     }
+
+    // Primary picker: GetMultipleContents — shows gallery + file manager, supports all formats
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> -> processPickedUris(uris) }
+
+    // Fallback: OpenMultipleDocuments for explicit file browsing
+    val documentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> -> processPickedUris(uris) }
 
     Scaffold(
         topBar = {
@@ -110,7 +119,7 @@ fun UploadScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { filePicker.launch(arrayOf("*/*")) }) {
+            FloatingActionButton(onClick = { filePicker.launch("*/*") }) {
                 Icon(Icons.Default.Add, contentDescription = "Pick files")
             }
         }

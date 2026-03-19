@@ -14,6 +14,7 @@ import com.bytebox.domain.model.ShareComment
 import com.bytebox.domain.model.ShareInfo
 import com.bytebox.domain.model.ShareLink
 import com.bytebox.domain.repository.ShareRepository
+import timber.log.Timber
 import javax.inject.Inject
 
 class ShareRepositoryImpl @Inject constructor(
@@ -52,15 +53,29 @@ class ShareRepositoryImpl @Inject constructor(
         return safeApiCall { shareApi.getShare(code) }.map { it.toDomain() }
     }
 
+    override suspend fun searchExploreItems(query: String, limit: Int): Result<List<ExploreItem>> {
+        return safeApiCall {
+            shareApi.searchExploreItems(query = query, limit = limit)
+        }.map { response ->
+            response.items.map { it.toDomain() }
+        }
+    }
+
     override suspend fun getExploreItems(
         cursor: String?,
         category: String?,
     ): Result<Pair<List<ExploreItem>, String?>> {
-        return safeApiCall {
+        Timber.d("EXPLORE_REPO: getExploreItems(cursor=$cursor, category=$category)")
+        val result = safeApiCall {
             shareApi.getExploreItems(cursor = cursor, category = category)
         }.map { response ->
+            Timber.d("EXPLORE_REPO: API returned ${response.items.size} items, nextCursor=${response.nextCursor}")
             response.items.map { it.toDomain() } to response.nextCursor
         }
+        if (result is com.bytebox.core.common.Result.Error) {
+            Timber.e("EXPLORE_REPO: getExploreItems FAILED: ${result.exception.message}")
+        }
+        return result
     }
 
     override suspend fun getPublicShareInfo(code: String): Result<ShareInfo> {

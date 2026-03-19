@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -128,8 +129,24 @@ func (s *Service) ListContents(ctx context.Context, claims *auth.TokenClaims, pa
 	}
 
 	fileResponses := make([]file.FileResponse, len(files))
+	fileIDs := make([]uuid.UUID, len(files))
 	for i, f := range files {
 		fileResponses[i] = f.ToResponse()
+		fileIDs[i] = f.ID
+		// Enrich thumbnail URL with presigned URL
+		if fileResponses[i].ThumbnailKey != "" {
+			if url, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), fileResponses[i].ThumbnailKey, 24*time.Hour); err == nil {
+				fileResponses[i].ThumbnailURL = url
+			}
+		}
+	}
+	// Enrich share codes
+	if shareCodes, err := s.fileRepo.GetShareCodes(ctx, claims.UserID, fileIDs); err == nil {
+		for i := range fileResponses {
+			if code, ok := shareCodes[fileResponses[i].ID]; ok {
+				fileResponses[i].ShareCode = code
+			}
+		}
 	}
 
 	return &FolderContentsResult{

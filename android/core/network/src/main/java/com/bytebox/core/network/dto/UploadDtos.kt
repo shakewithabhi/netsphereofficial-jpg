@@ -13,12 +13,22 @@ data class InitUploadRequest(
 )
 
 @JsonClass(generateAdapter = true)
+data class UploadPartInfo(
+    @Json(name = "part_number") val partNumber: Int,
+    val url: String,
+)
+
+@JsonClass(generateAdapter = true)
 data class InitUploadResponse(
     @Json(name = "upload_id") val uploadId: String,
     @Json(name = "chunk_size") val chunkSize: Int,
     @Json(name = "total_chunks") val totalChunks: Int,
-    @Json(name = "presigned_urls") val presignedUrls: List<String>
-)
+    val parts: List<UploadPartInfo> = emptyList(),
+) {
+    /** Ordered list of presigned URLs extracted from parts, for backward compat. */
+    val presignedUrls: List<String>
+        get() = parts.sortedBy { it.partNumber }.map { it.url }
+}
 
 @JsonClass(generateAdapter = true)
 data class CompletePartRequest(

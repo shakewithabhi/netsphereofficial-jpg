@@ -86,6 +86,11 @@ interface FileApi {
         @Query("limit") limit: Int = 50
     ): Response<FolderContentsResponse>
 
+    @GET("files/recent")
+    suspend fun getRecentFiles(
+        @Query("limit") limit: Int = 20
+    ): Response<List<FileDto>>
+
     @GET("files/search")
     suspend fun searchFiles(
         @Query("q") query: String,

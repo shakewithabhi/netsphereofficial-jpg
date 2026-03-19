@@ -48,6 +48,13 @@ class UploadWorker @AssistedInject constructor(
     @javax.inject.Named("base_url") private val baseUrl: String
 ) : CoroutineWorker(appContext, workerParams) {
 
+    // Plain HTTP client without auth interceptor — used for presigned S3 URLs
+    private val plainHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .build()
+
     override suspend fun doWork(): Result {
         val taskId = inputData.getLong(KEY_TASK_ID, -1)
         if (taskId == -1L) return Result.failure()
@@ -92,7 +99,7 @@ class UploadWorker @AssistedInject constructor(
         val requestBody = MultipartBody.Builder()
             .setType(MultipartBody.FORM)
             .addFormDataPart("file", task.fileName, bytes.toRequestBody(task.mimeType.toMediaType()))
-            .apply { task.folderId?.let { addFormDataPart("folder_id", it) } }
+            .apply { task.folderId?.takeIf { it.isNotBlank() }?.let { addFormDataPart("folder_id", it) } }
             .build()
 
         val httpRequest = Request.Builder()
@@ -100,28 +107,40 @@ class UploadWorker @AssistedInject constructor(
             .post(requestBody)
             .build()
 
+        Timber.d("UPLOAD: Sending small file upload to ${getBaseUrl()}files/upload, fileName=${task.fileName}, mimeType=${task.mimeType}, folderId=${task.folderId}, sharePublicly=${task.sharePublicly}")
         val httpResponse = okHttpClient.newCall(httpRequest).execute()
+        Timber.d("UPLOAD: Response code=${httpResponse.code}")
         return if (httpResponse.isSuccessful) {
             val responseBody = httpResponse.body?.string() ?: "{}"
-            Timber.d("Upload response: $responseBody")
+            Timber.d("UPLOAD: Response body: $responseBody")
             val serverFileId = try {
                 val json = org.json.JSONObject(responseBody)
                 // Response may be wrapped: {"success":true,"data":{"id":"..."}} or flat {"id":"..."}
                 val fileObj = if (json.has("data")) json.getJSONObject("data") else json
                 if (fileObj.has("id")) fileObj.getString("id") else null
             } catch (e: Exception) {
-                Timber.e(e, "Failed to parse upload response")
+                Timber.e(e, "UPLOAD: Failed to parse upload response")
                 null
             }
-            Timber.d("Extracted serverFileId: $serverFileId")
+            Timber.d("UPLOAD: Extracted serverFileId=$serverFileId, sharePublicly=${task.sharePublicly}")
             if (!serverFileId.isNullOrBlank()) {
                 uploadTaskDao.updateServerFileId(taskId, serverFileId)
-                if (task.sharePublicly) createShareLink(taskId, serverFileId)
+                if (task.sharePublicly) {
+                    Timber.d("UPLOAD: sharePublicly=true, creating share link...")
+                    createShareLink(taskId, serverFileId)
+                } else {
+                    Timber.d("UPLOAD: sharePublicly=false, skipping share link creation")
+                }
+            } else {
+                Timber.w("UPLOAD: serverFileId is null or blank! File won't appear in dashboard.")
             }
             uploadTaskDao.updateProgress(taskId, "completed", 1f, 1)
+            Timber.d("UPLOAD: Task $taskId marked completed")
             try { uri.path?.let { java.io.File(it).delete() } } catch (_: Exception) {}
             Result.success()
         } else {
+            val errorBody = httpResponse.body?.string()
+            Timber.e("UPLOAD: Upload FAILED: code=${httpResponse.code}, body=$errorBody")
             uploadTaskDao.markFailed(taskId, "Upload failed: ${httpResponse.code}")
             Result.retry()
         }
@@ -138,7 +157,7 @@ class UploadWorker @AssistedInject constructor(
                     filename = task.fileName,
                     fileSize = task.fileSize,
                     mimeType = task.mimeType,
-                    folderId = task.folderId,
+                    folderId = task.folderId?.takeIf { it.isNotBlank() },
                     chunkSize = Constants.CHUNK_SIZE
                 )
             )
@@ -159,9 +178,27 @@ class UploadWorker @AssistedInject constructor(
                 status = "uploading"
             ))
         } else {
-            val statusResp = uploadApi.getUploadStatus(sessionId)
-            if (!statusResp.isSuccessful()) return Result.retry()
-            presignedUrls = listOf()
+            // Existing session — re-init to get fresh presigned URLs
+            val initResp = uploadApi.initUpload(
+                InitUploadRequest(
+                    filename = task.fileName,
+                    fileSize = task.fileSize,
+                    mimeType = task.mimeType,
+                    folderId = task.folderId?.takeIf { it.isNotBlank() },
+                    chunkSize = Constants.CHUNK_SIZE
+                )
+            )
+            if (!initResp.isSuccessful()) return Result.retry()
+            val initBody = initResp.body()!!
+            sessionId = initBody.uploadId
+            totalChunks = initBody.totalChunks
+            presignedUrls = initBody.presignedUrls
+            uploadTaskDao.updateTask(task.copy(
+                uploadSessionId = sessionId,
+                totalChunks = totalChunks,
+                completedChunks = 0,
+                status = "uploading"
+            ))
         }
 
         val inputStream = applicationContext.contentResolver.openInputStream(uri)
@@ -190,7 +227,8 @@ class UploadWorker @AssistedInject constructor(
                         .put(chunk.toRequestBody("application/octet-stream".toMediaType()))
                         .build()
 
-                    val httpResponse = okHttpClient.newCall(httpRequest).execute()
+                    // Use a plain client without auth interceptor for presigned S3 URLs
+                    val httpResponse = plainHttpClient.newCall(httpRequest).execute()
                     if (!httpResponse.isSuccessful) {
                         uploadTaskDao.markFailed(taskId, "Chunk $partNumber upload failed")
                         return Result.retry()

@@ -14,6 +14,7 @@ interface FileRepository {
         order: String = "asc"
     ): Result<FolderContents>
 
+    suspend fun getRecentFiles(limit: Int = 20): Result<List<FileItem>>
     suspend fun createFolder(name: String, parentId: String?): Result<Folder>
     suspend fun renameFolder(id: String, name: String): Result<Folder>
     suspend fun deleteFolder(id: String): Result<Unit>

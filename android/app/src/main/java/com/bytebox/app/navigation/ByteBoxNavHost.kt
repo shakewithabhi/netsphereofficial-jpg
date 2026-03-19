@@ -242,6 +242,17 @@ fun ByteBoxNavHost(
                     onSharesClick = {
                         navController.navigate(Screen.Shares.route)
                     },
+                    onNotificationsClick = {
+                        // TODO: Navigate to Notifications screen when implemented
+                        android.widget.Toast.makeText(navController.context, "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    onProfileClick = {
+                        navController.navigate(Screen.Profile.route) {
+                            popUpTo(Screen.Dashboard.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
 
@@ -433,6 +444,9 @@ fun ByteBoxNavHost(
                 ExploreVideoScreen(
                     code = code,
                     onNavigateBack = { navController.popBackStack() },
+                    onNavigateToItem = { relatedCode ->
+                        navController.navigate(Screen.ExploreVideo.createRoute(relatedCode))
+                    },
                 )
             }
 
