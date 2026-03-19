@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
 } from 'react';
 import type { DragEvent as ReactDragEvent } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,6 +29,8 @@ import {
   CheckSquare,
   Square,
   Move,
+  ArrowUpDown,
+  ChevronDown,
 } from 'lucide-react';
 import {
   getRootContents,
@@ -64,12 +67,32 @@ interface BreadcrumbItem {
   id?: string;
 }
 
+type SortOption =
+  | 'name-asc'
+  | 'name-desc'
+  | 'date-newest'
+  | 'date-oldest'
+  | 'size-largest'
+  | 'size-smallest'
+  | 'type';
+
+const SORT_LABELS: Record<SortOption, string> = {
+  'name-asc': 'Name (A-Z)',
+  'name-desc': 'Name (Z-A)',
+  'date-newest': 'Date (Newest)',
+  'date-oldest': 'Date (Oldest)',
+  'size-largest': 'Size (Largest)',
+  'size-smallest': 'Size (Smallest)',
+  type: 'Type',
+};
+
 export default function Files() {
   const { user } = useAuth();
   const { folderId } = useParams<{ folderId?: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('search') ?? '';
+  const categoryFilter = searchParams.get('category') ?? '';
 
   const [folders, setFolders] = useState<FolderItem[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -101,6 +124,11 @@ export default function Files() {
   const newFolderRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
+  // Sort state
+  const [sortBy, setSortBy] = useState<SortOption>('name-asc');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+
   // File Preview state
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
 
@@ -117,13 +145,78 @@ export default function Files() {
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
+  // Close sort menu on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setShowSortMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Sorted folders and files (folders always first)
+  const sortedFolders = useMemo(() => {
+    const sorted = [...folders];
+    switch (sortBy) {
+      case 'name-asc':
+        sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        break;
+      case 'name-desc':
+        sorted.sort((a, b) => b.name.localeCompare(a.name, undefined, { sensitivity: 'base' }));
+        break;
+      case 'date-newest':
+        sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        break;
+      case 'date-oldest':
+        sorted.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+        break;
+      // Folders have no size or type distinction, fall back to name
+      case 'size-largest':
+      case 'size-smallest':
+      case 'type':
+        sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        break;
+    }
+    return sorted;
+  }, [folders, sortBy]);
+
+  const sortedFiles = useMemo(() => {
+    const sorted = [...files];
+    switch (sortBy) {
+      case 'name-asc':
+        sorted.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        break;
+      case 'name-desc':
+        sorted.sort((a, b) => b.name.localeCompare(a.name, undefined, { sensitivity: 'base' }));
+        break;
+      case 'date-newest':
+        sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        break;
+      case 'date-oldest':
+        sorted.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+        break;
+      case 'size-largest':
+        sorted.sort((a, b) => b.size - a.size);
+        break;
+      case 'size-smallest':
+        sorted.sort((a, b) => a.size - b.size);
+        break;
+      case 'type':
+        sorted.sort((a, b) => a.mime_type.localeCompare(b.mime_type) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        break;
+    }
+    return sorted;
+  }, [files, sortBy]);
+
   // Clear selection when navigating
   useEffect(() => {
     setSelectedFiles(new Set());
     setSelectedFolders(new Set());
     setSelectionMode(false);
     setLastClickedIndex(null);
-  }, [folderId, searchQuery]);
+  }, [folderId, searchQuery, categoryFilter]);
 
   useEffect(() => {
     async function load() {
@@ -138,17 +231,43 @@ export default function Files() {
             { label: 'My Files', to: '/' },
             { label: `Search: "${searchQuery}"` },
           ]);
+        } else if (categoryFilter) {
+          // Load all files and filter by category
+          const data = await getRootContents();
+          setFolders([]);
+          const categoryMap: Record<string, string[]> = {
+            image: ['image/'],
+            video: ['video/'],
+            audio: ['audio/'],
+            document: ['application/pdf', 'application/msword', 'application/vnd', 'text/'],
+            other: [],
+          };
+          const prefixes = categoryMap[categoryFilter] ?? [];
+          const filtered = (data.files ?? []).filter((f: FileItem) => {
+            if (categoryFilter === 'other') {
+              return !['image/', 'video/', 'audio/', 'application/pdf', 'application/msword', 'application/vnd', 'text/'].some(
+                (p) => f.mime_type.startsWith(p)
+              );
+            }
+            return prefixes.some((p) => f.mime_type.startsWith(p));
+          });
+          setFiles(filtered);
+          const labels: Record<string, string> = { image: 'Pictures', video: 'Videos', audio: 'Music', document: 'Documents', other: 'Other' };
+          setBreadcrumbs([
+            { label: 'My Files', to: '/' },
+            { label: labels[categoryFilter] ?? categoryFilter },
+          ]);
         } else if (!folderId) {
           const data = await getRootContents();
           setFolders(data.folders ?? []);
           setFiles(data.files ?? []);
-          setBreadcrumbs([{ label: 'My Files' }]);
+          setBreadcrumbs([{ label: 'All Files' }]);
         } else {
           const data = await getFolderContents(folderId);
           setFolders(data.folders ?? []);
           setFiles(data.files ?? []);
           setBreadcrumbs([
-            { label: 'My Files', to: '/', id: undefined },
+            { label: 'All Files', to: '/', id: undefined },
             { label: 'Folder' },
           ]);
         }
@@ -179,8 +298,8 @@ export default function Files() {
 
   // All items as a flat list for shift-click range selection
   const allItems: { type: 'folder' | 'file'; id: string }[] = [
-    ...folders.map((f) => ({ type: 'folder' as const, id: f.id })),
-    ...files.map((f) => ({ type: 'file' as const, id: f.id })),
+    ...sortedFolders.map((f) => ({ type: 'folder' as const, id: f.id })),
+    ...sortedFiles.map((f) => ({ type: 'file' as const, id: f.id })),
   ];
 
   const totalSelected = selectedFiles.size + selectedFolders.size;
@@ -542,6 +661,35 @@ export default function Files() {
             >
               {viewMode === 'grid' ? <List size={18} /> : <Grid3x3 size={18} />}
             </button>
+            {/* Sort dropdown */}
+            <div className="relative" ref={sortRef}>
+              <button
+                onClick={() => setShowSortMenu((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                title="Sort files"
+              >
+                <ArrowUpDown size={16} />
+                <span className="hidden sm:inline">{SORT_LABELS[sortBy]}</span>
+                <ChevronDown size={14} className={`transition-transform ${showSortMenu ? 'rotate-180' : ''}`} />
+              </button>
+              {showSortMenu && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1">
+                  {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => { setSortBy(option); setShowSortMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        sortBy === option
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {SORT_LABELS[option]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={() => { setNewFolderMode(true); setNewFolderName(''); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
@@ -643,7 +791,7 @@ export default function Files() {
             )}
 
             {/* Folders */}
-            {folders.map((folder, idx) => (
+            {sortedFolders.map((folder, idx) => (
               <FolderCard
                 key={folder.id}
                 folder={folder}
@@ -671,7 +819,7 @@ export default function Files() {
             ))}
 
             {/* Files with in-feed ads every 8 items for free users */}
-            {files.map((file, index) => (
+            {sortedFiles.map((file, index) => (
               <React.Fragment key={file.id}>
                 <FileCard
                   file={file}
@@ -682,14 +830,14 @@ export default function Files() {
                   onToggleStar={() => handleToggleStar(file)}
                   isSelected={selectedFiles.has(file.id)}
                   selectionMode={selectionMode}
-                  onToggleSelect={(e) => toggleSelectFile(file.id, folders.length + index, e.shiftKey)}
+                  onToggleSelect={(e) => toggleSelectFile(file.id, sortedFolders.length + index, e.shiftKey)}
                   isDragging={draggedItemId === file.id}
                   onDragStart={(e) => handleItemDragStart(e, 'file', file.id)}
                   onDragEnd={handleItemDragEnd}
                 />
                 {(!user?.plan || user.plan === 'free') &&
                   (index + 1) % 8 === 0 &&
-                  index < files.length - 1 && (
+                  index < sortedFiles.length - 1 && (
                     <div className={viewMode === 'grid' ? 'col-span-full' : ''}>
                       <InFeedAd />
                     </div>

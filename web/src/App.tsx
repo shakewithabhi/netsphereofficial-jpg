@@ -10,6 +10,7 @@ import Explore from './pages/Explore';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import ShareView from './pages/ShareView';
+import Shares from './pages/Shares';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -110,6 +111,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/shares"
+          element={
+            <ProtectedRoute>
+              <Shares />
             </ProtectedRoute>
           }
         />

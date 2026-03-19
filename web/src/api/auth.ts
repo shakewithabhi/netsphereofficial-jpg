@@ -7,6 +7,7 @@ export interface User {
   storage_used: number;
   storage_limit: number;
   plan?: string;
+  avatar_url?: string;
   created_at: string;
 }
 
@@ -77,4 +78,27 @@ export async function verify2FALogin(
     temp_token: tempToken,
   });
   return res.data.data;
+}
+
+// Profile avatar upload
+
+export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const res = await client.put('/auth/profile/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data.data;
+}
+
+// Change password
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  await client.put('/auth/password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
 }

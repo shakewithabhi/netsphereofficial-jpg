@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import type { FormEvent } from 'react';
-import { User, Check, X, HardDrive, FileText, Shield } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import type { FormEvent, ChangeEvent } from 'react';
+import { User, Check, X, HardDrive, FileText, Shield, Camera, Lock, Eye, EyeOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import client from '../api/client';
+import { uploadAvatar, changePassword } from '../api/auth';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { RewardedAdButton } from '../components/RewardedAd';
 import { TwoFactorSetup } from '../components/TwoFactorSetup';
@@ -17,9 +18,28 @@ export default function Settings() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
+  // Avatar state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   useEffect(() => {
     setDisplayName(user?.display_name ?? '');
     setEmail(user?.email ?? '');
+    // Load avatar: prefer user profile, fallback to localStorage
+    const storedAvatar = localStorage.getItem('bytebox_avatar');
+    setAvatarUrl(user?.avatar_url ?? storedAvatar ?? null);
   }, [user]);
 
   async function handleSave(e: FormEvent) {
@@ -44,6 +64,98 @@ export default function Settings() {
     }
   }
 
+  async function handleAvatarChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be smaller than 5MB.');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Try uploading via API
+      const result = await uploadAvatar(file);
+      setAvatarUrl(result.avatar_url);
+      await refreshUser();
+      setSuccess('Profile photo updated.');
+    } catch {
+      // Fallback: store as base64 in localStorage
+      try {
+        const base64 = await fileToBase64(file);
+        localStorage.setItem('bytebox_avatar', base64);
+        setAvatarUrl(base64);
+        setSuccess('Profile photo updated locally.');
+      } catch {
+        setError('Failed to update profile photo.');
+      }
+    } finally {
+      setAvatarUploading(false);
+      // Reset file input so re-selecting the same file triggers onChange
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleChangePassword(e: FormEvent) {
+    e.preventDefault();
+    setPasswordSuccess('');
+    setPasswordError('');
+
+    // Validation
+    if (!currentPassword) {
+      setPasswordError('Current password is required.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setPasswordError('New password must be different from current password.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setPasswordSuccess('Password changed successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Failed to change password.';
+      setPasswordError(msg);
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
 
   useEffect(() => {
@@ -63,6 +175,9 @@ export default function Settings() {
   const storageLimit = user?.storage_limit ?? 1073741824;
   const storagePercent = Math.min(100, Math.round((storageUsed / storageLimit) * 100));
 
+  const inputClass =
+    'w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200';
+
   return (
     <Layout>
       <div className="p-6 max-w-2xl dark:bg-slate-900 min-h-full">
@@ -79,8 +194,47 @@ export default function Settings() {
             </div>
             <div className="p-6">
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shrink-0">
-                  {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
+                {/* Clickable avatar with camera overlay */}
+                <div className="relative shrink-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarUploading}
+                    className="group relative w-16 h-16 rounded-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800"
+                    title="Change profile photo"
+                  >
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold">
+                        {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
+                      </div>
+                    )}
+                    {/* Camera overlay on hover */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                      <Camera
+                        size={20}
+                        className="text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      />
+                    </div>
+                    {/* Loading spinner */}
+                    {avatarUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </button>
                 </div>
                 <div>
                   <p className="font-semibold text-slate-800 dark:text-slate-200">{user?.display_name}</p>
@@ -120,7 +274,7 @@ export default function Settings() {
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                    className={inputClass}
                   />
                 </div>
 
@@ -132,7 +286,7 @@ export default function Settings() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                    className={inputClass}
                   />
                 </div>
 
@@ -143,6 +297,107 @@ export default function Settings() {
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
                   >
                     {saving ? 'Saving...' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Change Password section */}
+          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+              <Lock size={16} className="text-slate-500 dark:text-slate-400" />
+              <h2 className="font-semibold text-slate-800 dark:text-slate-200">Change Password</h2>
+            </div>
+            <div className="p-6">
+              {passwordSuccess && (
+                <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-green-50 dark:bg-green-900/30 border border-green-100 dark:border-green-800 text-green-700 dark:text-green-400 rounded-xl text-sm">
+                  <Check size={16} />
+                  {passwordSuccess}
+                </div>
+              )}
+
+              {passwordError && (
+                <div className="mb-4 flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm">
+                  <X size={16} />
+                  {passwordError}
+                </div>
+              )}
+
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    Current password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className={inputClass + ' pr-10'}
+                      placeholder="Enter current password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                      {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    New password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className={inputClass + ' pr-10'}
+                      placeholder="At least 8 characters"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    Confirm new password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className={inputClass + ' pr-10'}
+                      placeholder="Re-enter new password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={passwordSaving}
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    {passwordSaving ? 'Changing...' : 'Change password'}
                   </button>
                 </div>
               </form>

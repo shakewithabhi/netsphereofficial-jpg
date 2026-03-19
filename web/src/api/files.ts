@@ -31,8 +31,12 @@ export interface ShareLink {
   id: string;
   share_url: string;
   file_id: string;
+  file_name?: string;
+  code?: string;
   expires_at: string | null;
   created_at: string;
+  has_password?: boolean;
+  download_count?: number;
 }
 
 export async function getRootContents(sort = 'name', order = 'asc'): Promise<FolderContents> {
@@ -144,6 +148,15 @@ export async function createShare(
     ...(password ? { password } : {}),
   });
   return res.data.data;
+}
+
+export async function getMyShares(): Promise<ShareLink[]> {
+  const res = await client.get('/shares');
+  return res.data.data?.shares ?? res.data.data ?? [];
+}
+
+export async function deleteShare(id: string): Promise<void> {
+  await client.delete(`/shares/${id}`);
 }
 
 export async function starFile(id: string): Promise<void> {

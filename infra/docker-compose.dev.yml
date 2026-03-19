@@ -58,6 +58,7 @@ services:
     environment:
       APP_ENV: development
       APP_BASE_URL: http://localhost:8080
+      APP_MAX_UPLOAD_SIZE_MB: "100"
       DB_HOST: postgres
       DB_SSL_MODE: disable
       REDIS_HOST: redis
