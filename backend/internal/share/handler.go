@@ -3,6 +3,7 @@ package share
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -135,10 +136,32 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ExploreRoutes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.Explore)
+	r.Get("/search", h.SearchExplore)
 	r.Post("/{code}/like", h.ToggleLike)
 	r.Get("/{code}/comments", h.GetComments)
 	r.Post("/{code}/comments", h.AddComment)
 	return r
+}
+
+func (h *Handler) SearchExplore(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		common.JSONError(w, common.ErrBadRequest("search query is required"))
+		return
+	}
+
+	limit := 20
+	if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && n > 0 && n <= 50 {
+		limit = n
+	}
+
+	resp, err := h.service.SearchExploreItems(r.Context(), query, limit)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, resp)
 }
 
 // Public handlers (no auth)
@@ -276,12 +299,16 @@ func (h *Handler) Explore(w http.ResponseWriter, r *http.Request) {
 		categoryPtr = &category
 	}
 
+	slog.Info("Explore called", "limit", limit, "cursor", cursor, "category", category)
+
 	resp, err := h.service.GetExploreItems(r.Context(), limit, cursorPtr, categoryPtr)
 	if err != nil {
+		slog.Error("Explore failed", "error", err)
 		common.JSONError(w, err)
 		return
 	}
 
+	slog.Info("Explore success", "item_count", len(resp.Items))
 	common.JSON(w, http.StatusOK, resp)
 }
 

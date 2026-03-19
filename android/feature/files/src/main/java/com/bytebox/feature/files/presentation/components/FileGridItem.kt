@@ -31,7 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.bytebox.core.common.FileCategory
 import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.components.FileTypeIcon
@@ -78,14 +78,21 @@ fun FileGridItem(
                     .clip(RoundedCornerShape(ByteBoxTheme.radius.sm)),
                 contentAlignment = Alignment.Center,
             ) {
-                if (file.thumbnailUrl != null && file.category == FileCategory.IMAGE) {
-                    AsyncImage(
+                if (file.thumbnailUrl != null && (file.category == FileCategory.IMAGE || file.category == FileCategory.VIDEO)) {
+                    SubcomposeAsyncImage(
                         model = file.thumbnailUrl,
                         contentDescription = file.name,
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(ByteBoxTheme.radius.sm)),
                         contentScale = ContentScale.Crop,
+                        error = {
+                            FileTypeIcon(
+                                category = file.category,
+                                containerSize = 56.dp,
+                                iconSize = 28.dp,
+                            )
+                        },
                     )
                 } else {
                     FileTypeIcon(

@@ -73,6 +73,50 @@ func (s *Service) invalidateRootContentsCache(ctx context.Context, userID uuid.U
 	}
 }
 
+// enrichThumbnail populates ThumbnailURL with a presigned URL when a thumbnail exists.
+// For images without a generated thumbnail, falls back to a presigned URL of the file itself.
+func (s *Service) enrichThumbnail(ctx context.Context, resp *FileResponse, storageKey string) {
+	if resp.ThumbnailKey != "" {
+		if url, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), resp.ThumbnailKey, 24*time.Hour); err == nil {
+			resp.ThumbnailURL = url
+			return
+		}
+	}
+	// Fallback: for images without a dedicated thumbnail, presign the file itself
+	if strings.HasPrefix(resp.MimeType, "image/") && storageKey != "" {
+		if url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), storageKey, 24*time.Hour); err == nil {
+			resp.ThumbnailURL = url
+		}
+	}
+}
+
+func (s *Service) enrichThumbnails(ctx context.Context, files []File, responses []FileResponse) {
+	for i := range responses {
+		storageKey := ""
+		if i < len(files) {
+			storageKey = files[i].StorageKey
+		}
+		s.enrichThumbnail(ctx, &responses[i], storageKey)
+	}
+}
+
+func (s *Service) enrichShareCodes(ctx context.Context, userID uuid.UUID, responses []FileResponse) {
+	fileIDs := make([]uuid.UUID, len(responses))
+	for i, r := range responses {
+		fileIDs[i] = r.ID
+	}
+	codes, err := s.repo.GetShareCodes(ctx, userID, fileIDs)
+	if err != nil {
+		slog.Error("failed to get share codes", "error", err)
+		return
+	}
+	for i := range responses {
+		if code, ok := codes[responses[i].ID]; ok {
+			responses[i].ShareCode = code
+		}
+	}
+}
+
 func (s *Service) Upload(ctx context.Context, claims *auth.TokenClaims, header *multipart.FileHeader, folderID *uuid.UUID) (*FileResponse, error) {
 	// Check file size
 	if header.Size > s.maxUploadSize {
@@ -445,6 +489,7 @@ func (s *Service) GetByID(ctx context.Context, claims *auth.TokenClaims, id uuid
 		return nil, common.ErrNotFound("file not found")
 	}
 	resp := file.ToResponse()
+	s.enrichThumbnail(ctx, &resp, file.StorageKey)
 	return &resp, nil
 }
 
@@ -539,7 +584,54 @@ func (s *Service) ListByFolder(ctx context.Context, claims *auth.TokenClaims, fo
 	for i, f := range files {
 		result[i] = f.ToResponse()
 	}
+	s.enrichThumbnails(ctx, files, result)
+	s.enrichShareCodes(ctx, claims.UserID, result)
 	return result, hasMore, nil
+}
+
+func (s *Service) RegenerateThumbnails(ctx context.Context, userID uuid.UUID) (int, error) {
+	files, err := s.repo.ListRecent(ctx, userID, 50)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, f := range files {
+		if f.ThumbnailKey != "" {
+			continue
+		}
+		task, err := media.NewThumbnailTask(f.ID, f.UserID, f.StorageKey, f.MimeType)
+		if err != nil {
+			continue
+		}
+		if s.queue != nil {
+			if _, err := s.queue.Enqueue(task); err != nil {
+				slog.Error("failed to enqueue thumbnail task", "error", err, "file_id", f.ID)
+				continue
+			}
+			count++
+		}
+	}
+	slog.Info("re-queued thumbnail generation", "user_id", userID, "count", count)
+	return count, nil
+}
+
+func (s *Service) ListRecent(ctx context.Context, userID uuid.UUID, limit int) ([]FileResponse, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	files, err := s.repo.ListRecent(ctx, userID, limit)
+	if err != nil {
+		slog.Error("failed to list recent files", "error", err)
+		return nil, common.ErrInternal("failed to list recent files")
+	}
+
+	result := make([]FileResponse, len(files))
+	for i, f := range files {
+		result[i] = f.ToResponse()
+	}
+	s.enrichThumbnails(ctx, files, result)
+	s.enrichShareCodes(ctx, userID, result)
+	return result, nil
 }
 
 func (s *Service) Rename(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID, req RenameFileRequest) (*FileResponse, error) {
@@ -781,6 +873,7 @@ func (s *Service) Search(ctx context.Context, claims *auth.TokenClaims, query st
 	for i, f := range files {
 		result[i] = f.ToResponse()
 	}
+	s.enrichThumbnails(ctx, files, result)
 	return result, nil
 }
 
@@ -899,6 +992,7 @@ func (s *Service) ListByCategory(ctx context.Context, claims *auth.TokenClaims, 
 	for i, f := range files {
 		result[i] = f.ToResponse()
 	}
+	s.enrichThumbnails(ctx, files, result)
 	return result, hasMore, nil
 }
 
@@ -930,6 +1024,7 @@ func (s *Service) ListTrashed(ctx context.Context, claims *auth.TokenClaims) ([]
 	for i, f := range files {
 		result[i] = f.ToResponse()
 	}
+	s.enrichThumbnails(ctx, files, result)
 	return result, nil
 }
 
@@ -972,6 +1067,7 @@ func (s *Service) ListStarred(ctx context.Context, claims *auth.TokenClaims) ([]
 		resp.IsStarred = true
 		result[i] = resp
 	}
+	s.enrichThumbnails(ctx, files, result)
 	return result, nil
 }
 

@@ -14,8 +14,10 @@ data class FileItem(
     val trashedAt: String?,
     val createdAt: String,
     val updatedAt: String,
-    val isStarred: Boolean = false
+    val isStarred: Boolean = false,
+    val shareCode: String? = null,
 ) {
+    val isSharedToExplore: Boolean get() = shareCode != null
     val category: FileCategory get() = mimeType.mimeToCategory()
     val extension: String get() = name.substringAfterLast('.', "")
 }

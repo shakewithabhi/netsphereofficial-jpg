@@ -46,7 +46,8 @@ data class FileListUiState(
     val showRemoteUploadDialog: Boolean = false,
     val isRemoteUploading: Boolean = false,
     val remoteUploadError: String? = null,
-    val remoteUploadSuccess: String? = null
+    val remoteUploadSuccess: String? = null,
+    val exploreShareSuccess: Boolean = false,
 )
 
 data class BreadcrumbItem(val folderId: String?, val name: String)
@@ -251,13 +252,30 @@ class FileListViewModel @Inject constructor(
     }
 
     fun toggleStar(fileId: String, isCurrentlyStarred: Boolean) {
+        // Optimistically update the local state
+        _uiState.update { state ->
+            state.copy(
+                files = state.files.map { file ->
+                    if (file.id == fileId) file.copy(isStarred = !isCurrentlyStarred) else file
+                }
+            )
+        }
         viewModelScope.launch {
-            if (isCurrentlyStarred) {
+            val result = if (isCurrentlyStarred) {
                 fileRepository.unstarFile(fileId)
             } else {
                 fileRepository.starFile(fileId)
             }
-            loadContents()
+            // Revert on failure
+            if (result is Result.Error) {
+                _uiState.update { state ->
+                    state.copy(
+                        files = state.files.map { file ->
+                            if (file.id == fileId) file.copy(isStarred = isCurrentlyStarred) else file
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -317,6 +335,56 @@ class FileListViewModel @Inject constructor(
                     )
                 }
                 is Result.Error -> _uiState.update { it.copy(isCreatingShare = false) }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun clearExploreShareSuccess() {
+        _uiState.update { it.copy(exploreShareSuccess = false) }
+    }
+
+    fun shareToExplore(fileId: String) {
+        val file = _uiState.value.files.find { it.id == fileId }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingShare = true) }
+            // Create a public share (no password) — this makes it visible in Explore
+            when (val result = shareRepository.createShare(fileId = fileId)) {
+                is Result.Success -> _uiState.update { state ->
+                    state.copy(
+                        shareUrl = result.data.shareUrl,
+                        shareItemName = file?.name ?: "File",
+                        shareItemSize = file?.size ?: 0,
+                        shareItemMimeType = file?.mimeType,
+                        shareItemIsFolder = false,
+                        isCreatingShare = false,
+                        exploreShareSuccess = true,
+                        files = state.files.map { f ->
+                            if (f.id == fileId) f.copy(shareCode = result.data.code) else f
+                        },
+                    )
+                }
+                is Result.Error -> _uiState.update { it.copy(isCreatingShare = false) }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun unshareFromExplore(fileId: String, shareCode: String) {
+        viewModelScope.launch {
+            // Find the share ID by code and delete it
+            when (shareRepository.deleteShare(shareCode)) {
+                is Result.Success -> {
+                    // Update local state to remove share_code
+                    _uiState.update { state ->
+                        state.copy(
+                            files = state.files.map { f ->
+                                if (f.id == fileId) f.copy(shareCode = null) else f
+                            }
+                        )
+                    }
+                }
+                is Result.Error -> {}
                 is Result.Loading -> {}
             }
         }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OfflinePin
 import androidx.compose.material.icons.filled.Star
@@ -32,7 +33,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.bytebox.core.common.FileCategory
 import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.common.toLocalDateTime
@@ -69,14 +70,17 @@ fun FileListItem(
     ) {
         // Leading: Colored icon container or thumbnail
         Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            if (file.thumbnailUrl != null && file.category == FileCategory.IMAGE) {
-                AsyncImage(
+            if (file.thumbnailUrl != null && (file.category == FileCategory.IMAGE || file.category == FileCategory.VIDEO)) {
+                SubcomposeAsyncImage(
                     model = file.thumbnailUrl,
                     contentDescription = file.name,
                     modifier = Modifier
                         .size(48.dp)
                         .clip(RoundedCornerShape(ByteBoxTheme.radius.sm)),
                     contentScale = ContentScale.Crop,
+                    error = {
+                        FileTypeIcon(category = file.category)
+                    },
                 )
             } else {
                 FileTypeIcon(category = file.category)
@@ -91,6 +95,21 @@ fun FileListItem(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .size(18.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(ByteBoxTheme.radius.sm),
+                        ),
+                )
+            }
+            // Shared to Explore badge
+            if (file.isSharedToExplore && !isSelected) {
+                Icon(
+                    Icons.Default.Public,
+                    contentDescription = "Shared to Explore",
+                    tint = Color(0xFF2563EB),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(16.dp)
                         .background(
                             color = MaterialTheme.colorScheme.surface,
                             shape = RoundedCornerShape(ByteBoxTheme.radius.sm),

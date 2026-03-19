@@ -180,7 +180,12 @@ func (s *Service) Delete(ctx context.Context, claims *auth.TokenClaims, id uuid.
 
 func (s *Service) GetPublicInfo(ctx context.Context, code string, viewerID *uuid.UUID) (*PublicShareResponse, error) {
 	share, err := s.repo.GetByCode(ctx, code)
-	if err != nil || share == nil {
+	if err != nil {
+		slog.Error("GetPublicInfo: GetByCode failed", "code", code, "error", err)
+		return nil, common.ErrNotFound("share not found")
+	}
+	if share == nil {
+		slog.Warn("GetPublicInfo: share not found in DB", "code", code)
 		return nil, common.ErrNotFound("share not found")
 	}
 
@@ -212,7 +217,7 @@ func (s *Service) GetPublicInfo(ctx context.Context, code string, viewerID *uuid
 		if f.IsVideo && f.HLSURL != "" {
 			resp.HLSURL = f.HLSURL
 		}
-		if !f.IsVideo && f.ThumbnailKey != "" {
+		if f.ThumbnailKey != "" {
 			if url, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), f.ThumbnailKey, 24*time.Hour); err == nil {
 				resp.ThumbnailURL = url
 			}
@@ -518,11 +523,13 @@ func (s *Service) GetExploreItems(ctx context.Context, limit int, cursor *string
 		mimePrefix = &p
 	}
 
+	slog.Info("GetExploreItems calling repo", "limit", limit+1, "hasCursor", cursorTime != nil, "mimePrefix", mimePrefix)
 	rows, err := s.repo.GetExploreItems(ctx, limit+1, cursorTime, cursorID, mimePrefix)
 	if err != nil {
-		slog.Error("failed to get explore items", "error", err)
-		return nil, common.ErrInternal("failed to load explore items")
+		slog.Error("failed to get explore items", "error", err, "detail", fmt.Sprintf("%+v", err))
+		return nil, common.ErrInternal(fmt.Sprintf("failed to load explore items: %v", err))
 	}
+	slog.Info("GetExploreItems success", "row_count", len(rows))
 
 	hasMore := len(rows) > limit
 	if hasMore {
@@ -691,6 +698,59 @@ func (s *Service) HasUserSavedFile(ctx context.Context, userID uuid.UUID, code s
 
 	return false, nil
 }
+
+func (s *Service) SearchExploreItems(ctx context.Context, query string, limit int) (*ExploreListResponse, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	rows, err := s.repo.SearchExploreItems(ctx, query, limit)
+	if err != nil {
+		slog.Error("failed to search explore items", "error", err, "query", query)
+		return nil, common.ErrInternal("failed to search explore items")
+	}
+
+	items := make([]ExploreItem, 0, len(rows))
+	for _, row := range rows {
+		thumbnailURL := ""
+		if row.IsVideo && row.VideoThumbnailURL != "" {
+			thumbnailURL = row.VideoThumbnailURL
+		} else if row.ThumbnailKey != "" {
+			url, err := s.store.PresignGetURL(ctx, s.store.BucketThumbs(), row.ThumbnailKey, 24*time.Hour)
+			if err == nil {
+				thumbnailURL = url
+			}
+		} else if strings.HasPrefix(row.MimeType, "image/") && row.StorageKey != "" {
+			url, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), row.StorageKey, 24*time.Hour)
+			if err == nil {
+				thumbnailURL = url
+			}
+		}
+
+		hlsURL := ""
+		if row.IsVideo && row.HLSURL != "" {
+			hlsURL = row.HLSURL
+		}
+
+		items = append(items, ExploreItem{
+			ID:            row.ShareID,
+			Code:          row.Code,
+			FileName:      row.FileName,
+			FileSize:      row.FileSize,
+			MimeType:      row.MimeType,
+			ThumbnailURL:  thumbnailURL,
+			OwnerName:     row.OwnerName,
+			DownloadCount: row.DownloadCount,
+			CreatedAt:     row.CreatedAt,
+			LikeCount:     row.LikeCount,
+			CommentCount:  row.CommentCount,
+			HLSURL:        hlsURL,
+		})
+	}
+
+	return &ExploreListResponse{Items: items}, nil
+}
+
 func (s *Service) validateShare(share *Share) error {
 	if !share.IsActive {
 		return common.ErrNotFound("share not found")

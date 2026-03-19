@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.onError
 import com.bytebox.core.common.onSuccess
+import com.bytebox.domain.model.ExploreItem
 import com.bytebox.domain.model.ShareComment
 import com.bytebox.domain.model.ShareInfo
 import com.bytebox.domain.repository.ShareRepository
@@ -32,12 +33,17 @@ class ExploreVideoViewModel @Inject constructor(
         val commentText: String = "",
         val isSubmittingComment: Boolean = false,
         val commentError: String? = null,
+        val relatedItems: List<ExploreItem> = emptyList(),
+        val isRelatedLoading: Boolean = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private var currentCode: String? = null
+
     fun load(code: String) {
+        currentCode = code
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             shareRepository.getPublicShareInfo(code)
@@ -49,6 +55,22 @@ class ExploreVideoViewModel @Inject constructor(
                 }
         }
         loadComments(code)
+        loadRelated(code)
+    }
+
+    private fun loadRelated(excludeCode: String) {
+        _uiState.update { it.copy(isRelatedLoading = true) }
+        viewModelScope.launch {
+            shareRepository.getExploreItems(cursor = null, category = null)
+                .onSuccess { (items, _) ->
+                    // Exclude the current item
+                    val related = items.filter { it.code != excludeCode }
+                    _uiState.update { it.copy(relatedItems = related, isRelatedLoading = false) }
+                }
+                .onError {
+                    _uiState.update { it.copy(isRelatedLoading = false) }
+                }
+        }
     }
 
     fun loadComments(code: String) {

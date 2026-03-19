@@ -50,6 +50,12 @@ interface ShareApi {
         @Header("X-Share-Password") password: String? = null
     ): Response<FileDto>
 
+    @GET("explore/search")
+    suspend fun searchExploreItems(
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 20,
+    ): Response<ExploreResponse>
+
     @GET("explore-shares")
     suspend fun getExploreItems(
         @Query("cursor") cursor: String? = null,

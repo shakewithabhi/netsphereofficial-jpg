@@ -48,6 +48,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.coroutines.core)
     implementation(libs.coil.compose)
+    implementation(libs.timber)
 
     // Media3 / ExoPlayer for video playback
     implementation(libs.media3.exoplayer)

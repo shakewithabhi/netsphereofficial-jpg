@@ -65,6 +65,7 @@ type FileResponse struct {
 	Size              int64      `json:"size"`
 	MimeType          string     `json:"mime_type"`
 	ThumbnailKey      string     `json:"thumbnail_key,omitempty"`
+	ThumbnailURL      string     `json:"thumbnail_url,omitempty"`
 	ScanStatus        string     `json:"scan_status"`
 	CurrentVersion    int        `json:"current_version"`
 	IsVideo           bool       `json:"is_video"`
@@ -72,6 +73,7 @@ type FileResponse struct {
 	HLSURL            string     `json:"hls_url,omitempty"`
 	VideoThumbnailURL string     `json:"video_thumbnail_url,omitempty"`
 	IsStarred         bool       `json:"is_starred"`
+	ShareCode         string     `json:"share_code,omitempty"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 }

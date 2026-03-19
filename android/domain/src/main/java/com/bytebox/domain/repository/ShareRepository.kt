@@ -24,6 +24,8 @@ interface ShareRepository {
         category: String? = null,
     ): Result<Pair<List<ExploreItem>, String?>>
 
+    suspend fun searchExploreItems(query: String, limit: Int = 20): Result<List<ExploreItem>>
+
     // Public share info with social data
     suspend fun getPublicShareInfo(code: String): Result<ShareInfo>
 

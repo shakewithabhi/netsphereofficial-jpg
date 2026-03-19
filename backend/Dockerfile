@@ -19,7 +19,7 @@ RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate
 # Runtime stage
 FROM alpine:3.19
 
-RUN apk --no-cache add ca-certificates tzdata curl
+RUN apk --no-cache add ca-certificates tzdata curl ffmpeg
 
 # Run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

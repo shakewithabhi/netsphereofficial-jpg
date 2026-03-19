@@ -28,9 +28,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material3.Card
@@ -41,6 +44,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -61,6 +65,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -118,11 +124,14 @@ fun DashboardScreen(
     onFavoritesClick: () -> Unit = {},
     onSharesClick: () -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onNotificationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by remember { mutableIntStateOf(0) }
     var selectedFilter by remember { mutableStateOf<Set<FileCategory>?>(null) }
+    var contextMenuFileId by remember { mutableStateOf<String?>(null) }
 
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val greeting = when (hour) {
@@ -136,10 +145,13 @@ fun DashboardScreen(
         onPauseOrDispose {}
     }
 
-    val displayFiles = remember(uiState.recentFiles, selectedTab, selectedFilter) {
-        if (selectedTab == 1) emptyList()
-        else if (selectedFilter == null) uiState.recentFiles
-        else uiState.recentFiles.filter { it.category in selectedFilter!! }
+    val publicFiles = remember(uiState.recentFiles) {
+        uiState.recentFiles.filter { it.isSharedToExplore }
+    }
+    val displayFiles = remember(uiState.recentFiles, publicFiles, selectedTab, selectedFilter) {
+        val source = if (selectedTab == 1) publicFiles else uiState.recentFiles
+        if (selectedFilter == null) source
+        else source.filter { it.category in selectedFilter!! }
     }
 
     Scaffold(
@@ -339,7 +351,7 @@ fun DashboardScreen(
                     item {
                         CategoryGrid(
                             onFolderClick = onSeeAllFolders,
-                            onFavoritesClick = onFavoritesClick,
+                            onPublicClick = { selectedTab = 1 },
                             onSharesClick = onSharesClick,
                             onCategoryFilter = { cats -> selectedFilter = cats },
                         )
@@ -371,7 +383,7 @@ fun DashboardScreen(
                                 }
                             },
                         ) {
-                            listOf("Recent", "Starred").forEachIndexed { index, label ->
+                            listOf("Recent", "Public").forEachIndexed { index, label ->
                                 Tab(
                                     selected = selectedTab == index,
                                     onClick = { selectedTab = index },
@@ -423,6 +435,7 @@ fun DashboardScreen(
                                     file.createdAt.toLocalDateTime().toRelativeTime()
                                 } catch (_: Exception) { "" },
                                 onClick = { onFileClick(file.id, file.mimeType) },
+                                onMoreClick = { contextMenuFileId = file.id },
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp)
                                     .padding(bottom = ByteBoxTheme.spacing.xs),
@@ -433,9 +446,9 @@ fun DashboardScreen(
                         item {
                             Spacer(modifier = Modifier.height(24.dp))
                             EmptyState(
-                                icon = if (selectedTab == 1) Icons.Default.Star else Icons.Default.FolderOpen,
-                                title = if (selectedTab == 1) "No starred files" else "No files yet",
-                                subtitle = if (selectedTab == 1) "Star files to see them here" else "Upload files to get started",
+                                icon = if (selectedTab == 1) Icons.Default.Public else Icons.Default.FolderOpen,
+                                title = if (selectedTab == 1) "No public files" else "No files yet",
+                                subtitle = if (selectedTab == 1) "Share files to Explore to see them here" else "Upload files to get started",
                             )
                         }
                     }
@@ -448,6 +461,43 @@ fun DashboardScreen(
                             onUploadClick = onUploadClick,
                         )
                         Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+            }
+        }
+    }
+
+    // File context menu
+    contextMenuFileId?.let { fileId ->
+        val file = uiState.recentFiles.find { it.id == fileId }
+        if (file != null) {
+            Dialog(onDismissRequest = { contextMenuFileId = null }) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            text = file.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                        ListItem(
+                            headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                            leadingContent = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                contextMenuFileId = null
+                                viewModel.trashFile(fileId)
+                            },
+                        )
                     }
                 }
             }
@@ -468,7 +518,7 @@ private data class CategoryTile(
 @Composable
 private fun CategoryGrid(
     onFolderClick: () -> Unit,
-    onFavoritesClick: () -> Unit,
+    onPublicClick: () -> Unit,
     onSharesClick: () -> Unit,
     onCategoryFilter: (Set<FileCategory>?) -> Unit,
 ) {

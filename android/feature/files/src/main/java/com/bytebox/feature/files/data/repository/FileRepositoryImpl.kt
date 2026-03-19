@@ -27,6 +27,7 @@ import com.bytebox.domain.model.FolderContents
 import com.bytebox.domain.model.NotificationItem
 import com.bytebox.domain.repository.FileRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
 import java.io.File
 import java.net.URL
 import javax.inject.Inject
@@ -45,6 +46,7 @@ class FileRepositoryImpl @Inject constructor(
         sort: String,
         order: String
     ): Result<FolderContents> {
+        Timber.d("FILE_REPO: getFolderContents(folderId=$folderId, sort=$sort, order=$order)")
         val result = safeApiCall {
             if (folderId == null) {
                 fileApi.getRootContents(cursor = cursor, sort = sort, order = order)
@@ -56,12 +58,15 @@ class FileRepositoryImpl @Inject constructor(
         // Cache results
         if (result is Result.Success) {
             val data = result.data
+            Timber.d("FILE_REPO: getFolderContents returned ${data.files.size} files, ${data.folders.size} folders")
             if (cursor == null) {
                 // First page — replace cache for this folder
                 fileDao.deleteFilesByFolder(folderId)
             }
             fileDao.insertFiles(data.files.map { it.toEntity() })
             folderDao.insertFolders(data.folders.map { it.toEntity() })
+        } else if (result is Result.Error) {
+            Timber.e("FILE_REPO: getFolderContents FAILED: ${result.exception.message}")
         }
 
         return result.map { response ->
@@ -72,6 +77,19 @@ class FileRepositoryImpl @Inject constructor(
                 totalCount = response.totalCount
             )
         }
+    }
+
+    override suspend fun getRecentFiles(limit: Int): Result<List<FileItem>> {
+        Timber.d("FILE_REPO: getRecentFiles(limit=$limit) calling GET files/recent")
+        val result = safeApiCall {
+            fileApi.getRecentFiles(limit)
+        }
+        when (result) {
+            is Result.Success -> Timber.d("FILE_REPO: getRecentFiles returned ${result.data.size} files")
+            is Result.Error -> Timber.e("FILE_REPO: getRecentFiles FAILED: ${result.exception.message}")
+            is Result.Loading -> {}
+        }
+        return result.map { dtos -> dtos.map { it.toDomain() } }
     }
 
     override suspend fun createFolder(name: String, parentId: String?): Result<Folder> {
@@ -271,7 +289,7 @@ class FileRepositoryImpl @Inject constructor(
         id = id, name = name, folderId = folderId, size = size,
         mimeType = mimeType, thumbnailUrl = thumbnailUrl, scanStatus = scanStatus,
         trashedAt = trashedAt, createdAt = createdAt, updatedAt = updatedAt,
-        isStarred = isStarred
+        isStarred = isStarred, shareCode = shareCode,
     )
 
     private fun FolderDto.toDomain() = Folder(

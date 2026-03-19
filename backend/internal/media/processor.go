@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -50,37 +51,47 @@ func (p *Processor) HandleGenerateThumbnail(ctx context.Context, t *asynq.Task) 
 
 	slog.Info("generating thumbnail", "file_id", payload.FileID, "mime", payload.MimeType)
 
-	// Only process images for now
-	if !isImageType(payload.MimeType) {
-		slog.Info("skipping non-image file", "mime", payload.MimeType)
+	isVideo := strings.HasPrefix(payload.MimeType, "video/")
+	isImage := isImageType(payload.MimeType)
+
+	if !isImage && !isVideo {
+		slog.Info("skipping unsupported file type for thumbnail", "mime", payload.MimeType)
 		return nil
 	}
 
 	// Download original from storage
-	imgData, err := p.downloadFile(ctx, payload.StorageKey)
+	fileData, err := p.downloadFile(ctx, payload.StorageKey)
 	if err != nil {
 		return fmt.Errorf("download file: %w", err)
 	}
 
-	// Decode image
-	img, _, err := image.Decode(bytes.NewReader(imgData))
-	if err != nil {
-		slog.Error("failed to decode image", "error", err)
-		return nil // Don't retry, image may be corrupt
-	}
+	var thumbData []byte
 
-	// Resize
-	thumb := resizeImage(img, thumbMaxWidth, thumbMaxHeight)
-
-	// Encode as JPEG
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, thumb, &jpeg.Options{Quality: thumbQuality}); err != nil {
-		return fmt.Errorf("encode thumbnail: %w", err)
+	if isVideo {
+		// Extract frame from video using ffmpeg
+		thumbData, err = p.extractVideoFrame(fileData)
+		if err != nil {
+			slog.Error("failed to extract video frame", "error", err, "file_id", payload.FileID)
+			return nil // Don't retry
+		}
+	} else {
+		// Decode image
+		img, _, decErr := image.Decode(bytes.NewReader(fileData))
+		if decErr != nil {
+			slog.Error("failed to decode image", "error", decErr)
+			return nil
+		}
+		thumb := resizeImage(img, thumbMaxWidth, thumbMaxHeight)
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, thumb, &jpeg.Options{Quality: thumbQuality}); err != nil {
+			return fmt.Errorf("encode thumbnail: %w", err)
+		}
+		thumbData = buf.Bytes()
 	}
 
 	// Upload thumbnail
 	thumbKey := fmt.Sprintf("thumbnails/%s/%s_thumb.jpg", payload.UserID, payload.FileID)
-	if err := p.store.Upload(ctx, p.store.BucketThumbs(), thumbKey, &buf, "image/jpeg", int64(buf.Len())); err != nil {
+	if err := p.store.Upload(ctx, p.store.BucketThumbs(), thumbKey, bytes.NewReader(thumbData), "image/jpeg", int64(len(thumbData))); err != nil {
 		return fmt.Errorf("upload thumbnail: %w", err)
 	}
 
@@ -89,8 +100,43 @@ func (p *Processor) HandleGenerateThumbnail(ctx context.Context, t *asynq.Task) 
 		return fmt.Errorf("update thumbnail key: %w", err)
 	}
 
-	slog.Info("thumbnail generated", "file_id", payload.FileID, "key", thumbKey)
+	slog.Info("thumbnail generated", "file_id", payload.FileID, "key", thumbKey, "type", payload.MimeType)
 	return nil
+}
+
+// extractVideoFrame uses ffmpeg to grab a frame at 1 second and return JPEG bytes.
+func (p *Processor) extractVideoFrame(videoData []byte) ([]byte, error) {
+	tmpDir, err := os.MkdirTemp("", "bytebox-thumb-*")
+	if err != nil {
+		return nil, fmt.Errorf("create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	inputPath := filepath.Join(tmpDir, "input.mp4")
+	outputPath := filepath.Join(tmpDir, "thumb.jpg")
+
+	if err := os.WriteFile(inputPath, videoData, 0600); err != nil {
+		return nil, fmt.Errorf("write temp video: %w", err)
+	}
+
+	// Extract frame at 1s, scale to max 400px width, JPEG quality ~80
+	cmd := exec.Command("ffmpeg",
+		"-i", inputPath,
+		"-ss", "1",
+		"-vframes", "1",
+		"-vf", fmt.Sprintf("scale='min(%d,iw)':-1", thumbMaxWidth),
+		"-q:v", "5",
+		"-y",
+		outputPath,
+	)
+	cmd.Stderr = io.Discard
+	cmd.Stdout = io.Discard
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("ffmpeg: %w", err)
+	}
+
+	return os.ReadFile(outputPath)
 }
 
 func (p *Processor) HandleCleanupTrash(ctx context.Context, t *asynq.Task) error {

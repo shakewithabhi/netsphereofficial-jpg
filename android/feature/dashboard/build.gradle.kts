@@ -49,4 +49,5 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
     implementation(libs.coroutines.core)
+    implementation(libs.timber)
 }
