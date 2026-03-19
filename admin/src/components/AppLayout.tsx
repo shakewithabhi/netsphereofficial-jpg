@@ -4,7 +4,7 @@ import {
   CloudServerOutlined, AuditOutlined, CheckCircleOutlined,
   SettingOutlined, FolderOutlined, CommentOutlined, DollarOutlined,
   BarChartOutlined, PlayCircleOutlined, BellOutlined, HeartOutlined,
-  DownloadOutlined,
+  DownloadOutlined, EyeOutlined, DatabaseOutlined, PieChartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
@@ -20,14 +20,23 @@ const menuItems = [
   { key: '/pending-approvals', icon: <CheckCircleOutlined />, label: 'Approvals' },
   { key: '/comments', icon: <CommentOutlined />, label: 'Comments' },
   { key: '/audit-logs', icon: <AuditOutlined />, label: 'Audit Logs' },
-  { key: '/ad-analytics', icon: <BarChartOutlined />, label: 'Ad Analytics' },
   { key: '/posts', icon: <PlayCircleOutlined />, label: 'Posts' },
+  { key: '/explore-posts', icon: <EyeOutlined />, label: 'Explore Moderation' },
   { key: '/notifications', icon: <BellOutlined />, label: 'Notifications' },
-  { key: '/ad-settings', icon: <DollarOutlined />, label: 'Ad Settings' },
-  { key: '/revenue', icon: <DollarOutlined />, label: 'Revenue' },
-  { key: '/system-health', icon: <HeartOutlined />, label: 'System Health' },
-  { key: '/reports', icon: <DownloadOutlined />, label: 'Reports' },
-  { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
+
+  { type: 'group' as const, label: 'Analytics', children: [
+    { key: '/ad-analytics', icon: <BarChartOutlined />, label: 'Ad Analytics' },
+    { key: '/ad-settings', icon: <DollarOutlined />, label: 'Ad Settings' },
+    { key: '/user-storage', icon: <DatabaseOutlined />, label: 'User Storage' },
+    { key: '/revenue', icon: <DollarOutlined />, label: 'Revenue' },
+    { key: '/billing', icon: <PieChartOutlined />, label: 'Billing' },
+    { key: '/reports', icon: <DownloadOutlined />, label: 'Reports' },
+  ]},
+
+  { type: 'group' as const, label: 'System', children: [
+    { key: '/system-health', icon: <HeartOutlined />, label: 'System Health' },
+    { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
+  ]},
 ];
 
 export default function AppLayout() {

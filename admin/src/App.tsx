@@ -15,8 +15,11 @@ import CommentsPage from './pages/Comments';
 import AdAnalyticsPage from './pages/AdAnalytics';
 import AdSettingsPage from './pages/AdSettings';
 import PostsPage from './pages/Posts';
+import ExplorePostsPage from './pages/ExplorePosts';
 import NotificationsPage from './pages/Notifications';
 import RevenuePage from './pages/Revenue';
+import BillingPage from './pages/Billing';
+import UserStoragePage from './pages/UserStorage';
 import SystemHealthPage from './pages/SystemHealth';
 import ReportsPage from './pages/Reports';
 
@@ -44,8 +47,11 @@ export default function App() {
             <Route path="/ad-analytics" element={<AdAnalyticsPage />} />
             <Route path="/ad-settings" element={<AdSettingsPage />} />
             <Route path="/posts" element={<PostsPage />} />
+            <Route path="/explore-posts" element={<ExplorePostsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/revenue" element={<RevenuePage />} />
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/user-storage" element={<UserStoragePage />} />
             <Route path="/system-health" element={<SystemHealthPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />

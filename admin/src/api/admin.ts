@@ -207,9 +207,41 @@ export interface SystemHealth {
   goroutines: number;
   memory_used: number;
   memory_total: number;
+  cpu_usage: number;
+  disk_used: number;
+  disk_total: number;
+  active_connections: number;
   db_connections: number;
   go_version: string;
   components: { name: string; status: 'up' | 'down'; latency_ms: number }[];
+  recent_errors: { timestamp: string; endpoint: string; status_code: number; message: string }[];
+  response_times: { timestamp: string; p50: number; p95: number; p99: number }[];
+}
+
+export interface BillingStats {
+  mrr: number;
+  total_revenue: number;
+  active_subscriptions: number;
+  churn_rate: number;
+  revenue_over_time: { month: string; revenue: number }[];
+  subscriptions_by_plan: { plan: string; count: number }[];
+  recent_transactions: { user_email: string; plan: string; amount: number; date: string; status: string }[];
+  revenue_by_plan: { plan: string; revenue: number }[];
+}
+
+export interface ExportHistoryEntry {
+  id: string;
+  report_type: string;
+  date_range: string;
+  row_count: number;
+  exported_at: string;
+  file_name: string;
+}
+
+export interface NotificationStats {
+  total_sent: number;
+  read_rate: number;
+  unread_count: number;
 }
 
 export const adminApi = {
@@ -363,4 +395,31 @@ export const adminApi = {
 
   exportAnalytics: () =>
     client.get('/admin/export/analytics', { responseType: 'blob' }),
+
+  // Explore posts (enhanced moderation)
+  bulkPostAction: (postIds: string[], action: string) =>
+    client.post<{ message: string; affected: number }>('/admin/posts/bulk', { post_ids: postIds, action }),
+
+  // Billing
+  getBillingStats: () =>
+    client.get<BillingStats>('/admin/billing'),
+
+  // Notification stats
+  getNotificationStats: () =>
+    client.get<NotificationStats>('/admin/notifications/stats'),
+
+  bulkDeleteNotifications: (olderThanDays: number) =>
+    client.delete<{ message: string; deleted: number }>('/admin/notifications/bulk', { params: { older_than_days: olderThanDays } }),
+
+  // Export with date range
+  exportWithRange: (reportType: string, startDate: string, endDate: string) =>
+    client.get(`/admin/export/${reportType}`, { params: { start_date: startDate, end_date: endDate }, responseType: 'blob' }),
+
+  // Export history
+  getExportHistory: () =>
+    client.get<{ exports: ExportHistoryEntry[] }>('/admin/export/history'),
+
+  // Preview export
+  previewExport: (reportType: string, startDate: string, endDate: string) =>
+    client.get<{ columns: string[]; rows: Record<string, unknown>[] }>(`/admin/export/${reportType}/preview`, { params: { start_date: startDate, end_date: endDate, limit: 10 } }),
 };
