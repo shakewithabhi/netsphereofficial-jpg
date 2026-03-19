@@ -32,8 +32,8 @@ func (h *Handler) Routes() chi.Router {
 	r.Group(func(r chi.Router) {
 		r.Use(h.middleware.Authenticate)
 		r.Get("/subscription", h.GetSubscription)
-		r.Post("/checkout", h.CreateCheckout)
-		r.Post("/portal", h.CreateBillingPortal)
+		r.Post("/checkout", h.CreateOrder)
+		r.Post("/verify", h.VerifyPayment)
 		r.Post("/cancel", h.CancelSubscription)
 	})
 
@@ -61,20 +61,20 @@ func (h *Handler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	common.JSON(w, http.StatusOK, resp)
 }
 
-func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetClaims(r.Context())
 	if claims == nil {
 		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
 		return
 	}
 
-	var req CreateCheckoutRequest
+	var req CreateOrderRequest
 	if err := common.DecodeAndValidate(r, &req); err != nil {
 		common.JSONError(w, err)
 		return
 	}
 
-	resp, err := h.service.CreateCheckoutSession(r.Context(), claims.UserID, claims.Email, req)
+	resp, err := h.service.CreateOrder(r.Context(), claims.UserID, claims.Email, req)
 	if err != nil {
 		common.JSONError(w, err)
 		return
@@ -83,20 +83,25 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	common.JSON(w, http.StatusOK, resp)
 }
 
-func (h *Handler) CreateBillingPortal(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) VerifyPayment(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetClaims(r.Context())
 	if claims == nil {
 		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
 		return
 	}
 
-	resp, err := h.service.CreateBillingPortal(r.Context(), claims.UserID)
-	if err != nil {
+	var req VerifyPaymentRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
 		common.JSONError(w, err)
 		return
 	}
 
-	common.JSON(w, http.StatusOK, resp)
+	if err := h.service.VerifyPayment(r.Context(), claims.UserID, req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+
+	common.JSON(w, http.StatusOK, map[string]string{"message": "payment verified and subscription activated"})
 }
 
 func (h *Handler) CancelSubscription(w http.ResponseWriter, r *http.Request) {

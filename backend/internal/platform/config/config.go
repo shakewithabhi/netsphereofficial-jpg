@@ -17,7 +17,7 @@ type Config struct {
 	Auth        AuthConfig
 	App         AppConfig
 	Google      GoogleConfig
-	Stripe      StripeConfig
+	Razorpay    RazorpayConfig
 	Meilisearch MeilisearchConfig
 	Scanner     ScannerConfig
 	FCM         FCMConfig
@@ -130,11 +130,12 @@ type AppConfig struct {
 	RequireApproval  bool     // require admin approval for new registrations
 }
 
-type StripeConfig struct {
-	SecretKey      string
-	WebhookSecret  string
-	ProPriceID     string
-	PremiumPriceID string
+type RazorpayConfig struct {
+	KeyID         string
+	KeySecret     string
+	WebhookSecret string
+	ProPlanID     string
+	PremiumPlanID string
 }
 
 func Load() (*Config, error) {
@@ -195,11 +196,12 @@ func Load() (*Config, error) {
 			ClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 			RedirectURL:  getEnv("GOOGLE_REDIRECT_URL", ""),
 		},
-		Stripe: StripeConfig{
-			SecretKey:      getEnv("STRIPE_SECRET_KEY", ""),
-			WebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
-			ProPriceID:     getEnv("STRIPE_PRO_PRICE_ID", ""),
-			PremiumPriceID: getEnv("STRIPE_PREMIUM_PRICE_ID", ""),
+		Razorpay: RazorpayConfig{
+			KeyID:         getEnv("RAZORPAY_KEY_ID", ""),
+			KeySecret:     getEnv("RAZORPAY_KEY_SECRET", ""),
+			WebhookSecret: getEnv("RAZORPAY_WEBHOOK_SECRET", ""),
+			ProPlanID:     getEnv("RAZORPAY_PRO_PLAN_ID", ""),
+			PremiumPlanID: getEnv("RAZORPAY_PREMIUM_PLAN_ID", ""),
 		},
 		Meilisearch: MeilisearchConfig{
 			Host:   getEnv("MEILISEARCH_HOST", ""),

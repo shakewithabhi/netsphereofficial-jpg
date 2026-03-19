@@ -11,23 +11,23 @@ import (
 type PlanConfig struct {
 	Name             string `json:"name"`
 	SoftStorageLimit int64  `json:"soft_storage_limit"`
-	PriceMonthly     int64  `json:"price_monthly"` // in cents
-	StripePriceID    string `json:"-"`
+	PriceMonthly     int64  `json:"price_monthly"` // in paise (4900 = ₹49)
+	RazorpayPlanID   string `json:"-"`
 }
 
 // Domain models
 
 type Subscription struct {
-	ID                   uuid.UUID
-	UserID               uuid.UUID
-	Plan                 string
-	StripeCustomerID     string
-	StripeSubscriptionID string
-	Status               string // active, cancelled, past_due
-	CurrentPeriodStart   *time.Time
-	CurrentPeriodEnd     *time.Time
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                     uuid.UUID
+	UserID                 uuid.UUID
+	Plan                   string
+	RazorpayCustomerID     string
+	RazorpaySubscriptionID string
+	Status                 string // active, cancelled, past_due
+	CurrentPeriodStart     *time.Time
+	CurrentPeriodEnd       *time.Time
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 // Response types
@@ -61,16 +61,21 @@ type PlanResponse struct {
 
 // Request types
 
-type CreateCheckoutRequest struct {
+type CreateOrderRequest struct {
 	Plan string `json:"plan" validate:"required,oneof=pro premium"`
 }
 
-// Checkout / portal responses
-
-type CheckoutResponse struct {
-	CheckoutURL string `json:"checkout_url"`
+type VerifyPaymentRequest struct {
+	RazorpayPaymentID string `json:"razorpay_payment_id" validate:"required"`
+	RazorpayOrderID   string `json:"razorpay_order_id" validate:"required"`
+	RazorpaySignature string `json:"razorpay_signature" validate:"required"`
 }
 
-type BillingPortalResponse struct {
-	PortalURL string `json:"portal_url"`
+// Response types for order
+
+type OrderResponse struct {
+	OrderID  string `json:"order_id"`
+	KeyID    string `json:"key_id"`
+	Amount   int64  `json:"amount"`
+	Currency string `json:"currency"`
 }

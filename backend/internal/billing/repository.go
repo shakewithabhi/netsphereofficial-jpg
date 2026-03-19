@@ -28,8 +28,8 @@ func (r *Repository) CreateSubscription(ctx context.Context, sub *Subscription) 
 	err := r.db.QueryRow(ctx, query,
 		sub.UserID,
 		sub.Plan,
-		sub.StripeCustomerID,
-		sub.StripeSubscriptionID,
+		sub.RazorpayCustomerID,
+		sub.RazorpaySubscriptionID,
 		sub.Status,
 		sub.CurrentPeriodStart,
 		sub.CurrentPeriodEnd,
@@ -48,7 +48,7 @@ func (r *Repository) GetSubscriptionByUserID(ctx context.Context, userID uuid.UU
 
 	sub := &Subscription{}
 	err := r.db.QueryRow(ctx, query, userID).Scan(
-		&sub.ID, &sub.UserID, &sub.Plan, &sub.StripeCustomerID, &sub.StripeSubscriptionID,
+		&sub.ID, &sub.UserID, &sub.Plan, &sub.RazorpayCustomerID, &sub.RazorpaySubscriptionID,
 		&sub.Status, &sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.CreatedAt, &sub.UpdatedAt,
 	)
 	if err != nil {
@@ -60,22 +60,22 @@ func (r *Repository) GetSubscriptionByUserID(ctx context.Context, userID uuid.UU
 	return sub, nil
 }
 
-func (r *Repository) GetSubscriptionByStripeID(ctx context.Context, stripeSubID string) (*Subscription, error) {
+func (r *Repository) GetSubscriptionByRazorpayID(ctx context.Context, razorpaySubID string) (*Subscription, error) {
 	query := `
 		SELECT id, user_id, plan, stripe_customer_id, stripe_subscription_id,
 		       status, current_period_start, current_period_end, created_at, updated_at
 		FROM subscriptions WHERE stripe_subscription_id = $1`
 
 	sub := &Subscription{}
-	err := r.db.QueryRow(ctx, query, stripeSubID).Scan(
-		&sub.ID, &sub.UserID, &sub.Plan, &sub.StripeCustomerID, &sub.StripeSubscriptionID,
+	err := r.db.QueryRow(ctx, query, razorpaySubID).Scan(
+		&sub.ID, &sub.UserID, &sub.Plan, &sub.RazorpayCustomerID, &sub.RazorpaySubscriptionID,
 		&sub.Status, &sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.CreatedAt, &sub.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("get subscription by stripe id: %w", err)
+		return nil, fmt.Errorf("get subscription by razorpay id: %w", err)
 	}
 	return sub, nil
 }

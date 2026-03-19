@@ -144,9 +144,9 @@ func main() {
 	}
 
 	// Billing module
-	billing.SetStripePriceIDs(cfg.Stripe.ProPriceID, cfg.Stripe.PremiumPriceID)
+	billing.SetRazorpayPlanIDs(cfg.Razorpay.ProPlanID, cfg.Razorpay.PremiumPlanID)
 	billingRepo := billing.NewRepository(db)
-	billingService := billing.NewService(billingRepo, cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret, cfg.App.BaseURL)
+	billingService := billing.NewService(billingRepo, cfg.Razorpay.KeyID, cfg.Razorpay.KeySecret, cfg.Razorpay.WebhookSecret, cfg.App.BaseURL)
 	billingHandler := billing.NewHandler(billingService, authMiddleware)
 
 	// Batch module
