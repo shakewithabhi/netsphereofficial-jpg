@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/bytebox/backend/internal/auth"
 	"github.com/bytebox/backend/internal/common"
@@ -33,10 +34,23 @@ type Service struct {
 	store    *storage.Client
 	quota    *quota.Service
 	queue    *asynq.Client
+	rdb      *redis.Client
 }
 
-func NewService(repo *Repository, fileRepo *file.Repository, store *storage.Client, quotaSvc *quota.Service, queue *asynq.Client) *Service {
-	return &Service{repo: repo, fileRepo: fileRepo, store: store, quota: quotaSvc, queue: queue}
+func NewService(repo *Repository, fileRepo *file.Repository, store *storage.Client, quotaSvc *quota.Service, queue *asynq.Client, rdb *redis.Client) *Service {
+	return &Service{repo: repo, fileRepo: fileRepo, store: store, quota: quotaSvc, queue: queue, rdb: rdb}
+}
+
+// invalidateRootContentsCache removes the cached root folder listing for a user
+// after a chunked upload completes and changes folder contents.
+func (s *Service) invalidateRootContentsCache(ctx context.Context, userID uuid.UUID) {
+	if s.rdb == nil {
+		return
+	}
+	key := "folder:root:" + userID.String()
+	if err := s.rdb.Del(ctx, key).Err(); err != nil {
+		slog.Warn("failed to invalidate root contents cache from upload service", "error", err)
+	}
 }
 
 func (s *Service) Init(ctx context.Context, claims *auth.TokenClaims, req InitUploadRequest) (*InitUploadResponse, error) {
@@ -234,6 +248,9 @@ func (s *Service) Finalize(ctx context.Context, claims *auth.TokenClaims, id uui
 
 	// Mark session completed and clean up
 	s.repo.UpdateStatus(ctx, session.ID, "completed")
+
+	// Invalidate root folder contents cache
+	s.invalidateRootContentsCache(ctx, claims.UserID)
 
 	// Enqueue background tasks
 	if s.queue != nil {

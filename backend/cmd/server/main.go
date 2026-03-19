@@ -105,19 +105,19 @@ func main() {
 
 	// Folder module
 	folderRepo := folder.NewRepository(db)
-	folderService := folder.NewService(folderRepo, fileRepo, store)
+	folderService := folder.NewService(folderRepo, fileRepo, store, rdb)
 	folderHandler := folder.NewHandler(folderService)
 
 	// Quota module
-	quotaService := quota.NewService(db)
+	quotaService := quota.NewService(db, rdb)
 
 	// File module
-	fileService := file.NewService(fileRepo, store, streamClient, quotaService, asynqClient, cfg.App.MaxUploadSize)
+	fileService := file.NewService(fileRepo, store, streamClient, quotaService, asynqClient, rdb, cfg.App.MaxUploadSize)
 	fileHandler := file.NewHandler(fileService, cfg.App.MaxUploadSize, cfg.App.BaseURL)
 
 	// Upload module
 	uploadRepo := upload.NewRepository(db)
-	uploadService := upload.NewService(uploadRepo, fileRepo, store, quotaService, asynqClient)
+	uploadService := upload.NewService(uploadRepo, fileRepo, store, quotaService, asynqClient, rdb)
 	uploadHandler := upload.NewHandler(uploadService)
 
 	// Share module
@@ -214,7 +214,7 @@ func main() {
 			r.Use(authMiddleware.OptionalAuthenticate)
 			r.Use(rateLimiter.Limit(30, time.Minute, middleware.ByIP))
 			r.Mount("/s", shareHandler.PublicRoutes())
-			r.Mount("/explore", shareHandler.ExploreRoutes())
+			r.Mount("/explore-shares", shareHandler.ExploreRoutes())
 		})
 
 		// Share preview: 60 req/min by IP (separate limit from download)

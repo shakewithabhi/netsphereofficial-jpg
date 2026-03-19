@@ -2,14 +2,19 @@ package quota
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/bytebox/backend/internal/billing"
 )
+
+const quotaCacheTTL = 30 * time.Second
 
 type QuotaCheck struct {
 	Allowed    bool   `json:"allowed"`
@@ -23,12 +28,75 @@ type PoolStatus struct {
 	UsagePercent  float64 `json:"usage_percent"`
 }
 
-type Service struct {
-	db *pgxpool.Pool
+// cachedQuotaInfo is the data we store in Redis for a user's quota check.
+type cachedQuotaInfo struct {
+	StorageUsed int64  `json:"storage_used"`
+	SoftLimit   *int64 `json:"soft_limit"`
+	Plan        string `json:"plan"`
 }
 
-func NewService(db *pgxpool.Pool) *Service {
-	return &Service{db: db}
+type Service struct {
+	db  *pgxpool.Pool
+	rdb *redis.Client
+}
+
+func NewService(db *pgxpool.Pool, rdb *redis.Client) *Service {
+	return &Service{db: db, rdb: rdb}
+}
+
+func quotaCacheKey(userID uuid.UUID) string {
+	return "quota:" + userID.String()
+}
+
+// getQuotaInfo returns the user's storage_used, soft_storage_limit, and plan,
+// using a 30-second Redis cache to avoid hitting the DB on every upload.
+func (s *Service) getQuotaInfo(ctx context.Context, userID uuid.UUID) (*cachedQuotaInfo, error) {
+	key := quotaCacheKey(userID)
+
+	// Try Redis first
+	if s.rdb != nil {
+		data, err := s.rdb.Get(ctx, key).Bytes()
+		if err == nil {
+			var info cachedQuotaInfo
+			if err := json.Unmarshal(data, &info); err == nil {
+				return &info, nil
+			}
+		}
+	}
+
+	// Cache miss or Redis unavailable — query DB
+	var info cachedQuotaInfo
+	err := s.db.QueryRow(ctx,
+		`SELECT u.storage_used, u.soft_storage_limit, COALESCE(sub.plan, 'free')
+		 FROM users u
+		 LEFT JOIN subscriptions sub ON sub.user_id = u.id AND sub.status = 'active'
+		 WHERE u.id = $1`, userID,
+	).Scan(&info.StorageUsed, &info.SoftLimit, &info.Plan)
+	if err != nil {
+		return nil, fmt.Errorf("get user storage: %w", err)
+	}
+
+	// Store in Redis (best-effort)
+	if s.rdb != nil {
+		if data, err := json.Marshal(info); err == nil {
+			if err := s.rdb.Set(ctx, key, data, quotaCacheTTL).Err(); err != nil {
+				slog.Warn("failed to cache quota info", "error", err)
+			}
+		}
+	}
+
+	return &info, nil
+}
+
+// InvalidateQuotaCache removes the cached quota data for a user.
+// Called after storage usage changes so the next check reads fresh data.
+func (s *Service) InvalidateQuotaCache(ctx context.Context, userID uuid.UUID) {
+	if s.rdb == nil {
+		return
+	}
+	if err := s.rdb.Del(ctx, quotaCacheKey(userID)).Err(); err != nil {
+		slog.Warn("failed to invalidate quota cache", "user_id", userID, "error", err)
+	}
 }
 
 // CheckUpload determines whether a user can upload a file of the given size.
@@ -48,25 +116,16 @@ func (s *Service) CheckUpload(ctx context.Context, userID uuid.UUID, fileSize in
 		return &QuotaCheck{Allowed: false, WarningMsg: "storage capacity is full, please try again later"}, nil
 	}
 
-	// Get user's current usage and soft limit
-	var storageUsed int64
-	var softLimit *int64
-	var plan string
-
-	err = s.db.QueryRow(ctx,
-		`SELECT u.storage_used, u.soft_storage_limit, COALESCE(sub.plan, 'free')
-		 FROM users u
-		 LEFT JOIN subscriptions sub ON sub.user_id = u.id AND sub.status = 'active'
-		 WHERE u.id = $1`, userID,
-	).Scan(&storageUsed, &softLimit, &plan)
+	// Get user's current usage and soft limit (cached)
+	info, err := s.getQuotaInfo(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("get user storage: %w", err)
+		return nil, err
 	}
 
 	// Determine effective soft limit
-	effectiveLimit := getSoftLimit(plan, softLimit)
+	effectiveLimit := getSoftLimit(info.Plan, info.SoftLimit)
 
-	newUsage := storageUsed + fileSize
+	newUsage := info.StorageUsed + fileSize
 
 	// Hard reject if > 3x soft limit
 	if newUsage > effectiveLimit*3 {
@@ -89,6 +148,7 @@ func (s *Service) CheckUpload(ctx context.Context, userID uuid.UUID, fileSize in
 }
 
 // UpdateUsage atomically updates both user storage_used and global pool used_capacity.
+// It also invalidates the cached quota info so the next check reads fresh data.
 func (s *Service) UpdateUsage(ctx context.Context, userID uuid.UUID, delta int64) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -115,6 +175,10 @@ func (s *Service) UpdateUsage(ctx context.Context, userID uuid.UUID, delta int64
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit: %w", err)
 	}
+
+	// Invalidate cached quota after successful DB update
+	s.InvalidateQuotaCache(ctx, userID)
+
 	return nil
 }
 

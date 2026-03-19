@@ -93,7 +93,7 @@ func (r *Repository) enrichViewerFields(ctx context.Context, posts []Post, viewe
 
 	// Subscribed creators
 	subRows, err := r.db.Query(ctx,
-		`SELECT creator_id FROM subscriptions WHERE subscriber_id = $1 AND creator_id = ANY($2)`,
+		`SELECT creator_id FROM follows WHERE subscriber_id = $1 AND creator_id = ANY($2)`,
 		viewerID, creatorIDs)
 	if err != nil {
 		return fmt.Errorf("check subs: %w", err)
@@ -111,7 +111,7 @@ func (r *Repository) enrichViewerFields(ctx context.Context, posts []Post, viewe
 
 	// Subscriber counts
 	countRows, err := r.db.Query(ctx,
-		`SELECT creator_id, COUNT(*) FROM subscriptions WHERE creator_id = ANY($1) GROUP BY creator_id`,
+		`SELECT creator_id, COUNT(*) FROM follows WHERE creator_id = ANY($1) GROUP BY creator_id`,
 		creatorIDs)
 	if err != nil {
 		return fmt.Errorf("sub counts: %w", err)
@@ -177,7 +177,7 @@ func (r *Repository) GetByID(ctx context.Context, id, viewerUserID uuid.UUID) (*
 	} else {
 		// Still get subscriber count
 		_ = r.db.QueryRow(ctx,
-			`SELECT COUNT(*) FROM subscriptions WHERE creator_id = $1`, p.UserID,
+			`SELECT COUNT(*) FROM follows WHERE creator_id = $1`, p.UserID,
 		).Scan(&p.SubscriberCount)
 	}
 
@@ -313,7 +313,7 @@ func (r *Repository) GetForYouFeed(ctx context.Context, userID uuid.UUID, limit 
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN files f ON f.id = p.file_id
 		WHERE p.status = 'active'
-		  AND p.user_id IN (SELECT creator_id FROM subscriptions WHERE subscriber_id = $1)
+		  AND p.user_id IN (SELECT creator_id FROM follows WHERE subscriber_id = $1)
 		ORDER BY p.created_at DESC
 		LIMIT $2`, postColumns)
 
@@ -407,7 +407,7 @@ func (r *Repository) GetSubscriptionFeed(ctx context.Context, userID uuid.UUID, 
 		JOIN users u ON u.id = p.user_id
 		LEFT JOIN files f ON f.id = p.file_id
 		WHERE p.status = 'active'
-		  AND p.user_id IN (SELECT creator_id FROM subscriptions WHERE subscriber_id = $1)`, postColumns)
+		  AND p.user_id IN (SELECT creator_id FROM follows WHERE subscriber_id = $1)`, postColumns)
 
 	args := []any{userID}
 	argIdx := 2
@@ -660,7 +660,7 @@ func (r *Repository) Subscribe(ctx context.Context, subscriberID, creatorID uuid
 		return fmt.Errorf("cannot subscribe to yourself")
 	}
 	_, err := r.db.Exec(ctx,
-		`INSERT INTO subscriptions (subscriber_id, creator_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+		`INSERT INTO follows (subscriber_id, creator_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		subscriberID, creatorID)
 	if err != nil {
 		return fmt.Errorf("subscribe: %w", err)
@@ -671,7 +671,7 @@ func (r *Repository) Subscribe(ctx context.Context, subscriberID, creatorID uuid
 // Unsubscribe removes a subscription.
 func (r *Repository) Unsubscribe(ctx context.Context, subscriberID, creatorID uuid.UUID) error {
 	_, err := r.db.Exec(ctx,
-		`DELETE FROM subscriptions WHERE subscriber_id = $1 AND creator_id = $2`,
+		`DELETE FROM follows WHERE subscriber_id = $1 AND creator_id = $2`,
 		subscriberID, creatorID)
 	if err != nil {
 		return fmt.Errorf("unsubscribe: %w", err)
@@ -683,7 +683,7 @@ func (r *Repository) Unsubscribe(ctx context.Context, subscriberID, creatorID uu
 func (r *Repository) GetSubscriberCount(ctx context.Context, creatorID uuid.UUID) (int64, error) {
 	var count int64
 	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM subscriptions WHERE creator_id = $1`, creatorID,
+		`SELECT COUNT(*) FROM follows WHERE creator_id = $1`, creatorID,
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("subscriber count: %w", err)
@@ -695,7 +695,7 @@ func (r *Repository) GetSubscriberCount(ctx context.Context, creatorID uuid.UUID
 func (r *Repository) IsSubscribed(ctx context.Context, subscriberID, creatorID uuid.UUID) (bool, error) {
 	var exists bool
 	err := r.db.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM subscriptions WHERE subscriber_id = $1 AND creator_id = $2)`,
+		`SELECT EXISTS(SELECT 1 FROM follows WHERE subscriber_id = $1 AND creator_id = $2)`,
 		subscriberID, creatorID,
 	).Scan(&exists)
 	if err != nil {
@@ -780,12 +780,12 @@ func (r *Repository) GetCreatorProfile(ctx context.Context, creatorID, viewerID 
 	).Scan(&profile.PostCount)
 
 	_ = r.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM subscriptions WHERE creator_id = $1`, creatorID,
+		`SELECT COUNT(*) FROM follows WHERE creator_id = $1`, creatorID,
 	).Scan(&profile.SubscriberCount)
 
 	if viewerID != uuid.Nil {
 		_ = r.db.QueryRow(ctx,
-			`SELECT EXISTS(SELECT 1 FROM subscriptions WHERE subscriber_id = $1 AND creator_id = $2)`,
+			`SELECT EXISTS(SELECT 1 FROM follows WHERE subscriber_id = $1 AND creator_id = $2)`,
 			viewerID, creatorID,
 		).Scan(&profile.IsSubscribed)
 	}

@@ -9,25 +9,30 @@ import {
   ChevronRight,
   Flame,
   X,
+  Trash2,
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { VideoWatchModal } from '../components/VideoWatchModal';
+import type { Post } from '../api/explore';
 import {
-  Post,
   getFeed,
   getTrendingFeed,
   getForYouFeed,
   getSubscriptionFeed,
+  getCreatorPosts,
+  deletePost,
   searchPosts,
   formatCount,
   formatDuration,
   CATEGORIES,
 } from '../api/explore';
+import { useAuth } from '../store/auth';
 
-type Tab = 'foryou' | 'trending' | 'subscriptions';
+type Tab = 'foryou' | 'trending' | 'subscriptions' | 'myposts';
 
 export default function Explore() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('foryou');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -80,6 +85,8 @@ export default function Explore() {
         posts = await getTrendingFeed(20);
       } else if (activeTab === 'subscriptions') {
         posts = await getSubscriptionFeed(20);
+      } else if (activeTab === 'myposts' && user) {
+        posts = await getCreatorPosts(user.id);
       }
 
       // Filter by category
@@ -236,6 +243,16 @@ export default function Explore() {
               >
                 Subscriptions
               </button>
+              <button
+                onClick={() => { setActiveTab('myposts'); clearSearch(); }}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  activeTab === 'myposts' && !searchResults
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                My Posts
+              </button>
 
               <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1 shrink-0" />
 
@@ -376,14 +393,20 @@ export default function Explore() {
                     ? 'For You'
                     : activeTab === 'trending'
                     ? 'Trending'
+                    : activeTab === 'myposts'
+                    ? `My Posts (${feedPosts.length})`
                     : 'Subscriptions'}
                 </h2>
                 {feedPosts.length === 0 ? (
                   <div className="text-center py-16 text-slate-400 dark:text-slate-500">
                     <Play size={48} className="mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">No videos yet</p>
+                    <p className="font-medium">
+                      {activeTab === 'myposts' ? 'No posts yet' : 'No videos yet'}
+                    </p>
                     <p className="text-sm mt-1">
-                      {activeTab === 'subscriptions'
+                      {activeTab === 'myposts'
+                        ? 'Videos you post to Explore will appear here'
+                        : activeTab === 'subscriptions'
                         ? 'Subscribe to creators to see their videos here'
                         : 'Be the first to post a video!'}
                     </p>
@@ -394,7 +417,18 @@ export default function Explore() {
                       fadeIn ? 'opacity-100' : 'opacity-0'
                     }`}
                   >
-                    <VideoGrid posts={feedPosts} onWatch={handleWatchPost} relativeTime={relativeTime} />
+                    <VideoGrid
+                      posts={feedPosts}
+                      onWatch={handleWatchPost}
+                      relativeTime={relativeTime}
+                      showManage={activeTab === 'myposts'}
+                      onDelete={async (postId) => {
+                        try {
+                          await deletePost(postId);
+                          setFeedPosts((prev) => prev.filter((p) => p.id !== postId));
+                        } catch { /* ignore */ }
+                      }}
+                    />
                   </div>
                 )}
               </section>
@@ -442,15 +476,19 @@ function VideoGrid({
   posts,
   onWatch,
   relativeTime,
+  showManage,
+  onDelete,
 }: {
   posts: Post[];
   onWatch: (post: Post) => void;
   relativeTime: (dateStr: string) => string;
+  showManage?: boolean;
+  onDelete?: (postId: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
       {posts.map((post) => (
-        <VideoCard key={post.id} post={post} onWatch={onWatch} relativeTime={relativeTime} />
+        <VideoCard key={post.id} post={post} onWatch={onWatch} relativeTime={relativeTime} showManage={showManage} onDelete={onDelete} />
       ))}
     </div>
   );
@@ -462,37 +500,45 @@ function VideoCard({
   post,
   onWatch,
   relativeTime,
+  showManage,
+  onDelete,
 }: {
   post: Post;
   onWatch: (post: Post) => void;
   relativeTime: (dateStr: string) => string;
+  showManage?: boolean;
+  onDelete?: (postId: string) => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   return (
-    <button
-      onClick={() => onWatch(post)}
-      className="group text-left w-full"
-    >
+    <div className="group text-left w-full">
       {/* Thumbnail */}
-      <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 hover:scale-[1.02] transition-transform duration-200 shadow-sm hover:shadow-lg">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-300 dark:from-slate-700 to-slate-400 dark:to-slate-800 flex items-center justify-center">
-          <Play size={24} className="text-slate-400 dark:text-slate-500" />
-        </div>
-
-        {/* Hover play */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <div className="w-11 h-11 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center">
-            <Play size={18} className="text-white ml-0.5" />
+      <button
+        onClick={() => onWatch(post)}
+        className="w-full text-left"
+      >
+        <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-800 hover:scale-[1.02] transition-transform duration-200 shadow-sm hover:shadow-lg">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-300 dark:from-slate-700 to-slate-400 dark:to-slate-800 flex items-center justify-center">
+            <Play size={24} className="text-slate-400 dark:text-slate-500" />
           </div>
-        </div>
 
-        {/* Duration badge */}
-        <div className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 bg-black/75 backdrop-blur-sm rounded text-white text-[11px] font-medium">
-          {formatDuration(post.duration_seconds)}
-        </div>
+          {/* Hover play */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <div className="w-11 h-11 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center">
+              <Play size={18} className="text-white ml-0.5" />
+            </div>
+          </div>
 
-        {/* Gradient overlay on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
+          {/* Duration badge */}
+          <div className="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 bg-black/75 backdrop-blur-sm rounded text-white text-[11px] font-medium">
+            {formatDuration(post.duration_seconds)}
+          </div>
+
+          {/* Gradient overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      </button>
 
       {/* Info */}
       <div className="flex gap-3 mt-3">
@@ -500,17 +546,47 @@ function VideoCard({
           {post.creator_name?.[0]?.toUpperCase() ?? '?'}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-            {post.caption}
-          </p>
+          <button onClick={() => onWatch(post)} className="text-left">
+            <p className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              {post.caption}
+            </p>
+          </button>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            @{post.creator_name}
+            {formatCount(post.view_count)} views &middot; {formatCount(post.like_count)} likes &middot; {relativeTime(post.created_at)}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            {formatCount(post.view_count)} views &middot; {relativeTime(post.created_at)}
-          </p>
+
+          {/* Manage controls for own posts */}
+          {showManage && (
+            <div className="flex items-center gap-2 mt-2">
+              {confirmDelete ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-red-500">Delete this post?</span>
+                  <button
+                    onClick={() => { onDelete?.(post.id); setConfirmDelete(false); }}
+                    className="px-2 py-1 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                  >
+                    Yes, delete
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-2 py-1 text-xs font-medium text-slate-500 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-500 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
+                >
+                  <Trash2 size={12} />
+                  Delete from Explore
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

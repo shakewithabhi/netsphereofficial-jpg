@@ -188,11 +188,19 @@ export async function moveFile(id: string, folderId: string | null): Promise<voi
 }
 
 export async function batchTrash(fileIds: string[], folderIds: string[]): Promise<void> {
-  await client.post('/batch/trash', { file_ids: fileIds, folder_ids: folderIds });
+  const items = [
+    ...fileIds.map((id) => ({ id, type: 'file' })),
+    ...folderIds.map((id) => ({ id, type: 'folder' })),
+  ];
+  await client.post('/batch/trash', { items });
 }
 
 export async function batchMove(fileIds: string[], folderIds: string[], targetFolderId: string | null): Promise<void> {
-  await client.post('/batch/move', { file_ids: fileIds, folder_ids: folderIds, folder_id: targetFolderId });
+  const items = [
+    ...fileIds.map((id) => ({ id, type: 'file' })),
+    ...folderIds.map((id) => ({ id, type: 'folder' })),
+  ];
+  await client.post('/batch/move', { items, folder_id: targetFolderId });
 }
 
 export function formatBytes(bytes: number): string {

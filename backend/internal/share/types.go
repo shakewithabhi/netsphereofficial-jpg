@@ -63,7 +63,7 @@ type Share struct {
 	UserID        uuid.UUID
 	Code          string
 	ShareType     string // "file" or "folder"
-	PasswordHash  string
+	PasswordHash  *string
 	ExpiresAt     *time.Time
 	MaxDownloads  *int
 	DownloadCount int

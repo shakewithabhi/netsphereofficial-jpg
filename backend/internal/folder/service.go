@@ -2,11 +2,14 @@ package folder
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/bytebox/backend/internal/auth"
 	"github.com/bytebox/backend/internal/common"
@@ -14,14 +17,31 @@ import (
 	"github.com/bytebox/backend/internal/storage"
 )
 
+const rootContentsCacheTTL = 15 * time.Second
+
 type Service struct {
 	repo     *Repository
 	fileRepo *file.Repository
 	store    *storage.Client
+	rdb      *redis.Client
 }
 
-func NewService(repo *Repository, fileRepo *file.Repository, store *storage.Client) *Service {
-	return &Service{repo: repo, fileRepo: fileRepo, store: store}
+func NewService(repo *Repository, fileRepo *file.Repository, store *storage.Client, rdb *redis.Client) *Service {
+	return &Service{repo: repo, fileRepo: fileRepo, store: store, rdb: rdb}
+}
+
+func rootContentsCacheKey(userID uuid.UUID) string {
+	return "folder:root:" + userID.String()
+}
+
+// invalidateRootContents removes the cached root folder listing for a user.
+func (s *Service) invalidateRootContents(ctx context.Context, userID uuid.UUID) {
+	if s.rdb == nil {
+		return
+	}
+	if err := s.rdb.Del(ctx, rootContentsCacheKey(userID)).Err(); err != nil {
+		slog.Warn("failed to invalidate root contents cache", "user_id", userID, "error", err)
+	}
 }
 
 func (s *Service) Create(ctx context.Context, claims *auth.TokenClaims, req CreateFolderRequest) (*FolderResponse, error) {
@@ -72,6 +92,8 @@ func (s *Service) Create(ctx context.Context, claims *auth.TokenClaims, req Crea
 		return nil, common.ErrInternal("failed to create folder")
 	}
 
+	s.invalidateRootContents(ctx, claims.UserID)
+
 	resp := folder.ToResponse()
 	return &resp, nil
 }
@@ -110,6 +132,19 @@ func (s *Service) ListContents(ctx context.Context, claims *auth.TokenClaims, pa
 		}
 	}
 
+	// For root folder listing with default pagination, try Redis cache
+	isRootDefault := parentID == nil && params.Cursor == "" && params.Sort == "name" && params.Order == "asc"
+	if isRootDefault && s.rdb != nil {
+		key := rootContentsCacheKey(claims.UserID)
+		data, err := s.rdb.Get(ctx, key).Bytes()
+		if err == nil {
+			var cached FolderContentsResult
+			if err := json.Unmarshal(data, &cached); err == nil {
+				return &cached, nil
+			}
+		}
+	}
+
 	folders, err := s.repo.ListByParent(ctx, claims.UserID, parentID)
 	if err != nil {
 		slog.Error("failed to list folders", "error", err)
@@ -132,10 +167,21 @@ func (s *Service) ListContents(ctx context.Context, claims *auth.TokenClaims, pa
 		fileResponses[i] = f.ToResponse()
 	}
 
-	return &FolderContentsResult{
+	result := &FolderContentsResult{
 		Folders: folderResponses,
 		Files:   fileResponses,
-	}, nil
+	}
+
+	// Cache root folder result in Redis (best-effort)
+	if isRootDefault && s.rdb != nil {
+		if data, err := json.Marshal(result); err == nil {
+			if err := s.rdb.Set(ctx, rootContentsCacheKey(claims.UserID), data, rootContentsCacheTTL).Err(); err != nil {
+				slog.Warn("failed to cache root contents", "error", err)
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (s *Service) Rename(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID, req RenameFolderRequest) (*FolderResponse, error) {
@@ -158,6 +204,8 @@ func (s *Service) Rename(ctx context.Context, claims *auth.TokenClaims, id uuid.
 		slog.Error("failed to rename folder", "error", err)
 		return nil, common.ErrInternal("failed to rename folder")
 	}
+
+	s.invalidateRootContents(ctx, claims.UserID)
 
 	updated, _ := s.repo.GetByID(ctx, id, claims.UserID)
 	if updated == nil {
@@ -198,6 +246,8 @@ func (s *Service) Move(ctx context.Context, claims *auth.TokenClaims, id uuid.UU
 		return nil, common.ErrInternal("failed to move folder")
 	}
 
+	s.invalidateRootContents(ctx, claims.UserID)
+
 	updated, _ := s.repo.GetByID(ctx, id, claims.UserID)
 	if updated == nil {
 		return nil, common.ErrNotFound("folder not found")
@@ -214,6 +264,7 @@ func (s *Service) Trash(ctx context.Context, claims *auth.TokenClaims, id uuid.U
 		slog.Error("failed to trash folder", "error", err)
 		return common.ErrInternal("failed to trash folder")
 	}
+	s.invalidateRootContents(ctx, claims.UserID)
 	return nil
 }
 
@@ -225,6 +276,7 @@ func (s *Service) Restore(ctx context.Context, claims *auth.TokenClaims, id uuid
 		slog.Error("failed to restore folder", "error", err)
 		return common.ErrInternal("failed to restore folder")
 	}
+	s.invalidateRootContents(ctx, claims.UserID)
 	return nil
 }
 
@@ -244,6 +296,8 @@ func (s *Service) Delete(ctx context.Context, claims *auth.TokenClaims, id uuid.
 			)
 		}
 	}
+
+	s.invalidateRootContents(ctx, claims.UserID)
 
 	return nil
 }

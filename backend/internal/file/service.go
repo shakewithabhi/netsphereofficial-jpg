@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 
 	"html"
 
@@ -38,6 +39,7 @@ type Service struct {
 	stream        *storage.StreamClient
 	quota         *quota.Service
 	queue         *asynq.Client
+	rdb           *redis.Client
 	maxUploadSize int64
 	notifier      NotificationSender
 }
@@ -47,14 +49,27 @@ func (s *Service) SetNotificationService(n NotificationSender) {
 	s.notifier = n
 }
 
-func NewService(repo *Repository, store *storage.Client, stream *storage.StreamClient, quotaSvc *quota.Service, queue *asynq.Client, maxUploadSize int64) *Service {
+func NewService(repo *Repository, store *storage.Client, stream *storage.StreamClient, quotaSvc *quota.Service, queue *asynq.Client, rdb *redis.Client, maxUploadSize int64) *Service {
 	return &Service{
 		repo:          repo,
 		store:         store,
 		stream:        stream,
 		quota:         quotaSvc,
 		queue:         queue,
+		rdb:           rdb,
 		maxUploadSize: maxUploadSize,
+	}
+}
+
+// invalidateRootContentsCache removes the cached root folder listing for a user
+// after file uploads or deletions change the root folder contents.
+func (s *Service) invalidateRootContentsCache(ctx context.Context, userID uuid.UUID) {
+	if s.rdb == nil {
+		return
+	}
+	key := "folder:root:" + userID.String()
+	if err := s.rdb.Del(ctx, key).Err(); err != nil {
+		slog.Warn("failed to invalidate root contents cache from file service", "error", err)
 	}
 }
 
@@ -180,6 +195,9 @@ func (s *Service) Upload(ctx context.Context, claims *auth.TokenClaims, header *
 	if err := s.quota.UpdateUsage(ctx, claims.UserID, header.Size); err != nil {
 		slog.Error("failed to update storage used", "error", err)
 	}
+
+	// Invalidate root folder contents cache (file was added/replaced)
+	s.invalidateRootContentsCache(ctx, claims.UserID)
 
 	// Enqueue thumbnail generation
 	if s.queue != nil {
@@ -409,6 +427,9 @@ func (s *Service) RemoteUpload(ctx context.Context, claims *auth.TokenClaims, re
 		}
 	}
 
+	// Invalidate root folder contents cache
+	s.invalidateRootContentsCache(ctx, claims.UserID)
+
 	slog.Info("remote upload complete", "file_id", file.ID, "url", req.URL, "size", fileSize)
 	resp := file.ToResponse()
 	return &resp, nil
@@ -478,25 +499,14 @@ func (s *Service) DownloadProxy(ctx context.Context, claims *auth.TokenClaims, i
 		return nil, nil, common.ErrNotFound("file not found")
 	}
 
-	// Get the file from S3 via presigned URL and stream it
-	presignedURL, err := s.store.PresignGetURL(ctx, s.store.BucketFiles(), file.StorageKey, s.store.PresignExpiry())
+	// Get the file directly from S3 via internal endpoint
+	body, _, err := s.store.GetObject(ctx, s.store.BucketFiles(), file.StorageKey)
 	if err != nil {
-		slog.Error("failed to generate presigned URL for proxy download", "error", err)
-		return nil, nil, common.ErrInternal("failed to generate download URL")
-	}
-
-	resp, err := http.Get(presignedURL)
-	if err != nil {
-		slog.Error("failed to fetch file from storage for proxy", "error", err)
+		slog.Error("failed to get file from storage for proxy", "error", err)
 		return nil, nil, common.ErrInternal("failed to fetch file from storage")
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, nil, common.ErrInternal("failed to fetch file from storage")
-	}
-
-	return file, resp.Body, nil
+	return file, body, nil
 }
 
 func (s *Service) GetStreamInfo(ctx context.Context, claims *auth.TokenClaims, id uuid.UUID) (*DownloadResponse, error) {
@@ -662,6 +672,9 @@ func (s *Service) Copy(ctx context.Context, claims *auth.TokenClaims, id uuid.UU
 		}
 	}
 
+	// Invalidate root folder contents cache
+	s.invalidateRootContentsCache(ctx, claims.UserID)
+
 	resp := newFile.ToResponse()
 	return &resp, nil
 }
@@ -704,6 +717,7 @@ func (s *Service) Trash(ctx context.Context, claims *auth.TokenClaims, id uuid.U
 		slog.Error("failed to trash file", "error", err)
 		return common.ErrInternal("failed to trash file")
 	}
+	s.invalidateRootContentsCache(ctx, claims.UserID)
 	return nil
 }
 
@@ -715,6 +729,7 @@ func (s *Service) Restore(ctx context.Context, claims *auth.TokenClaims, id uuid
 		slog.Error("failed to restore file", "error", err)
 		return common.ErrInternal("failed to restore file")
 	}
+	s.invalidateRootContentsCache(ctx, claims.UserID)
 	return nil
 }
 
@@ -744,6 +759,9 @@ func (s *Service) Delete(ctx context.Context, claims *auth.TokenClaims, id uuid.
 	if err := s.quota.UpdateUsage(ctx, claims.UserID, -file.Size); err != nil {
 		slog.Error("failed to update storage used", "error", err)
 	}
+
+	// Invalidate root folder contents cache (file was removed)
+	s.invalidateRootContentsCache(ctx, claims.UserID)
 
 	return nil
 }

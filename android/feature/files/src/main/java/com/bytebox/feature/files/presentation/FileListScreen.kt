@@ -171,7 +171,6 @@ fun FileListScreen(
                                 Icon(Icons.Default.Delete, contentDescription = "Delete selected")
                             }
                         },
-                        windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                             titleContentColor = MaterialTheme.colorScheme.onBackground,
@@ -230,7 +229,6 @@ fun FileListScreen(
                                 }
                             }
                         },
-                        windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                             titleContentColor = MaterialTheme.colorScheme.onBackground,
@@ -286,7 +284,6 @@ fun FileListScreen(
                                 }
                             }
                         },
-                        windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background,
                             titleContentColor = MaterialTheme.colorScheme.onBackground,

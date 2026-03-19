@@ -38,14 +38,14 @@ CREATE TABLE IF NOT EXISTS post_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_post_comments_post ON post_comments(post_id, created_at);
 
--- Subscriptions (follow creators)
-CREATE TABLE IF NOT EXISTS subscriptions (
+-- Follows (follow creators)
+CREATE TABLE IF NOT EXISTS follows (
     subscriber_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     creator_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (subscriber_id, creator_id)
 );
-CREATE INDEX IF NOT EXISTS idx_subs_creator ON subscriptions(creator_id);
+CREATE INDEX IF NOT EXISTS idx_follows_creator ON follows(creator_id);
 
 -- Watch history
 CREATE TABLE IF NOT EXISTS watch_history (

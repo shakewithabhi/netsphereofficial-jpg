@@ -199,7 +199,7 @@ func (r *Repository) GetExploreItems(ctx context.Context, limit int, cursorTime 
 		JOIN files f ON f.id = s.file_id
 		JOIN users u ON u.id = s.user_id
 		WHERE s.is_active = true
-		  AND s.password_hash = ''
+		  AND (s.password_hash IS NULL OR s.password_hash = '')
 		  AND s.share_type = 'file'
 		  AND (s.expires_at IS NULL OR s.expires_at > NOW())
 		  AND f.trashed_at IS NULL`

@@ -505,7 +505,7 @@ export default function Files() {
   return (
     <Layout onRefresh={refresh} currentFolderId={folderId}>
       <div
-        className={`p-6 min-h-full transition-colors dark:bg-slate-900 ${
+        className={`p-6 min-h-full h-full transition-colors bg-slate-50 dark:bg-slate-900 ${
           dragOver ? 'bg-blue-50 dark:bg-blue-950 drop-zone-active' : ''
         }`}
         onDrop={handleFileDrop}
@@ -974,9 +974,18 @@ function FolderCard({
             ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
             : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
         } ${isDragging ? 'opacity-50' : ''}`}
-        onClick={!isRenaming ? onClick : undefined}
+        onClick={!isRenaming ? (e: React.MouseEvent) => {
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            onToggleSelect(e);
+          } else if (selectionMode) {
+            onToggleSelect(e);
+          } else {
+            onClick?.();
+          }
+        } : undefined}
       >
-        {(selectionMode || isSelected) && (
+        {(selectionMode || isSelected) ? (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
             className="shrink-0 p-0.5"
@@ -987,7 +996,7 @@ function FolderCard({
               <Square size={16} className="text-slate-400" />
             )}
           </button>
-        )}
+        ) : null}
         <Folder size={20} className="text-blue-500 shrink-0" />
         {isRenaming ? (
           <input
@@ -1035,9 +1044,18 @@ function FolderCard({
           ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
           : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
       } ${isDragging ? 'opacity-50' : ''}`}
-      onClick={!isRenaming ? onClick : undefined}
+      onClick={!isRenaming ? (e: React.MouseEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          onToggleSelect(e);
+        } else if (selectionMode) {
+          onToggleSelect(e);
+        } else {
+          onClick?.();
+        }
+      } : undefined}
     >
-      {(selectionMode || isSelected) && (
+      {(selectionMode || isSelected) ? (
         <button
           onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
           className="absolute top-2 left-2 p-0.5"
@@ -1048,7 +1066,7 @@ function FolderCard({
             <Square size={14} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </button>
-      )}
+      ) : null}
       <button
         onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
@@ -1104,88 +1122,39 @@ function FileThumbnail({
   );
   const [error, setError] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-
+  const imgRef = useRef<HTMLDivElement>(null);
   const isImage = file.mime_type.startsWith('image/');
 
   useEffect(() => {
     if (!isImage || thumbnailCache.has(file.id)) return;
-
     let cancelled = false;
-
-    // Use IntersectionObserver for lazy loading
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
           getDownloadUrl(file.id)
-            .then((url) => {
-              if (!cancelled) {
-                thumbnailCache.set(file.id, url);
-                setThumbUrl(url);
-              }
-            })
-            .catch(() => {
-              if (!cancelled) setError(true);
-            });
+            .then((url) => { if (!cancelled) { thumbnailCache.set(file.id, url); setThumbUrl(url); } })
+            .catch(() => { if (!cancelled) setError(true); });
           observer.disconnect();
         }
       },
       { rootMargin: '100px' }
     );
-
-    if (imgRef.current) {
-      observer.observe(imgRef.current);
-    }
-
-    return () => {
-      cancelled = true;
-      observer.disconnect();
-    };
+    if (imgRef.current) observer.observe(imgRef.current);
+    return () => { cancelled = true; observer.disconnect(); };
   }, [file.id, isImage]);
 
   if (!isImage || error) {
-    return (
-      <FileIcon
-        mimeType={file.mime_type}
-        size={size === 'large' ? 40 : 20}
-        className={className}
-      />
-    );
+    return <FileIcon mimeType={file.mime_type} size={size === 'large' ? 40 : 20} className={className} />;
   }
 
-  if (size === 'small') {
-    return (
-      <div ref={imgRef as React.RefObject<HTMLDivElement>} className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-        {thumbUrl && !error ? (
-          <img
-            src={thumbUrl}
-            alt={file.name}
-            loading="lazy"
-            onError={() => setError(true)}
-            onLoad={() => setLoaded(true)}
-            className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
-          />
-        ) : (
-          <div className="w-full h-full bg-slate-100 dark:bg-slate-700 animate-pulse" />
-        )}
-      </div>
-    );
-  }
-
-  // Large thumbnail for grid view
   return (
-    <div ref={imgRef as React.RefObject<HTMLDivElement>} className="w-full h-24 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 mb-2 flex items-center justify-center">
-      {thumbUrl && !error ? (
-        <img
-          src={thumbUrl}
-          alt={file.name}
-          loading="lazy"
-          onError={() => setError(true)}
-          onLoad={() => setLoaded(true)}
-          className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`}
-        />
+    <div ref={imgRef} className={`${size === 'small' ? 'shrink-0 w-10 h-10' : 'w-full h-24 mb-2'} rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center`}>
+      {thumbUrl ? (
+        <img src={thumbUrl} alt={file.name} loading="lazy"
+          onError={() => setError(true)} onLoad={() => setLoaded(true)}
+          className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`} />
       ) : (
-        <div className="w-full h-full bg-slate-100 dark:bg-slate-700 animate-pulse" />
+        <FileIcon mimeType={file.mime_type} size={size === 'large' ? 24 : 16} />
       )}
     </div>
   );
@@ -1232,20 +1201,18 @@ function FileCard({
             ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
             : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
         } ${isDragging ? 'opacity-50' : ''}`}
-        onClick={onClick}
+        onClick={(e: React.MouseEvent) => { e.preventDefault(); onToggleSelect(e); }}
       >
-        {(selectionMode || isSelected) && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-            className="shrink-0 p-0.5"
-          >
-            {isSelected ? (
-              <CheckSquare size={16} className="text-blue-600" />
-            ) : (
-              <Square size={16} className="text-slate-400" />
-            )}
-          </button>
-        )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+          className="shrink-0 p-0.5"
+        >
+          {isSelected ? (
+            <CheckSquare size={16} className="text-blue-600" />
+          ) : (
+            <Square size={16} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+          )}
+        </button>
         <button
           onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
           className="shrink-0 p-0.5 transition-colors"
@@ -1262,7 +1229,10 @@ function FileCard({
         ) : (
           <FileIcon mimeType={file.mime_type} size={20} />
         )}
-        <span className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{file.name}</span>
+        <span
+          className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate hover:text-blue-600 dark:hover:text-blue-400 hover:underline cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+        >{file.name}</span>
         <span className="text-xs text-slate-400 shrink-0">{formatBytes(file.size)}</span>
         <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
           {new Date(file.created_at).toLocaleDateString()}
@@ -1288,32 +1258,30 @@ function FileCard({
           ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
           : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
       } ${isDragging ? 'opacity-50' : ''}`}
-      onClick={onClick}
+      onClick={(e: React.MouseEvent) => { e.preventDefault(); onToggleSelect(e); }}
+      onDoubleClick={() => onClick()}
     >
-      {(selectionMode || isSelected) ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-          className="absolute top-2 left-2 p-0.5 z-10"
-        >
-          {isSelected ? (
-            <CheckSquare size={14} className="text-blue-600" />
-          ) : (
-            <Square size={14} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-          )}
-        </button>
-      ) : (
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
-          className="absolute top-2 left-2 p-0.5 transition-colors z-10"
-          title={file.is_starred ? 'Unstar' : 'Star'}
-        >
-          {file.is_starred ? (
-            <Star size={14} className="text-yellow-500 fill-yellow-500" />
-          ) : (
-            <Star size={14} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all" />
-          )}
-        </button>
-      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+        className="absolute top-2 left-2 p-0.5 z-10"
+      >
+        {isSelected ? (
+          <CheckSquare size={14} className="text-blue-600" />
+        ) : (
+          <Square size={14} className="text-slate-400 group-hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+        )}
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+        className="absolute top-2 right-8 p-0.5 transition-colors z-10"
+        title={file.is_starred ? 'Unstar' : 'Star'}
+      >
+        {file.is_starred ? (
+          <Star size={14} className="text-yellow-500 fill-yellow-500" />
+        ) : (
+          <Star size={14} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all" />
+        )}
+      </button>
       <button
         onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all z-10"

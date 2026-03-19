@@ -15,7 +15,12 @@ suspend fun <T> safeApiCall(apiCall: suspend () -> Response<T>): Result<T> {
             if (body != null) {
                 Result.Success(body)
             } else {
-                Result.Success(Unit as T)
+                @Suppress("UNCHECKED_CAST")
+                try {
+                    Result.Success(Unit as T)
+                } catch (e: ClassCastException) {
+                    Result.Error(AppException.ServerError(response.code(), "Empty response body"))
+                }
             }
         } else {
             val errorBody = response.errorBody()?.string()

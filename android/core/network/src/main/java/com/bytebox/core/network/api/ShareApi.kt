@@ -50,7 +50,7 @@ interface ShareApi {
         @Header("X-Share-Password") password: String? = null
     ): Response<FileDto>
 
-    @GET("explore")
+    @GET("explore-shares")
     suspend fun getExploreItems(
         @Query("cursor") cursor: String? = null,
         @Query("limit") limit: Int = 20,
@@ -66,18 +66,18 @@ interface ShareApi {
     suspend fun downloadPublicShare(@Path("code") code: String): Response<DownloadUrlResponse>
 
     // Like / unlike a share
-    @POST("explore/{code}/like")
+    @POST("explore-shares/{code}/like")
     suspend fun toggleLike(@Path("code") code: String): Response<ToggleLikeDto>
 
     // Comments
-    @GET("explore/{code}/comments")
+    @GET("explore-shares/{code}/comments")
     suspend fun getComments(
         @Path("code") code: String,
         @Query("limit") limit: Int = 50,
         @Query("offset") offset: Int = 0,
     ): Response<ShareCommentsResponseDto>
 
-    @POST("explore/{code}/comments")
+    @POST("explore-shares/{code}/comments")
     suspend fun addComment(
         @Path("code") code: String,
         @Body request: AddCommentRequest,

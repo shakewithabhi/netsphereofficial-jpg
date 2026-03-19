@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Upload, Film, Tag, ChevronRight, Check } from 'lucide-react';
-import { getRootContents, FileItem, getDownloadUrl } from '../api/files';
+import { getRootContents, getDownloadUrl } from '../api/files';
+import type { FileItem } from '../api/files';
 import { createPost, CATEGORIES } from '../api/explore';
 
 interface CreatePostModalProps {

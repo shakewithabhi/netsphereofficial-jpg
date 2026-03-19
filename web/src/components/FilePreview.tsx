@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
 import type { FileItem } from '../api/files';
 import { getDownloadUrl, formatBytes } from '../api/files';
+import client from '../api/client';
 import { FileIcon } from './FileIcon';
 
 interface FilePreviewProps {
@@ -72,17 +73,28 @@ export function FilePreview({ file, files, onClose, onNavigate }: FilePreviewPro
 
     (async () => {
       try {
-        const downloadUrl = await getDownloadUrl(file.id);
-        if (cancelled) return;
-        setUrl(downloadUrl);
+        if (category === 'image' || category === 'video' || category === 'audio') {
+          // Fetch via authenticated proxy and create blob URL
+          const res = await client.get(`/files/${file.id}/download-proxy`, {
+            responseType: 'blob',
+          });
+          if (cancelled) return;
+          const blob = new Blob([res.data], { type: file.mime_type });
+          setUrl(URL.createObjectURL(blob));
+        } else {
+          const downloadUrl = await getDownloadUrl(file.id);
+          if (cancelled) return;
+          setUrl(downloadUrl);
 
-        if (category === 'text') {
-          try {
-            const res = await fetch(downloadUrl);
-            const text = await res.text();
-            if (!cancelled) setTextContent(text);
-          } catch {
-            // Failed to fetch text content, will show download instead
+          if (category === 'text') {
+            try {
+              const res = await client.get(`/files/${file.id}/download-proxy`, {
+                responseType: 'text',
+              });
+              if (!cancelled) setTextContent(res.data);
+            } catch {
+              // Failed to fetch text content, will show download instead
+            }
           }
         }
       } catch {
@@ -92,7 +104,10 @@ export function FilePreview({ file, files, onClose, onNavigate }: FilePreviewPro
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      setUrl((prev) => { if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev); return prev; });
+    };
   }, [file.id, category]);
 
   async function handleDownload() {

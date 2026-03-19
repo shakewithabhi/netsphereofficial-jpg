@@ -78,23 +78,48 @@ func New(cfg config.StorageConfig) (*Client, error) {
 }
 
 func (c *Client) Upload(ctx context.Context, bucket, key string, body io.Reader, contentType string, size int64) error {
-	// Read into memory so the body is seekable (required by AWS SDK v2 over HTTP).
-	data, err := io.ReadAll(body)
-	if err != nil {
-		return fmt.Errorf("read upload body: %w", err)
+	input := &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(contentType),
 	}
 
-	_, err = c.s3.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:        aws.String(bucket),
-		Key:           aws.String(key),
-		Body:          bytes.NewReader(data),
-		ContentType:   aws.String(contentType),
-		ContentLength: aws.Int64(int64(len(data))),
-	})
+	// AWS SDK v2 requires a seekable body for checksum computation.
+	// If the body is already seekable, use it directly; otherwise buffer into memory.
+	if rs, ok := body.(io.ReadSeeker); ok {
+		input.Body = rs
+		if size > 0 {
+			input.ContentLength = aws.Int64(size)
+		}
+	} else {
+		data, err := io.ReadAll(body)
+		if err != nil {
+			return fmt.Errorf("read upload body: %w", err)
+		}
+		input.Body = bytes.NewReader(data)
+		input.ContentLength = aws.Int64(int64(len(data)))
+	}
+
+	_, err := c.s3.PutObject(ctx, input)
 	if err != nil {
 		return fmt.Errorf("upload object: %w", err)
 	}
 	return nil
+}
+
+func (c *Client) GetObject(ctx context.Context, bucket, key string) (io.ReadCloser, string, error) {
+	out, err := c.s3.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("get object: %w", err)
+	}
+	ct := ""
+	if out.ContentType != nil {
+		ct = *out.ContentType
+	}
+	return out.Body, ct, nil
 }
 
 func (c *Client) Delete(ctx context.Context, bucket, key string) error {

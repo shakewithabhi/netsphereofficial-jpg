@@ -65,17 +65,17 @@ export async function getFeed(
 }
 
 export async function getTrendingFeed(limit = 10): Promise<Post[]> {
-  const res = await client.get('/explore/trending', { params: { limit } });
+  const res = await client.get('/explore/feed/trending', { params: { limit } });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
 export async function getForYouFeed(limit = 20): Promise<Post[]> {
-  const res = await client.get('/explore/for-you', { params: { limit } });
+  const res = await client.get('/explore/feed/foryou', { params: { limit } });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
 export async function getSubscriptionFeed(limit = 20): Promise<Post[]> {
-  const res = await client.get('/explore/subscriptions', { params: { limit } });
+  const res = await client.get('/explore/feed/subscriptions', { params: { limit } });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
@@ -143,11 +143,16 @@ export async function deleteComment(postId: string, commentId: string): Promise<
 // ─── Subscriptions ───────────────────────────────────────────
 
 export async function subscribe(userId: string): Promise<void> {
-  await client.post(`/explore/subscribe/${userId}`);
+  await client.post(`/explore/creators/${userId}/subscribe`);
 }
 
 export async function unsubscribe(userId: string): Promise<void> {
-  await client.delete(`/explore/subscribe/${userId}`);
+  await client.delete(`/explore/creators/${userId}/subscribe`);
+}
+
+export async function getCreatorPosts(userId: string, limit = 50): Promise<Post[]> {
+  const res = await client.get(`/explore/creators/${userId}/posts`, { params: { limit } });
+  return res.data.data?.posts ?? res.data.data ?? [];
 }
 
 export async function getCreatorProfile(userId: string): Promise<CreatorProfile> {
@@ -169,7 +174,7 @@ export async function reportPost(id: string, reason: string, details?: string): 
 // ─── Tags ────────────────────────────────────────────────────
 
 export async function getTrendingTags(): Promise<TrendingTag[]> {
-  const res = await client.get('/explore/tags/trending');
+  const res = await client.get('/explore/tags');
   return res.data.data?.tags ?? res.data.data ?? [];
 }
 

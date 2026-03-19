@@ -66,11 +66,6 @@ data class CreatePostRequest(
 )
 
 @JsonClass(generateAdapter = true)
-data class AddCommentRequest(
-    val content: String,
-)
-
-@JsonClass(generateAdapter = true)
 data class RecordViewRequest(
     @Json(name = "duration_seconds") val durationSeconds: Int = 0,
 )

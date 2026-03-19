@@ -18,9 +18,8 @@ import {
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
+import type { Post, PostComment } from '../api/explore';
 import {
-  Post,
-  PostComment,
   likePost,
   unlikePost,
   recordView,
@@ -35,6 +34,7 @@ import {
   formatDuration,
 } from '../api/explore';
 import { getDownloadUrl } from '../api/files';
+import client from '../api/client';
 
 interface VideoWatchModalProps {
   post: Post;
@@ -78,14 +78,33 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
 
     return () => {
       if (viewTimer.current) clearTimeout(viewTimer.current);
+      setVideoUrl((prev) => { if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev); return prev; });
     };
   }, [currentPost.id]);
 
   async function loadVideoUrl() {
-    try {
-      const url = await getDownloadUrl(currentPost.file_id);
-      setVideoUrl(url);
-    } catch {
+    // Use video_url from post (presigned MinIO URL) if available
+    if (currentPost.video_url) {
+      setVideoUrl(currentPost.video_url);
+      return;
+    }
+    // Fallback: fetch via authenticated proxy if file_id exists
+    if (currentPost.file_id) {
+      try {
+        const res = await client.get(`/files/${currentPost.file_id}/download-proxy`, {
+          responseType: 'blob',
+        });
+        const blob = new Blob([res.data], { type: 'video/mp4' });
+        setVideoUrl(URL.createObjectURL(blob));
+      } catch {
+        try {
+          const url = await getDownloadUrl(currentPost.file_id);
+          setVideoUrl(url);
+        } catch {
+          setVideoUrl(null);
+        }
+      }
+    } else {
       setVideoUrl(null);
     }
   }
@@ -230,9 +249,18 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
     }
   }
 
+  const [shareToast, setShareToast] = useState(false);
+
   function handleShare() {
     const url = `${window.location.origin}/explore?watch=${currentPost.id}`;
-    navigator.clipboard?.writeText(url);
+    if (navigator.share) {
+      navigator.share({ title: currentPost.caption, url }).catch(() => {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => {
+        setShareToast(true);
+        setTimeout(() => setShareToast(false), 2000);
+      });
+    }
   }
 
   function handleVideoEnd() {
@@ -448,10 +476,10 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
               </button>
               <button
                 onClick={handleShare}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors"
+                className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors"
               >
                 <Share2 size={18} />
-                Share
+                {shareToast ? 'Link copied!' : 'Share'}
               </button>
               <button
                 onClick={() => setShowReport(!showReport)}

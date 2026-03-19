@@ -72,13 +72,14 @@ func (s *Service) Create(ctx context.Context, claims *auth.TokenClaims, req Crea
 	}
 
 	// Hash password if provided
-	var passwordHash string
+	var passwordHash *string
 	if req.Password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, common.ErrInternal("failed to hash password")
 		}
-		passwordHash = string(hash)
+		h := string(hash)
+		passwordHash = &h
 	}
 
 	share := &Share{
@@ -107,11 +108,32 @@ func (s *Service) List(ctx context.Context, claims *auth.TokenClaims) ([]ShareRe
 		return nil, common.ErrInternal("failed to list shares")
 	}
 
+	// Batch-fetch all files in one query instead of N individual GetByID calls.
+	fileIDs := make([]uuid.UUID, 0, len(shares))
+	for _, sh := range shares {
+		if sh.FileID != nil {
+			fileIDs = append(fileIDs, *sh.FileID)
+		}
+	}
+
+	fileMap := map[uuid.UUID]*file.File{}
+	if len(fileIDs) > 0 {
+		files, err := s.fileRepo.GetByIDs(ctx, fileIDs, claims.UserID)
+		if err != nil {
+			slog.Error("failed to batch-fetch files for shares", "error", err)
+			// Fall through with empty map; toResponse handles nil file gracefully.
+		} else {
+			for i := range files {
+				fileMap[files[i].ID] = &files[i]
+			}
+		}
+	}
+
 	result := make([]ShareResponse, len(shares))
 	for i, sh := range shares {
 		var f *file.File
 		if sh.FileID != nil {
-			f, _ = s.fileRepo.GetByID(ctx, *sh.FileID, claims.UserID)
+			f = fileMap[*sh.FileID]
 		}
 		result[i] = *s.toResponse(&sh, f)
 	}
@@ -168,7 +190,7 @@ func (s *Service) GetPublicInfo(ctx context.Context, code string, viewerID *uuid
 
 	resp := &PublicShareResponse{
 		ShareType:      share.ShareType,
-		HasPassword:    share.PasswordHash != "",
+		HasPassword:    share.PasswordHash != nil && *share.PasswordHash != "",
 		DownloadCount:  int64(share.DownloadCount),
 		AppDownloadURL: "https://byteboxapp.com/download",
 		ExpiresAt:      share.ExpiresAt,
@@ -301,8 +323,8 @@ func (s *Service) GetPublicFolderContents(ctx context.Context, code, password st
 	}
 
 	// Check password
-	if share.PasswordHash != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)); err != nil {
+	if share.PasswordHash != nil && *share.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(*share.PasswordHash), []byte(password)); err != nil {
 			return nil, common.ErrUnauthorized("incorrect password")
 		}
 	}
@@ -342,8 +364,8 @@ func (s *Service) DownloadPublic(ctx context.Context, code, password string, fil
 	}
 
 	// Check password
-	if share.PasswordHash != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)); err != nil {
+	if share.PasswordHash != nil && *share.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(*share.PasswordHash), []byte(password)); err != nil {
 			return nil, common.ErrUnauthorized("incorrect password")
 		}
 	}
@@ -412,8 +434,8 @@ func (s *Service) PreviewPublic(ctx context.Context, code, password string) (*Pr
 	}
 
 	// Check password
-	if share.PasswordHash != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)); err != nil {
+	if share.PasswordHash != nil && *share.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(*share.PasswordHash), []byte(password)); err != nil {
 			return nil, common.ErrUnauthorized("incorrect password")
 		}
 	}
@@ -573,8 +595,8 @@ func (s *Service) SaveToStorage(ctx context.Context, claims *auth.TokenClaims, c
 	}
 
 	// Check password
-	if share.PasswordHash != "" {
-		if err := bcrypt.CompareHashAndPassword([]byte(share.PasswordHash), []byte(password)); err != nil {
+	if share.PasswordHash != nil && *share.PasswordHash != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(*share.PasswordHash), []byte(password)); err != nil {
 			return nil, common.ErrUnauthorized("incorrect password")
 		}
 	}
@@ -690,7 +712,7 @@ func (s *Service) toResponse(share *Share, f *file.File) *ShareResponse {
 		ShareType:     share.ShareType,
 		Code:          share.Code,
 		URL:           fmt.Sprintf("%s/s/%s", s.baseURL, share.Code),
-		HasPassword:   share.PasswordHash != "",
+		HasPassword:   share.PasswordHash != nil && *share.PasswordHash != "",
 		ExpiresAt:     share.ExpiresAt,
 		MaxDownloads:  share.MaxDownloads,
 		DownloadCount: share.DownloadCount,

@@ -47,7 +47,12 @@ export default function UserStoragePage() {
     try {
       const { data } = await adminApi.getTopStorageUsers();
       const d = data as any;
-      setUsers(d.users ?? d ?? []);
+      const raw = d?.data ?? d?.users ?? d ?? [];
+      const list = (Array.isArray(raw) ? raw : []).map((u: any) => ({
+        ...u,
+        usage_percent: u.usage_percent ?? (u.storage_limit > 0 ? (u.storage_used / u.storage_limit) * 100 : 0),
+      }));
+      setUsers(list);
     } catch {
       setUsers([]);
     } finally {

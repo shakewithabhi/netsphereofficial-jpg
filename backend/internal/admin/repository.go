@@ -296,7 +296,7 @@ func (r *Repository) ListAuditLogs(ctx context.Context, limit, offset int, actio
 
 	query := `
 		SELECT a.id, a.user_id, u.email, a.action, a.resource_type, a.resource_id,
-		       a.metadata, a.ip_address, a.created_at
+		       a.metadata, a.ip_address::text, a.created_at
 		FROM audit_logs a
 		LEFT JOIN users u ON u.id = a.user_id
 		WHERE 1=1`
@@ -436,7 +436,7 @@ func (r *Repository) GetUserActivity(ctx context.Context, userID uuid.UUID, limi
 
 	rows, err := r.db.Query(ctx, `
 		SELECT a.id, a.user_id, u.email, a.action, a.resource_type, a.resource_id,
-		       a.metadata, a.ip_address, a.created_at
+		       a.metadata, a.ip_address::text, a.created_at
 		FROM audit_logs a
 		LEFT JOIN users u ON u.id = a.user_id
 		WHERE a.user_id = $1

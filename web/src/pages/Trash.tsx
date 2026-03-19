@@ -140,6 +140,40 @@ export default function Trash() {
     return () => { cancelled = true; };
   }, [files]);
 
+  const [bulkLoading, setBulkLoading] = useState<'restore' | 'empty' | null>(null);
+  const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
+
+  async function handleRestoreAll() {
+    setBulkLoading('restore');
+    try {
+      await Promise.allSettled([
+        ...files.map((f) => restoreFile(f.id)),
+        ...folders.map((f) => restoreFolder(f.id)),
+      ]);
+      refresh();
+    } catch {
+      setError('Failed to restore some items.');
+    } finally {
+      setBulkLoading(null);
+    }
+  }
+
+  async function handleEmptyTrash() {
+    setBulkLoading('empty');
+    setConfirmEmptyTrash(false);
+    try {
+      await Promise.allSettled([
+        ...files.map((f) => deleteFilePermanently(f.id)),
+        ...folders.map((f) => deleteFolder(f.id)),
+      ]);
+      refresh();
+    } catch {
+      setError('Failed to delete some items.');
+    } finally {
+      setBulkLoading(null);
+    }
+  }
+
   const isEmpty = !loading && folders.length === 0 && files.length === 0;
 
   return (
@@ -148,9 +182,27 @@ export default function Trash() {
         <div className="flex items-center justify-between mb-6">
           <Breadcrumb crumbs={[{ label: 'Trash' }]} />
           {!isEmpty && (
-            <p className="text-xs text-slate-400">
-              {folders.length + files.length} item{folders.length + files.length !== 1 ? 's' : ''}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-slate-400">
+                {folders.length + files.length} item{folders.length + files.length !== 1 ? 's' : ''}
+              </p>
+              <button
+                onClick={handleRestoreAll}
+                disabled={bulkLoading !== null}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RotateCcw size={14} className={bulkLoading === 'restore' ? 'animate-spin' : ''} />
+                Restore All
+              </button>
+              <button
+                onClick={() => setConfirmEmptyTrash(true)}
+                disabled={bulkLoading !== null}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={14} className={bulkLoading === 'empty' ? 'animate-spin' : ''} />
+                Empty Trash
+              </button>
+            </div>
           )}
         </div>
 
@@ -303,6 +355,41 @@ export default function Trash() {
           </div>
         )}
       </div>
+
+      {/* Confirm empty trash dialog */}
+      {confirmEmptyTrash && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-800 dark:text-slate-200">Empty trash?</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    All {folders.length + files.length} items will be permanently deleted.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmEmptyTrash(false)}
+                  className="flex-1 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEmptyTrash}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  Delete all forever
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirm delete dialog */}
       {confirmDelete && (
