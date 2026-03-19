@@ -27,6 +27,12 @@ interface ShareApi {
         @Query("limit") limit: Int = 50
     ): Response<ShareListResponse>
 
+    @GET("explore/search")
+    suspend fun searchExploreItems(
+        @Query("q") query: String,
+        @Query("limit") limit: Int = 20,
+    ): Response<ExploreResponse>
+
     // Public share view endpoints (no auth required)
     @GET("s/{code}")
     suspend fun getShareInfo(@Path("code") code: String): Response<ShareInfoResponse>
@@ -49,12 +55,6 @@ interface ShareApi {
         @Body request: SaveToStorageRequest,
         @Header("X-Share-Password") password: String? = null
     ): Response<FileDto>
-
-    @GET("explore/search")
-    suspend fun searchExploreItems(
-        @Query("q") query: String,
-        @Query("limit") limit: Int = 20,
-    ): Response<ExploreResponse>
 
     @GET("explore-shares")
     suspend fun getExploreItems(

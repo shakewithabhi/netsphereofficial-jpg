@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
@@ -42,28 +43,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,14 +70,10 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,36 +81,22 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.PlayerView
 import coil.compose.SubcomposeAsyncImage
-import com.bytebox.core.common.FileCategory
-import com.bytebox.core.common.toLocalDateTime
-import com.bytebox.core.common.toRelativeTime
-import com.bytebox.core.common.toReadableFileSize
 import com.bytebox.core.ui.components.EmptyState
 import com.bytebox.core.ui.components.ErrorState
 import com.bytebox.core.ui.components.FileListShimmer
-import com.bytebox.core.ui.components.FileTypeIcon
-import com.bytebox.domain.model.ExploreItem
 import com.bytebox.domain.model.Post
-import timber.log.Timber
 
 private data class CategoryChip(val label: String, val value: String?, val icon: String)
 
@@ -135,6 +112,7 @@ private val categoryChips = listOf(
     CategoryChip("Comedy", "comedy", ""),
 )
 
+// Deterministic color for owner avatar based on name
 private fun avatarColor(name: String): Color {
     val colors = listOf(
         Color(0xFF2563EB), Color(0xFF059669), Color(0xFFDC2626),
@@ -146,181 +124,132 @@ private fun avatarColor(name: String): Color {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
-    onPostClick: (postId: String) -> Unit,
-    onCreatePost: () -> Unit = {},
+    onItemClick: (code: String) -> Unit,
     onUploadClick: () -> Unit = {},
-    onItemClick: (code: String) -> Unit = {},
     viewModel: ExploreViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var isSearchVisible by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
 
+    // Refresh feed whenever the screen resumes (e.g. after uploading a new file)
+    // Uses refresh() to avoid clearing existing items while new data loads
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
         onPauseOrDispose {}
-    }
-
-    // Track which item index is most visible for inline video preview
-    var activeVideoIndex by remember { mutableStateOf(-1) }
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            val visibleItems = listState.layoutInfo.visibleItemsInfo
-            // Find the most centered visible item (skip first item which is the filter chips)
-            visibleItems
-                .filter { it.index > 0 }
-                .maxByOrNull { info ->
-                    val viewportCenter = listState.layoutInfo.viewportStartOffset +
-                            (listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset) / 2
-                    val itemCenter = info.offset + info.size / 2
-                    -(kotlin.math.abs(viewportCenter - itemCenter))
-                }?.index?.minus(1) ?: -1 // -1 for filter chip offset
-        }.collect { idx ->
-            activeVideoIndex = idx
-        }
-    }
-
-    // Focus manager for search
-    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-
-    // Full-screen search overlay (YouTube-style)
-    if (uiState.isSearchActive) {
-        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
-        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            // Search bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = { viewModel.clearSearch() }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                }
-                androidx.compose.material3.OutlinedTextField(
-                    value = uiState.searchQuery,
-                    onValueChange = viewModel::onSearchQueryChanged,
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester),
-                    placeholder = { Text("Search videos, images...", fontSize = 14.sp) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        imeAction = androidx.compose.ui.text.input.ImeAction.Search,
-                    ),
-                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                        onSearch = { viewModel.submitSearch(); focusManager.clearFocus() },
-                    ),
-                    trailingIcon = {
-                        if (uiState.searchQuery.isNotBlank()) {
-                            IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    },
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-
-            // Suggestions or search results
-            when {
-                uiState.isSearching -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
-                }
-                uiState.searchResults.isNotEmpty() -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 88.dp)) {
-                        item {
-                            Text(
-                                "${uiState.searchResults.size} results for \"${uiState.searchQuery}\"",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        }
-                        items(uiState.searchResults, key = { "search_${it.id}" }) { item ->
-                            ExploreCard(
-                                item = item,
-                                isActivePreview = false,
-                                onClick = { onItemClick(item.code) },
-                                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 16.dp),
-                            )
-                        }
-                    }
-                }
-                uiState.showSuggestions && uiState.suggestions.isNotEmpty() -> {
-                    // Suggestions list
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(uiState.suggestions, key = { "sug_${it.id}" }) { suggestion ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.onSearchQueryChanged(suggestion.fileName)
-                                        viewModel.submitSearch()
-                                        focusManager.clearFocus()
-                                    }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(suggestion.fileName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("@${suggestion.ownerName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                        }
-                    }
-                }
-                uiState.searchQuery.isBlank() -> {
-                    // Empty state — recent or trending placeholder
-                    Box(modifier = Modifier.fillMaxSize().padding(top = 48.dp), contentAlignment = Alignment.TopCenter) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f), modifier = Modifier.size(64.dp))
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Search for videos, images & more", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
-                        }
-                    }
-                }
-            }
-        }
-        return@ExploreScreen
     }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(text = "Explore", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) },
-                actions = {
-                    IconButton(onClick = { viewModel.activateSearch() }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onBackground)
-                    }
-                    IconButton(onClick = onUploadClick) {
-                        Icon(Icons.Default.CloudUpload, contentDescription = "Upload to Explore", tint = MaterialTheme.colorScheme.onBackground)
-                    }
-                },
-                windowInsets = WindowInsets(0),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    actionIconContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
-            )
+            if (isSearchVisible) {
+                // Search bar
+                TopAppBar(
+                    windowInsets = WindowInsets(0),
+                    title = {
+                        TextField(
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::setSearchQuery,
+                            placeholder = {
+                                Text(
+                                    "Search videos, creators...",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            isSearchVisible = false
+                            viewModel.clearSearch()
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close search")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            } else {
+                TopAppBar(
+                    windowInsets = WindowInsets(0),
+                    title = {
+                        Text(
+                            text = "Explore",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = { isSearchVisible = true }) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        IconButton(onClick = onUploadClick) {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .background(
+                                        brush = Brush.linearGradient(
+                                            colors = listOf(
+                                                Color(0xFF6366F1),
+                                                Color(0xFF8B5CF6),
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Upload",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    ),
+                )
+            }
         },
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        AnimatedVisibility(
+            visible = uiState.isSearchActive && uiState.searchQuery.isNotBlank(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            // Search results
+            SearchResultsContent(
+                results = uiState.searchResults,
+                onPostClick = onItemClick,
+                onLikeClick = viewModel::toggleLike,
+                modifier = Modifier.padding(padding),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = !uiState.isSearchActive || uiState.searchQuery.isBlank(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
             when {
                 uiState.isLoading && uiState.forYou.isEmpty() && uiState.trending.isEmpty() -> {
-                    ExploreShimmer(modifier = Modifier)
+                    ExploreShimmer(modifier = Modifier.padding(padding))
                 }
                 uiState.error != null && uiState.forYou.isEmpty() && uiState.trending.isEmpty() -> {
                     ErrorState(
@@ -331,48 +260,15 @@ fun ExploreScreen(
                 else -> {
                     ExploreFeedContent(
                         uiState = uiState,
-                        onPostClick = onPostClick,
+                        onPostClick = onItemClick,
                         onTabSelect = viewModel::setTab,
                         onLikeClick = viewModel::toggleLike,
-                        modifier = Modifier,
+                        modifier = Modifier.padding(padding),
                     )
                 }
             }
         }
     }
-}
-
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable
-private fun InlineVideoPreview(
-    videoUrl: String,
-    modifier: Modifier = Modifier,
-) {
-    val context = LocalContext.current
-    val exoPlayer = remember(videoUrl) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(videoUrl))
-            prepare()
-            volume = 0f
-            repeatMode = Player.REPEAT_MODE_ONE
-            playWhenReady = true
-        }
-    }
-
-    DisposableEffect(exoPlayer) {
-        onDispose { exoPlayer.release() }
-    }
-
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                player = exoPlayer
-                useController = false
-                setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-            }
-        },
-        modifier = modifier,
-    )
 }
 
 @Composable
@@ -741,7 +637,7 @@ private fun TrendingCard(
                             fontWeight = FontWeight.Medium,
                         )
                         Text(
-                            text = "  \u00B7  ",
+                            text = "  ·  ",
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 11.sp,
                         )
@@ -942,139 +838,130 @@ private fun FeedCard(
     }
 }
 
-// ─── Explore Card (YouTube-style, used for search results and explore items) ─
+// ─── Search Results ──────────────────────────────────────────────────────────
 
 @Composable
-private fun ExploreCard(
-    item: ExploreItem,
-    isActivePreview: Boolean,
-    onClick: () -> Unit,
+private fun SearchResultsContent(
+    results: List<Post>,
+    onPostClick: (String) -> Unit,
+    onLikeClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        // ── Thumbnail (edge-to-edge, 16:9) ──────────────────────────────
+    if (results.isEmpty()) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(5.dp))
-                .aspectRatio(16f / 9f)
-                .background(Color(0xFF1A1A2E)),
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            if (isActivePreview && item.hlsUrl != null) {
-                InlineVideoPreview(videoUrl = item.hlsUrl!!, modifier = Modifier.fillMaxSize())
-                Surface(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color.Black.copy(alpha = 0.7f),
-                ) {
-                    Icon(Icons.Default.VolumeOff, null, tint = Color.White, modifier = Modifier.size(22.dp).padding(3.dp))
-                }
-            } else if (item.thumbnailUrl != null) {
-                SubcomposeAsyncImage(
-                    model = item.thumbnailUrl,
-                    contentDescription = item.fileName,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    error = {
-                        Box(Modifier.fillMaxSize().background(Color(0xFF1A1A2E)), contentAlignment = Alignment.Center) {
-                            FileTypeIcon(category = item.category, containerSize = 48.dp)
-                        }
-                    },
-                )
-            } else {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    FileTypeIcon(category = item.category, containerSize = 48.dp)
-                }
-            }
-
-            // Play button overlay (videos only, not previewing)
-            if (item.category == FileCategory.VIDEO && !isActivePreview) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.6f), modifier = Modifier.size(48.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.PlayArrow, "Play", tint = Color.White, modifier = Modifier.size(28.dp))
-                        }
-                    }
-                }
-            }
-
-            // Size badge (bottom-right, like YouTube duration)
-            Surface(
-                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                shape = RoundedCornerShape(4.dp),
-                color = Color.Black.copy(alpha = 0.8f),
-            ) {
-                Text(
-                    text = item.fileSize.toReadableFileSize(),
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            Text(
+                "No results found",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(results, key = { "search_${it.id}" }) { post ->
+                SearchResultCard(
+                    post = post,
+                    onClick = { onPostClick(post.id) },
                 )
             }
         }
+    }
+}
 
-        // ── Info row (avatar + title/meta + more) ───────────────────────
+@Composable
+private fun SearchResultCard(
+    post: Post,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val clipboardManager = LocalClipboardManager.current
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .padding(top = 10.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.Top,
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Avatar
-            val initials = item.ownerName
-                .split(" ", limit = 2)
-                .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-                .take(2).joinToString("").ifEmpty { "?" }
+            // Thumbnail
             Box(
                 modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(avatarColor(item.ownerName)),
-                contentAlignment = Alignment.Center,
+                    .size(width = 120.dp, height = 68.dp)
+                    .clip(RoundedCornerShape(10.dp)),
             ) {
-                Text(initials, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                if (post.thumbnailUrl != null) {
+                    SubcomposeAsyncImage(
+                        model = post.thumbnailUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        error = {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (post.durationSeconds > 0) {
+                    DurationBadge(
+                        seconds = post.durationSeconds,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp),
+                    )
+                }
             }
-
             Spacer(modifier = Modifier.width(12.dp))
-
-            // Title + meta
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = item.fileName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+                    text = post.caption.ifBlank { post.fileName },
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 20.sp,
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = buildString {
-                        append(item.ownerName)
-                        append("  \u00B7  ${formatCount(item.downloadCount)} views")
-                        append("  \u00B7  ${formatCount(item.likeCount)} likes")
-                        val time = try { item.createdAt.toLocalDateTime().toRelativeTime() } catch (_: Exception) { "" }
-                        if (time.isNotEmpty()) append("  \u00B7  $time")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = "@${post.userName}  ·  ${formatCount(post.viewCount)} views",
                     fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-
-            // More button
-            IconButton(onClick = { /* TODO: more menu */ }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.MoreVert, "More", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
     }

@@ -105,7 +105,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
 import coil.compose.SubcomposeAsyncImage
 import com.bytebox.core.common.FileCategory
 import com.bytebox.core.common.toLocalDateTime
@@ -237,6 +236,25 @@ fun ExploreVideoScreen(
         // Normal portrait mode
         Scaffold(
             containerColor = Color(0xFF0F172A),
+            topBar = {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White,
+                            )
+                        }
+                    },
+                    windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Black,
+                        navigationIconContentColor = Color.White,
+                    ),
+                )
+            },
         ) { padding ->
             when {
                 uiState.isLoading -> {
@@ -256,154 +274,140 @@ fun ExploreVideoScreen(
                     val info = uiState.shareInfo
                     val listState = rememberLazyListState()
                     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize().imePadding(),
-                    ) {
-                        // Video player
-                        item {
-                            val hlsUrl = info?.hlsUrl
-                            val isImage = info?.mimeType?.startsWith("image/") == true
-                            when {
-                                info?.isVideo == true && !hlsUrl.isNullOrBlank() -> {
-                                    YouTubeStylePlayer(
-                                        hlsUrl = hlsUrl,
-                                        thumbnailUrl = info.videoThumbnailUrl ?: info.thumbnailUrl,
-                                        isFullscreen = false,
-                                        onToggleFullscreen = {
-                                            isFullscreen = true
-                                            enterImmersive()
-                                        },
-                                        onPipRequest = { enterPip(activity) },
-                                    )
-                                }
-                                info?.isVideo == true -> {
-                                    val downloadUrl = uiState.downloadUrl
-                                    if (downloadUrl != null) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize().imePadding(),
+                        ) {
+                            // Video player
+                            item {
+                                val hlsUrl = info?.hlsUrl
+                                val isImage = info?.mimeType?.startsWith("image/") == true
+                                when {
+                                    info?.isVideo == true && !hlsUrl.isNullOrBlank() -> {
                                         YouTubeStylePlayer(
-                                            progressiveUrl = downloadUrl,
+                                            hlsUrl = hlsUrl,
                                             thumbnailUrl = info.videoThumbnailUrl ?: info.thumbnailUrl,
                                             isFullscreen = false,
                                             onToggleFullscreen = {
                                                 isFullscreen = true
-                                                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                                enterImmersive()
                                             },
                                             onPipRequest = { enterPip(activity) },
                                         )
-                                    } else {
-                                        LaunchedEffect(code) { viewModel.fetchDownloadUrl(code) {} }
-                                        Box(
-                                            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
-                                            contentAlignment = Alignment.Center,
-                                        ) { CircularProgressIndicator(color = Color.White) }
                                     }
-                                }
-                                isImage -> {
-                                    val previewUrl = info.thumbnailUrl ?: uiState.downloadUrl
-                                    if (previewUrl != null) {
-                                        Box(modifier = Modifier.fillMaxWidth().background(Color.Black), contentAlignment = Alignment.Center) {
-                                            SubcomposeAsyncImage(
-                                                model = previewUrl, contentDescription = info.fileName,
-                                                modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth,
-                                                error = { FilePreviewPlaceholder() },
+                                    info?.isVideo == true -> {
+                                        val downloadUrl = uiState.downloadUrl
+                                        if (downloadUrl != null) {
+                                            YouTubeStylePlayer(
+                                                progressiveUrl = downloadUrl,
+                                                thumbnailUrl = info.videoThumbnailUrl ?: info.thumbnailUrl,
+                                                isFullscreen = false,
+                                                onToggleFullscreen = {
+                                                    isFullscreen = true
+                                                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                                },
+                                                onPipRequest = { enterPip(activity) },
                                             )
+                                        } else {
+                                            LaunchedEffect(code) { viewModel.fetchDownloadUrl(code) {} }
+                                            Box(
+                                                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
+                                                contentAlignment = Alignment.Center,
+                                            ) { CircularProgressIndicator(color = Color.White) }
                                         }
-                                    } else {
-                                        LaunchedEffect(code) { viewModel.fetchDownloadUrl(code) {} }
+                                    }
+                                    isImage -> {
+                                        val previewUrl = info.thumbnailUrl ?: uiState.downloadUrl
+                                        if (previewUrl != null) {
+                                            Box(modifier = Modifier.fillMaxWidth().background(Color.Black), contentAlignment = Alignment.Center) {
+                                                SubcomposeAsyncImage(
+                                                    model = previewUrl, contentDescription = info.fileName,
+                                                    modifier = Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth,
+                                                    error = { FilePreviewPlaceholder() },
+                                                )
+                                            }
+                                        } else {
+                                            LaunchedEffect(code) { viewModel.fetchDownloadUrl(code) {} }
+                                            Box(
+                                                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
+                                                contentAlignment = Alignment.Center,
+                                            ) { CircularProgressIndicator(color = Color.White) }
+                                        }
+                                    }
+                                    else -> {
                                         Box(
                                             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
                                             contentAlignment = Alignment.Center,
-                                        ) { CircularProgressIndicator(color = Color.White) }
-                                    }
-                                }
-                                else -> {
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        val preview = info?.videoThumbnailUrl ?: info?.thumbnailUrl
-                                        if (preview != null) {
-                                            SubcomposeAsyncImage(model = preview, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, error = { FilePreviewPlaceholder() })
-                                        } else { FilePreviewPlaceholder() }
+                                        ) {
+                                            val preview = info?.videoThumbnailUrl ?: info?.thumbnailUrl
+                                            if (preview != null) {
+                                                SubcomposeAsyncImage(model = preview, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, error = { FilePreviewPlaceholder() })
+                                            } else { FilePreviewPlaceholder() }
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        // Title and metadata
-                        item {
-                            Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(16.dp)) {
-                                Text(info?.fileName ?: "Shared File", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (info?.ownerName?.isNotEmpty() == true) { Text("@${info.ownerName}", fontSize = 13.sp, color = Color(0xFF94A3B8)); Text("  ·  ", fontSize = 13.sp, color = Color(0xFF64748B)) }
-                                    val fileSize = info?.fileSize; if (fileSize != null && fileSize > 0) { Text(fileSize.toReadableFileSize(), fontSize = 13.sp, color = Color(0xFF94A3B8)); Text("  ·  ", fontSize = 13.sp, color = Color(0xFF64748B)) }
-                                    Text("${info?.downloadCount ?: 0} downloads", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                            // Title and metadata
+                            item {
+                                Column(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(16.dp)) {
+                                    Text(info?.fileName ?: "Shared File", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (info?.ownerName?.isNotEmpty() == true) { Text("@${info.ownerName}", fontSize = 13.sp, color = Color(0xFF94A3B8)); Text("  ·  ", fontSize = 13.sp, color = Color(0xFF64748B)) }
+                                        val fileSize = info?.fileSize; if (fileSize != null && fileSize > 0) { Text(fileSize.toReadableFileSize(), fontSize = 13.sp, color = Color(0xFF94A3B8)); Text("  ·  ", fontSize = 13.sp, color = Color(0xFF64748B)) }
+                                        Text("${info?.downloadCount ?: 0} downloads", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                                    }
                                 }
                             }
-                        }
 
-                        // Action buttons
-                        item {
-                            Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                FilledTonalButton(onClick = { viewModel.toggleLike(code) }, modifier = Modifier.weight(1f), enabled = !uiState.isLikeLoading) {
-                                    if (uiState.isLikeLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    else Icon(if (info?.isLiked == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Like", tint = if (info?.isLiked == true) Color(0xFFEF4444) else Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp)); Text("${info?.likeCount ?: 0} Likes", color = if (info?.isLiked == true) Color(0xFFEF4444) else Color(0xFF94A3B8))
-                                }
-                                FilledTonalButton(onClick = { viewModel.fetchDownloadUrl(code) { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }, modifier = Modifier.weight(1f), enabled = !uiState.isDownloading) {
-                                    if (uiState.isDownloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                                    else Icon(Icons.Default.Download, "Download", modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp)); Text("Download")
-                                }
-                            }
-                        }
-
-                        // Related videos
-                        if (uiState.relatedItems.isNotEmpty()) {
-                            item { HorizontalDivider(color = Color(0xFF334155), thickness = 1.dp); Text("Up next", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 12.dp)) }
-                            items(uiState.relatedItems, key = { "related_${it.id}" }) { relatedItem -> RelatedItemRow(item = relatedItem, onClick = { onNavigateToItem?.invoke(relatedItem.code) }) }
-                            item { HorizontalDivider(color = Color(0xFF334155), thickness = 1.dp) }
-                        }
-
-                        // Comments
-                        item {
-                            Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.AutoMirrored.Filled.Comment, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp)); Spacer(modifier = Modifier.width(8.dp))
-                                Text("${info?.commentCount ?: uiState.comments.size} Comments", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
-                            }
-                        }
-                        item {
-                            Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                OutlinedTextField(value = uiState.commentText, onValueChange = viewModel::updateCommentText, modifier = Modifier.weight(1f), placeholder = { Text("Add a comment...", color = Color(0xFF64748B), fontSize = 14.sp) }, isError = uiState.commentError != null, singleLine = true, shape = RoundedCornerShape(24.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(onClick = { viewModel.submitComment(code) }, enabled = !uiState.isSubmittingComment && uiState.commentText.isNotBlank()) {
-                                    if (uiState.isSubmittingComment) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF60A5FA))
-                                    else Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (uiState.commentText.isNotBlank()) Color(0xFF60A5FA) else Color(0xFF475569))
+                            // Action buttons
+                            item {
+                                Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    FilledTonalButton(onClick = { viewModel.toggleLike(code) }, modifier = Modifier.weight(1f), enabled = !uiState.isLikeLoading) {
+                                        if (uiState.isLikeLoading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        else Icon(if (info?.isLiked == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder, "Like", tint = if (info?.isLiked == true) Color(0xFFEF4444) else Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp)); Text("${info?.likeCount ?: 0} Likes", color = if (info?.isLiked == true) Color(0xFFEF4444) else Color(0xFF94A3B8))
+                                    }
+                                    FilledTonalButton(onClick = { viewModel.fetchDownloadUrl(code) { url -> context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }, modifier = Modifier.weight(1f), enabled = !uiState.isDownloading) {
+                                        if (uiState.isDownloading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        else Icon(Icons.Default.Download, "Download", modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp)); Text("Download")
+                                    }
                                 }
                             }
-                            if (uiState.commentError != null) Text(uiState.commentError!!, color = Color(0xFFEF4444), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+
+                            // Related videos
+                            if (uiState.relatedItems.isNotEmpty()) {
+                                item { HorizontalDivider(color = Color(0xFF334155), thickness = 1.dp); Text("Up next", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 12.dp)) }
+                                items(uiState.relatedItems, key = { "related_${it.id}" }) { relatedItem -> RelatedItemRow(item = relatedItem, onClick = { onNavigateToItem?.invoke(relatedItem.code) }) }
+                                item { HorizontalDivider(color = Color(0xFF334155), thickness = 1.dp) }
+                            }
+
+                            // Comments
+                            item {
+                                Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.AutoMirrored.Filled.Comment, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp)); Spacer(modifier = Modifier.width(8.dp))
+                                    Text("${info?.commentCount ?: uiState.comments.size} Comments", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
+                                }
+                            }
+                            item {
+                                Row(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedTextField(value = uiState.commentText, onValueChange = viewModel::updateCommentText, modifier = Modifier.weight(1f), placeholder = { Text("Add a comment...", color = Color(0xFF64748B), fontSize = 14.sp) }, isError = uiState.commentError != null, singleLine = true, shape = RoundedCornerShape(24.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    IconButton(onClick = { viewModel.submitComment(code) }, enabled = !uiState.isSubmittingComment && uiState.commentText.isNotBlank()) {
+                                        if (uiState.isSubmittingComment) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color(0xFF60A5FA))
+                                        else Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = if (uiState.commentText.isNotBlank()) Color(0xFF60A5FA) else Color(0xFF475569))
+                                    }
+                                }
+                                if (uiState.commentError != null) Text(uiState.commentError!!, color = Color(0xFFEF4444), fontSize = 12.sp, modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(start = 16.dp, end = 16.dp, bottom = 8.dp))
+                            }
+                            if (uiState.isCommentsLoading) { item { Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = Color(0xFF60A5FA)) } } }
+                            else if (uiState.comments.isEmpty()) { item { Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(32.dp), contentAlignment = Alignment.Center) { Text("No comments yet. Be the first!", color = Color(0xFF64748B), fontSize = 14.sp, textAlign = TextAlign.Center) } } }
+                            else { items(uiState.comments, key = { it.id }) { comment -> CommentItem(comment.userName, comment.content, comment.createdAt) } }
+                            item { Spacer(modifier = Modifier.height(24.dp)) }
                         }
-                        if (uiState.isCommentsLoading) { item { Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = Color(0xFF60A5FA)) } } }
-                        else if (uiState.comments.isEmpty()) { item { Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF1E293B)).padding(32.dp), contentAlignment = Alignment.Center) { Text("No comments yet. Be the first!", color = Color(0xFF64748B), fontSize = 14.sp, textAlign = TextAlign.Center) } } }
-                        else { items(uiState.comments, key = { it.id }) { comment -> CommentItem(comment.userName, comment.content, comment.createdAt) } }
-                        item { Spacer(modifier = Modifier.height(24.dp)) }
                     }
-
-                    // Back button overlaid on top of video area
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier
-                            .padding(start = 4.dp, top = 4.dp)
-                            .size(40.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                        )
-                    }
-                    } // Box
                 }
             }
         }
@@ -489,7 +493,15 @@ private fun YouTubeStylePlayer(
     ) {
         // Thumbnail
         if (!isPlaying && currentPosition == 0L && thumbnailUrl != null) {
-            AsyncImage(model = thumbnailUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            SubcomposeAsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                error = {
+                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+                },
+            )
         }
         // ExoPlayer
         AndroidView(

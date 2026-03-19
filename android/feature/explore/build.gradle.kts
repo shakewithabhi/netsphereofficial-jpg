@@ -50,7 +50,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.timber)
 
-    // Media3 / ExoPlayer for video playback
+    // Media3 / ExoPlayer for HLS video playback
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)

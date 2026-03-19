@@ -103,7 +103,7 @@ export default function BillingPage() {
       title: 'Amount',
       dataIndex: 'amount',
       width: 100,
-      render: (v: number) => `$${(v ?? 0).toFixed(2)}`,
+      render: (v: number) => `₹{(v ?? 0).toFixed(2)}`,
     },
     {
       title: 'Date',
@@ -134,7 +134,7 @@ export default function BillingPage() {
             <Statistic
               title="Monthly Recurring Revenue"
               value={b.mrr ?? 0}
-              prefix={<span style={{ color: '#52c41a' }}>$</span>}
+              prefix={<span style={{ color: '#52c41a' }}>₹</span>}
               precision={2}
             />
           </Card>
@@ -178,8 +178,8 @@ export default function BillingPage() {
             <LineChart data={b.revenue_over_time}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
-              <YAxis tickFormatter={(v) => `$${v}`} />
-              <Tooltip formatter={(v: number) => [`$${v.toFixed(2)}`, 'Revenue']} />
+              <YAxis tickFormatter={(v) => `₹{v}`} />
+              <Tooltip formatter={(v: number) => [`₹{v.toFixed(2)}`, 'Revenue']} />
               <Legend />
               <Line type="monotone" dataKey="revenue" stroke="#52c41a" name="Revenue" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
@@ -227,13 +227,13 @@ export default function BillingPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    label={({ plan, revenue }) => `${planLabel(plan)}: $${revenue.toFixed(0)}`}
+                    label={({ plan, revenue }) => `${planLabel(plan)}: ₹{revenue.toFixed(0)}`}
                   >
                     {(b.revenue_by_plan ?? []).map((entry, index) => (
                       <Cell key={index} fill={PLAN_COLORS[entry.plan] || PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [`$${v.toFixed(2)}`, 'Revenue']} />
+                  <Tooltip formatter={(v: number) => [`₹{v.toFixed(2)}`, 'Revenue']} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (

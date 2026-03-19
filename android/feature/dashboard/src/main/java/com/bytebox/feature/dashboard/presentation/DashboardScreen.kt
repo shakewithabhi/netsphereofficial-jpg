@@ -520,6 +520,7 @@ private fun CategoryGrid(
     onFolderClick: () -> Unit,
     onPublicClick: () -> Unit,
     onSharesClick: () -> Unit,
+    onFavoritesClick: () -> Unit = {},
     onCategoryFilter: (Set<FileCategory>?) -> Unit,
 ) {
     val tiles = listOf(
