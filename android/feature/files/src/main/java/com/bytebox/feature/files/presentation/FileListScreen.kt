@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Folder
@@ -142,6 +143,9 @@ fun FileListScreen(
     var showRenameFolderDialog by remember { mutableStateOf(false) }
     var renameFolderId by remember { mutableStateOf("") }
     var renameFolderName by remember { mutableStateOf("") }
+    var showRenameFileDialog by remember { mutableStateOf(false) }
+    var renameFileId by remember { mutableStateOf("") }
+    var renameFileName by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var deleteTargetId by remember { mutableStateOf("") }
     var deleteTargetName by remember { mutableStateOf("") }
@@ -619,6 +623,149 @@ fun FileListScreen(
         }
     }
 
+    // Rename file dialog
+    if (showRenameFileDialog) {
+        Dialog(onDismissRequest = { showRenameFileDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(modifier = Modifier.padding(ByteBoxTheme.spacing.xl)) {
+                    Text("Rename File", style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
+                    com.bytebox.core.ui.components.ByteBoxTextField(
+                        value = renameFileName,
+                        onValueChange = { renameFileName = it },
+                        label = "File name",
+                    )
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.lg))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = { showRenameFileDialog = false }) { Text("Cancel") }
+                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                        TextButton(
+                            onClick = {
+                                viewModel.renameFile(renameFileId, renameFileName)
+                                showRenameFileDialog = false
+                            },
+                            enabled = renameFileName.isNotBlank(),
+                        ) { Text("Rename") }
+                    }
+                }
+            }
+        }
+    }
+
+    // Move file dialog (folder picker)
+    if (uiState.showMoveDialog) {
+        var moveBreadcrumbs by remember { mutableStateOf(listOf<BreadcrumbItem>(BreadcrumbItem(null, "My Files"))) }
+
+        Dialog(onDismissRequest = { viewModel.hideMoveDialog() }) {
+            Card(
+                shape = RoundedCornerShape(ByteBoxTheme.radius.lg),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp),
+            ) {
+                Column(modifier = Modifier.padding(ByteBoxTheme.spacing.xl)) {
+                    Text("Move to...", style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+
+                    // Breadcrumb navigation
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        moveBreadcrumbs.forEachIndexed { index, crumb ->
+                            if (index > 0) {
+                                Text(" > ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Text(
+                                text = crumb.name,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (index == moveBreadcrumbs.lastIndex) FontWeight.Bold else FontWeight.Normal,
+                                color = if (index == moveBreadcrumbs.lastIndex) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                                modifier = if (index < moveBreadcrumbs.lastIndex) Modifier.clickable {
+                                    val newCrumbs = moveBreadcrumbs.subList(0, index + 1)
+                                    moveBreadcrumbs = newCrumbs
+                                    viewModel.loadMoveFolderContents(crumb.folderId)
+                                } else Modifier,
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+                    HorizontalDivider()
+
+                    if (uiState.isLoadingMoveFolders) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        }
+                    } else if (uiState.moveFolderOptions.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "No subfolders",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            items(uiState.moveFolderOptions, key = { it.id }) { folder ->
+                                ListItem(
+                                    headlineContent = { Text(folder.name) },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.Folder,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        moveBreadcrumbs = moveBreadcrumbs + BreadcrumbItem(folder.id, folder.name)
+                                        viewModel.loadMoveFolderContents(folder.id)
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.sm))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = { viewModel.hideMoveDialog() }) { Text("Cancel") }
+                        Spacer(modifier = Modifier.width(ByteBoxTheme.spacing.xs))
+                        TextButton(
+                            onClick = {
+                                val targetFolderId = moveBreadcrumbs.lastOrNull()?.folderId
+                                uiState.moveTargetFileId?.let { fileId ->
+                                    viewModel.moveFile(fileId, targetFolderId)
+                                }
+                            },
+                        ) { Text("Move Here") }
+                    }
+                }
+            }
+        }
+    }
+
     // Folder context menu
     contextMenuFolderId?.let { folderId ->
         val folder = uiState.folders.find { it.id == folderId }
@@ -717,6 +864,24 @@ fun FileListScreen(
                                 },
                             )
                         }
+                        ListItem(
+                            headlineContent = { Text("Rename") },
+                            leadingContent = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            modifier = Modifier.clickable {
+                                contextMenuFileId = null
+                                renameFileId = fileId
+                                renameFileName = file.name
+                                showRenameFileDialog = true
+                            },
+                        )
+                        ListItem(
+                            headlineContent = { Text("Move") },
+                            leadingContent = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = null) },
+                            modifier = Modifier.clickable {
+                                contextMenuFileId = null
+                                viewModel.showMoveDialog(fileId)
+                            },
+                        )
                         ListItem(
                             headlineContent = { Text("Copy") },
                             leadingContent = { Icon(Icons.Default.ContentCopy, contentDescription = null) },

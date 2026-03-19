@@ -130,4 +130,16 @@ interface FileApi {
 
     @POST("files/remote-upload")
     suspend fun remoteUpload(@Body request: RemoteUploadRequest): Response<FileDto>
+
+    @PUT("files/{id}")
+    suspend fun renameFile(
+        @Path("id") id: String,
+        @Body request: RenameFileRequest
+    ): Response<FileDto>
+
+    @POST("files/{id}/move")
+    suspend fun moveFile(
+        @Path("id") id: String,
+        @Body request: MoveFileRequest
+    ): Response<FileDto>
 }

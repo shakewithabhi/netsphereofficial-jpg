@@ -11,6 +11,7 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import ShareView from './pages/ShareView';
 import Shares from './pages/Shares';
+import Downloads from './pages/Downloads';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -119,6 +120,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Shares />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/downloads"
+          element={
+            <ProtectedRoute>
+              <Downloads />
             </ProtectedRoute>
           }
         />

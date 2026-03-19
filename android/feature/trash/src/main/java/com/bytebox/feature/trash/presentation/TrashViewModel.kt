@@ -18,6 +18,7 @@ data class TrashUiState(
     val files: List<FileItem> = emptyList(),
     val folders: List<Folder> = emptyList(),
     val isLoading: Boolean = false,
+    val isBulkOperationInProgress: Boolean = false,
     val errorMessage: String? = null,
     val previewUrl: String? = null,
     val previewFileName: String? = null
@@ -90,6 +91,36 @@ class TrashViewModel @Inject constructor(
                 }
                 is Result.Loading -> {}
             }
+        }
+    }
+
+    fun restoreAll() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBulkOperationInProgress = true) }
+            val currentState = _uiState.value
+            currentState.files.forEach { file ->
+                fileRepository.restoreFile(file.id)
+            }
+            currentState.folders.forEach { folder ->
+                fileRepository.restoreFolder(folder.id)
+            }
+            _uiState.update { it.copy(isBulkOperationInProgress = false) }
+            loadTrash()
+        }
+    }
+
+    fun emptyTrash() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBulkOperationInProgress = true) }
+            val currentState = _uiState.value
+            currentState.files.forEach { file ->
+                fileRepository.permanentDeleteFile(file.id)
+            }
+            currentState.folders.forEach { folder ->
+                fileRepository.deleteFolder(folder.id)
+            }
+            _uiState.update { it.copy(isBulkOperationInProgress = false) }
+            loadTrash()
         }
     }
 

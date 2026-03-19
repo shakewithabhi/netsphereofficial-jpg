@@ -31,6 +31,8 @@ import {
   Move,
   ArrowUpDown,
   ChevronDown,
+  Compass,
+  ExternalLink,
 } from 'lucide-react';
 import {
   getRootContents,
@@ -50,6 +52,8 @@ import {
   batchTrash,
   batchMove,
 } from '../api/files';
+import { createPost, CATEGORIES } from '../api/explore';
+import { trackDownload } from '../utils/downloadHistory';
 import type { FolderItem, FileItem } from '../api/files';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
@@ -117,6 +121,11 @@ export default function Files() {
 
   const [shareFile, setShareFile] = useState<FileItem | null>(null);
   const [commentsFile, setCommentsFile] = useState<FileItem | null>(null);
+  const [exploreFile, setExploreFile] = useState<FileItem | null>(null);
+  const [exploreCaption, setExploreCaption] = useState('');
+  const [exploreCategory, setExploreCategory] = useState('Entertainment');
+  const [explorePosting, setExplorePosting] = useState(false);
+  const [exploreError, setExploreError] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [showRemoteUpload, setShowRemoteUpload] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -460,6 +469,10 @@ export default function Files() {
   async function handleDownload(id: string) {
     try {
       const url = await getDownloadUrl(id);
+      const file = files.find((f) => f.id === id);
+      if (file) {
+        trackDownload({ id: file.id, name: file.name, size: file.size, mime_type: file.mime_type });
+      }
       window.open(url, '_blank');
     } catch {
       setError('Failed to get download link.');
@@ -952,6 +965,36 @@ export default function Files() {
                   setContextMenu(null);
                 }}
               />
+              {(contextMenu.item as FileItem).mime_type?.startsWith('video/') && (
+                <ContextMenuItem
+                  icon={<Compass size={15} />}
+                  label="Share to Explore"
+                  onClick={() => {
+                    setExploreFile(contextMenu.item as FileItem);
+                    setExploreCaption('');
+                    setExploreCategory('Entertainment');
+                    setExploreError('');
+                    setContextMenu(null);
+                  }}
+                />
+              )}
+              <ContextMenuItem
+                icon={<ExternalLink size={15} />}
+                label="Share via..."
+                onClick={async () => {
+                  const file = contextMenu.item as FileItem;
+                  const shareUrl = `${window.location.origin}/s/${file.id}`;
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({ title: file.name, text: `Check out ${file.name} on ByteBox`, url: shareUrl });
+                    } catch { /* user cancelled */ }
+                  } else if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(shareUrl);
+                    setError('');
+                  }
+                  setContextMenu(null);
+                }}
+              />
               <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
               <ContextMenuItem
                 icon={<Trash2 size={15} />}
@@ -1002,6 +1045,97 @@ export default function Files() {
           fileName={commentsFile.name}
           onClose={() => setCommentsFile(null)}
         />
+      )}
+
+      {/* Share to Explore Modal */}
+      {exploreFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExploreFile(null)} />
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <Compass size={16} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Share to Explore</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{exploreFile.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setExploreFile(null)}
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Caption</label>
+                <textarea
+                  value={exploreCaption}
+                  onChange={(e) => setExploreCaption(e.target.value)}
+                  placeholder="Write a caption for your post..."
+                  rows={3}
+                  maxLength={500}
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-colors"
+                />
+                <p className="text-xs text-slate-400 mt-1 text-right">{exploreCaption.length}/500</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Category</label>
+                <select
+                  value={exploreCategory}
+                  onChange={(e) => setExploreCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                >
+                  {CATEGORIES.filter((c) => c !== 'All').map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              {exploreError && (
+                <p className="text-sm text-red-500 bg-red-50 dark:bg-red-500/10 px-4 py-2 rounded-lg">{exploreError}</p>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <button
+                onClick={() => setExploreFile(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!exploreFile || !exploreCaption.trim()) return;
+                  setExplorePosting(true);
+                  setExploreError('');
+                  try {
+                    await createPost(exploreFile.id, exploreCaption.trim(), exploreCategory, []);
+                    setExploreFile(null);
+                  } catch {
+                    setExploreError('Failed to post. Please try again.');
+                  }
+                  setExplorePosting(false);
+                }}
+                disabled={explorePosting || !exploreCaption.trim()}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                {explorePosting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Posting...
+                  </>
+                ) : (
+                  <>
+                    <Compass size={16} />
+                    Post to Explore
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showUpload && (

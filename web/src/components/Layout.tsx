@@ -26,6 +26,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
+  Download,
 } from 'lucide-react';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
@@ -108,6 +109,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
   const bottomNav = [
     { to: '/explore', label: 'Explore', icon: Compass },
     { to: '/shares', label: 'My Shares', icon: Share2 },
+    { to: '/downloads', label: 'Downloads', icon: Download },
     { to: '/favorites', label: 'Starred', icon: Star },
     { to: '/trash', label: 'Recycle Bin', icon: Trash2 },
   ];

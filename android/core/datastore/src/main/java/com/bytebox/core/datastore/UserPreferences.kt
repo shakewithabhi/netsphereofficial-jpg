@@ -78,6 +78,11 @@ class UserPreferences @Inject constructor(
             prefs[USER_PLAN_KEY] ?: "free"
         }
 
+    val profileAvatarBase64: Flow<String?>
+        get() = dataStore.data.map { prefs ->
+            prefs[PROFILE_AVATAR_BASE64_KEY]
+        }
+
     suspend fun setViewMode(mode: ViewMode) {
         dataStore.edit { it[VIEW_MODE_KEY] = mode.name.lowercase() }
     }
@@ -117,6 +122,13 @@ class UserPreferences @Inject constructor(
         dataStore.edit { it[USER_PLAN_KEY] = plan }
     }
 
+    suspend fun setProfileAvatarBase64(base64: String?) {
+        dataStore.edit {
+            if (base64 != null) it[PROFILE_AVATAR_BASE64_KEY] = base64
+            else it.remove(PROFILE_AVATAR_BASE64_KEY)
+        }
+    }
+
     companion object {
         private val VIEW_MODE_KEY = stringPreferencesKey("view_mode")
         private val SORT_BY_KEY = stringPreferencesKey("sort_by")
@@ -127,6 +139,7 @@ class UserPreferences @Inject constructor(
         private val AUTO_UPLOAD_FOLDER_ID_KEY = stringPreferencesKey("auto_upload_folder_id")
         private val LAST_AUTO_UPLOAD_TIMESTAMP_KEY = longPreferencesKey("last_auto_upload_timestamp")
         private val USER_PLAN_KEY = stringPreferencesKey("user_plan")
+        private val PROFILE_AVATAR_BASE64_KEY = stringPreferencesKey("profile_avatar_base64")
     }
 }
 

@@ -1,6 +1,8 @@
 package com.bytebox.feature.settings.presentation
 
 import android.content.Context
+import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.Result
@@ -25,7 +27,13 @@ data class SettingsUiState(
     val isLoading: Boolean = false,
     val uploadOnWifiOnly: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val autoUploadEnabled: Boolean = false
+    val autoUploadEnabled: Boolean = false,
+    val avatarBase64: String? = null,
+    val isUploadingAvatar: Boolean = false,
+    val avatarMessage: String? = null,
+    val isChangingPassword: Boolean = false,
+    val changePasswordMessage: String? = null,
+    val changePasswordSuccess: Boolean = false,
 )
 
 @HiltViewModel
@@ -54,6 +62,11 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             userPreferences.autoUploadEnabled.collect { enabled ->
                 _uiState.update { it.copy(autoUploadEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            userPreferences.profileAvatarBase64.collect { base64 ->
+                _uiState.update { it.copy(avatarBase64 = base64) }
             }
         }
     }
@@ -99,5 +112,98 @@ class SettingsViewModel @Inject constructor(
             authRepository.logout()
             onLoggedOut()
         }
+    }
+
+    fun uploadAvatar(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingAvatar = true, avatarMessage = null) }
+
+            try {
+                val inputStream = appContext.contentResolver.openInputStream(uri)
+                val imageBytes = inputStream?.readBytes() ?: run {
+                    _uiState.update {
+                        it.copy(isUploadingAvatar = false, avatarMessage = "Failed to read image")
+                    }
+                    return@launch
+                }
+                inputStream.close()
+
+                val fileName = "avatar_${System.currentTimeMillis()}.jpg"
+
+                when (val result = authRepository.uploadAvatar(imageBytes, fileName)) {
+                    is Result.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                user = result.data,
+                                isUploadingAvatar = false,
+                                avatarMessage = "Profile photo updated",
+                            )
+                        }
+                    }
+                    is Result.Error -> {
+                        // API endpoint not available, store locally as base64 fallback
+                        val base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+                        userPreferences.setProfileAvatarBase64(base64)
+                        _uiState.update {
+                            it.copy(
+                                isUploadingAvatar = false,
+                                avatarMessage = "Profile photo saved locally",
+                            )
+                        }
+                    }
+                    is Result.Loading -> {}
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isUploadingAvatar = false,
+                        avatarMessage = "Failed to upload photo: ${e.message}",
+                    )
+                }
+            }
+        }
+    }
+
+    fun changePassword(currentPassword: String, newPassword: String) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isChangingPassword = true,
+                    changePasswordMessage = null,
+                    changePasswordSuccess = false,
+                )
+            }
+
+            when (val result = authRepository.changePassword(currentPassword, newPassword)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isChangingPassword = false,
+                            changePasswordMessage = "Password changed successfully",
+                            changePasswordSuccess = true,
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    val errorMsg = result.exception.message ?: "Failed to change password"
+                    _uiState.update {
+                        it.copy(
+                            isChangingPassword = false,
+                            changePasswordMessage = errorMsg,
+                            changePasswordSuccess = false,
+                        )
+                    }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun clearAvatarMessage() {
+        _uiState.update { it.copy(avatarMessage = null) }
+    }
+
+    fun clearChangePasswordMessage() {
+        _uiState.update { it.copy(changePasswordMessage = null, changePasswordSuccess = false) }
     }
 }

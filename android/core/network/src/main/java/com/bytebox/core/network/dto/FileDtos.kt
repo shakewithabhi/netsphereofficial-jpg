@@ -110,3 +110,13 @@ data class RemoteUploadRequest(
     @Json(name = "folder_id") val folderId: String? = null,
     @Json(name = "file_name") val fileName: String? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class RenameFileRequest(
+    val name: String
+)
+
+@JsonClass(generateAdapter = true)
+data class MoveFileRequest(
+    @Json(name = "folder_id") val folderId: String? = null
+)

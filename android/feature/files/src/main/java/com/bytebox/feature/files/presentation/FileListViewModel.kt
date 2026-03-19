@@ -48,6 +48,10 @@ data class FileListUiState(
     val remoteUploadError: String? = null,
     val remoteUploadSuccess: String? = null,
     val exploreShareSuccess: Boolean = false,
+    val showMoveDialog: Boolean = false,
+    val moveTargetFileId: String? = null,
+    val moveFolderOptions: List<Folder> = emptyList(),
+    val isLoadingMoveFolders: Boolean = false,
 )
 
 data class BreadcrumbItem(val folderId: String?, val name: String)
@@ -241,6 +245,62 @@ class FileListViewModel @Inject constructor(
         viewModelScope.launch {
             fileRepository.renameFolder(folderId, newName)
             loadContents()
+        }
+    }
+
+    fun renameFile(fileId: String, newName: String) {
+        viewModelScope.launch {
+            fileRepository.renameFile(fileId, newName)
+            loadContents()
+        }
+    }
+
+    fun showMoveDialog(fileId: String) {
+        _uiState.update { it.copy(showMoveDialog = true, moveTargetFileId = fileId, isLoadingMoveFolders = true) }
+        viewModelScope.launch {
+            // Load root folders for move picker
+            val result = fileRepository.getFolderContents(folderId = null)
+            when (result) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(moveFolderOptions = result.data.folders, isLoadingMoveFolders = false)
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isLoadingMoveFolders = false) }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun hideMoveDialog() {
+        _uiState.update { it.copy(showMoveDialog = false, moveTargetFileId = null, moveFolderOptions = emptyList()) }
+    }
+
+    fun moveFile(fileId: String, targetFolderId: String?) {
+        viewModelScope.launch {
+            fileRepository.moveFile(fileId, targetFolderId)
+            hideMoveDialog()
+            loadContents()
+        }
+    }
+
+    fun loadMoveFolderContents(folderId: String?) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMoveFolders = true) }
+            val result = fileRepository.getFolderContents(folderId = folderId)
+            when (result) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(moveFolderOptions = result.data.folders, isLoadingMoveFolders = false)
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isLoadingMoveFolders = false) }
+                }
+                is Result.Loading -> {}
+            }
         }
     }
 

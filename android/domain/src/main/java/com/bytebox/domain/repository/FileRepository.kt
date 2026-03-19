@@ -43,4 +43,6 @@ interface FileRepository {
     suspend fun markAllNotificationsRead(): Result<Unit>
     suspend fun registerPushToken(token: String): Result<Unit>
     suspend fun remoteUpload(url: String, folderId: String? = null, fileName: String? = null): Result<FileItem>
+    suspend fun renameFile(id: String, name: String): Result<FileItem>
+    suspend fun moveFile(id: String, targetFolderId: String?): Result<FileItem>
 }
