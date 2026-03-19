@@ -54,6 +54,22 @@ class ExploreViewModel @Inject constructor(
         }
     }
 
+    // Refresh without clearing existing items (called on screen resume to avoid visible flash)
+    fun refresh() {
+        if (_uiState.value.isLoading) return
+        val category = _uiState.value.selectedCategory
+        _uiState.update { it.copy(isLoading = true, errorMessage = null, nextCursor = null) }
+        viewModelScope.launch {
+            shareRepository.getExploreItems(cursor = null, category = category)
+                .onSuccess { (items, nextCursor) ->
+                    _uiState.update { it.copy(items = items, nextCursor = nextCursor, isLoading = false) }
+                }
+                .onError { error ->
+                    _uiState.update { it.copy(isLoading = false, errorMessage = error.message ?: "Failed to load") }
+                }
+        }
+    }
+
     fun loadMore() {
         val state = _uiState.value
         if (state.isLoadingMore || state.nextCursor == null) return

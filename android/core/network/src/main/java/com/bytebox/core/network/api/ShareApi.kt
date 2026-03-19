@@ -33,4 +33,30 @@ interface ShareApi {
         @Query("limit") limit: Int = 20,
         @Query("category") category: String? = null,
     ): Response<ExploreResponse>
+
+    // Public share info (with social counts)
+    @GET("s/{code}")
+    suspend fun getPublicShareInfo(@Path("code") code: String): Response<PublicShareInfoDto>
+
+    // Download URL for a public share
+    @POST("s/{code}/download")
+    suspend fun downloadPublicShare(@Path("code") code: String): Response<DownloadUrlResponse>
+
+    // Like / unlike a share
+    @POST("explore/{code}/like")
+    suspend fun toggleLike(@Path("code") code: String): Response<ToggleLikeDto>
+
+    // Comments
+    @GET("explore/{code}/comments")
+    suspend fun getComments(
+        @Path("code") code: String,
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0,
+    ): Response<ShareCommentsResponseDto>
+
+    @POST("explore/{code}/comments")
+    suspend fun addComment(
+        @Path("code") code: String,
+        @Body request: AddCommentRequest,
+    ): Response<ShareCommentDto>
 }

@@ -8,6 +8,30 @@ import (
 	"github.com/bytebox/backend/internal/file"
 )
 
+// Social types
+
+type ShareComment struct {
+	ID        uuid.UUID `json:"id"`
+	ShareID   uuid.UUID `json:"share_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	UserName  string    `json:"user_name"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type AddCommentRequest struct {
+	Content string `json:"content"`
+}
+
+type ToggleLikeResponse struct {
+	Liked     bool `json:"liked"`
+	LikeCount int  `json:"like_count"`
+}
+
+type ShareCommentsResponse struct {
+	Comments []ShareComment `json:"comments"`
+}
+
 // Request types
 
 type CreateShareRequest struct {
@@ -76,7 +100,14 @@ type PublicShareResponse struct {
 	ItemCount         int    `json:"item_count,omitempty"`
 	HasPassword       bool   `json:"has_password"`
 	IsVideo           bool   `json:"is_video,omitempty"`
+	ThumbnailURL      string `json:"thumbnail_url,omitempty"`
 	VideoThumbnailURL string `json:"video_thumbnail_url,omitempty"`
+	HLSURL            string `json:"hls_url,omitempty"`
+	LikeCount         int    `json:"like_count"`
+	CommentCount      int    `json:"comment_count"`
+	IsLiked           bool   `json:"is_liked"`
+	OwnerName         string `json:"owner_name,omitempty"`
+	DownloadCount     int    `json:"download_count"`
 }
 
 type ShareDownloadResponse struct {
@@ -104,6 +135,9 @@ type ExploreItem struct {
 	OwnerName     string    `json:"owner_name"`
 	DownloadCount int       `json:"download_count"`
 	CreatedAt     time.Time `json:"created_at"`
+	LikeCount     int       `json:"like_count"`
+	CommentCount  int       `json:"comment_count"`
+	HLSURL        string    `json:"hls_url,omitempty"`
 }
 
 type ExploreListResponse struct {
@@ -118,9 +152,14 @@ type exploreRow struct {
 	FileSize          int64
 	MimeType          string
 	ThumbnailKey      string
+	StorageKey        string
 	VideoThumbnailURL string
+	StreamVideoID     string
 	IsVideo           bool
+	HLSURL            string
 	OwnerName         string
 	DownloadCount     int
 	CreatedAt         time.Time
+	LikeCount         int
+	CommentCount      int
 }

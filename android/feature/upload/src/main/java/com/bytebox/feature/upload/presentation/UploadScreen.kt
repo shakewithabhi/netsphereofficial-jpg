@@ -16,13 +16,24 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytebox.core.common.toReadableFileSize
@@ -36,6 +47,7 @@ fun UploadScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPreview: (fileId: String, mimeType: String) -> Unit = { _, _ -> },
     folderId: String? = null,
+    sharePublicly: Boolean = false,
     viewModel: UploadViewModel = hiltViewModel()
 ) {
     LaunchedEffect(folderId) {
@@ -43,6 +55,9 @@ fun UploadScreen(
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // Privacy toggle state — pre-set from nav argument
+    var sharePubliclyState by remember { mutableStateOf(sharePublicly) }
 
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -63,7 +78,7 @@ fun UploadScreen(
                         cacheFile.outputStream().use { output -> input.copyTo(output) }
                     }
                     val cacheUri = Uri.fromFile(cacheFile)
-                    viewModel.uploadFile(cacheUri, name, size, mimeType)
+                    viewModel.uploadFile(cacheUri, name, size, mimeType, sharePubliclyState)
                 }
             }
         }
@@ -85,11 +100,12 @@ fun UploadScreen(
                         }
                     }
                 },
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
         },
@@ -99,34 +115,99 @@ fun UploadScreen(
             }
         }
     ) { padding ->
-        if (uiState.tasks.isEmpty()) {
-            EmptyState(
-                icon = Icons.Default.CloudUpload,
-                title = "No uploads",
-                subtitle = "Tap + to select files to upload",
-                modifier = Modifier.padding(padding)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Privacy toggle card — always visible
+            PrivacyToggleCard(
+                sharePublicly = sharePubliclyState,
+                onToggle = { sharePubliclyState = it },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-            ) {
-                items(uiState.tasks, key = { it.id }) { task ->
-                    UploadTaskItem(
-                        task = task,
-                        onCancel = { viewModel.cancelUpload(task.id) },
-                        onRetry = { viewModel.retryUpload(task.id) },
-                        onRemove = { viewModel.removeUpload(task.id) },
-                        onClick = {
-                            val fileId = task.serverFileId
-                            if (task.status == UploadStatus.COMPLETED && fileId != null) {
-                                onNavigateToPreview(fileId, task.mimeType)
+
+            if (uiState.tasks.isEmpty()) {
+                EmptyState(
+                    icon = Icons.Default.CloudUpload,
+                    title = "No uploads",
+                    subtitle = "Tap + to select files to upload",
+                )
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(uiState.tasks, key = { it.id }) { task ->
+                        UploadTaskItem(
+                            task = task,
+                            onCancel = { viewModel.cancelUpload(task.id) },
+                            onRetry = { viewModel.retryUpload(task.id) },
+                            onRemove = { viewModel.removeUpload(task.id) },
+                            onClick = {
+                                val fileId = task.serverFileId
+                                if (task.status == UploadStatus.COMPLETED && fileId != null) {
+                                    onNavigateToPreview(fileId, task.mimeType)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun PrivacyToggleCard(
+    sharePublicly: Boolean,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (sharePublicly)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = if (sharePublicly) Icons.Default.Public else Icons.Default.Lock,
+                contentDescription = null,
+                tint = if (sharePublicly) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Share to Public (Explore)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = if (sharePublicly) "Visible to all users in Explore feed"
+                           else "Only visible to you in Files",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = sharePublicly,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            )
         }
     }
 }
@@ -182,11 +263,35 @@ private fun UploadTaskItem(
             }
         },
         leadingContent = {
-            when (task.status) {
-                UploadStatus.COMPLETED -> Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
-                UploadStatus.FAILED -> Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
-                UploadStatus.UPLOADING -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                else -> Icon(Icons.Default.CloudUpload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            val isMedia = task.mimeType.startsWith("image/") || task.mimeType.startsWith("video/")
+            if (isMedia && task.localFileUri.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    AsyncImage(
+                        model = android.net.Uri.parse(task.localFileUri),
+                        contentDescription = null,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                    if (task.status == UploadStatus.UPLOADING) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp).align(Alignment.BottomEnd).padding(2.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            } else {
+                when (task.status) {
+                    UploadStatus.COMPLETED -> Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                    UploadStatus.FAILED -> Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error)
+                    UploadStatus.UPLOADING -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    else -> Icon(Icons.Default.CloudUpload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         trailingContent = {

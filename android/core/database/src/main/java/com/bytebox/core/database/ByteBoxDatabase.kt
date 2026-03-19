@@ -16,7 +16,7 @@ import com.bytebox.core.database.entity.*
         PendingOperationEntity::class,
         PinnedFileEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class ByteBoxDatabase : RoomDatabase() {
@@ -71,6 +71,11 @@ abstract class ByteBoxDatabase : RoomDatabase() {
                         last_synced INTEGER NOT NULL
                     )"""
                 )
+            }
+        }
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE upload_tasks ADD COLUMN share_publicly INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

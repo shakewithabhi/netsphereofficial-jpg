@@ -80,6 +80,7 @@ import com.bytebox.feature.settings.presentation.SettingsScreen
 import com.bytebox.feature.settings.presentation.StorageAnalyticsScreen
 import com.bytebox.feature.share.presentation.ShareScreen
 import com.bytebox.feature.explore.presentation.ExploreScreen
+import com.bytebox.feature.explore.presentation.ExploreVideoScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
@@ -230,7 +231,7 @@ fun ByteBoxNavHost(
                         navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
                     },
                     onUploadClick = {
-                        navController.navigate(Screen.Upload.createRoute(null))
+                        navController.navigate(Screen.Upload.createRoute(null, sharePublicly = false))
                     },
                     onSeeAllFolders = {
                         navController.navigate(Screen.Files.route)
@@ -293,16 +294,22 @@ fun ByteBoxNavHost(
                         type = NavType.StringType
                         nullable = true
                         defaultValue = null
-                    }
+                    },
+                    navArgument("sharePublicly") {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
                 ),
             ) { backStackEntry ->
                 val folderId = backStackEntry.arguments?.getString("folderId")
+                val sharePublicly = backStackEntry.arguments?.getBoolean("sharePublicly") ?: false
                 UploadScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToPreview = { fileId, mimeType ->
                         navController.navigate(Screen.Preview.createRoute(fileId, mimeType))
                     },
                     folderId = folderId,
+                    sharePublicly = sharePublicly,
                 )
             }
 
@@ -408,8 +415,24 @@ fun ByteBoxNavHost(
             composable(Screen.Explore.route) {
                 ExploreScreen(
                     onItemClick = { code ->
-                        navController.navigate(Screen.ShareView.createRoute(code))
+                        navController.navigate(Screen.ExploreVideo.createRoute(code))
                     },
+                    onUploadClick = {
+                        navController.navigate(Screen.Upload.createRoute(null, sharePublicly = true))
+                    },
+                )
+            }
+
+            composable(
+                route = Screen.ExploreVideo.route,
+                arguments = listOf(
+                    navArgument("code") { type = NavType.StringType },
+                ),
+            ) { backStackEntry ->
+                val code = backStackEntry.arguments?.getString("code") ?: return@composable
+                ExploreVideoScreen(
+                    code = code,
+                    onNavigateBack = { navController.popBackStack() },
                 )
             }
 

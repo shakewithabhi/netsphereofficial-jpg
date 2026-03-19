@@ -118,7 +118,7 @@ func main() {
 
 	// Share module
 	shareRepo := share.NewRepository(db)
-	shareService := share.NewService(shareRepo, fileRepo, folderRepo, store, cfg.App.BaseURL)
+	shareService := share.NewService(shareRepo, fileRepo, folderRepo, store, streamClient, cfg.App.BaseURL)
 	shareHandler := share.NewHandler(shareService)
 
 	// Backup module
@@ -179,9 +179,9 @@ func main() {
 
 	// API v1 routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Auth routes: 5 req/min by IP
+		// Auth routes: 20 req/min by IP
 		r.Group(func(r chi.Router) {
-			r.Use(rateLimiter.Limit(5, time.Minute, middleware.ByIP))
+			r.Use(rateLimiter.Limit(20, time.Minute, middleware.ByIP))
 			r.Mount("/auth", authHandler.Routes())
 		})
 

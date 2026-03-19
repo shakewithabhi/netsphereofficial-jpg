@@ -48,4 +48,9 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.coroutines.core)
     implementation(libs.coil.compose)
+
+    // Media3 / ExoPlayer for HLS video playback
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.ui)
 }

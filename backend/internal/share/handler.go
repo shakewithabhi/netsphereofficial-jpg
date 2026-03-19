@@ -133,6 +133,9 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ExploreRoutes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.Explore)
+	r.Post("/{code}/like", h.ToggleLike)
+	r.Get("/{code}/comments", h.GetComments)
+	r.Post("/{code}/comments", h.AddComment)
 	return r
 }
 
@@ -141,7 +144,13 @@ func (h *Handler) ExploreRoutes() chi.Router {
 func (h *Handler) GetPublicInfo(w http.ResponseWriter, r *http.Request) {
 	code := chi.URLParam(r, "code")
 
-	resp, err := h.service.GetPublicInfo(r.Context(), code)
+	// Optional auth: extract viewer user ID if authenticated
+	var viewerID *uuid.UUID
+	if claims := auth.GetClaims(r.Context()); claims != nil {
+		viewerID = &claims.UserID
+	}
+
+	resp, err := h.service.GetPublicInfo(r.Context(), code, viewerID)
 	if err != nil {
 		common.JSONError(w, err)
 		return
@@ -230,6 +239,61 @@ func (h *Handler) Explore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ToggleLike(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+	code := chi.URLParam(r, "code")
+	resp, err := h.service.ToggleLike(r.Context(), code, claims.UserID)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	common.JSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) GetComments(w http.ResponseWriter, r *http.Request) {
+	code := chi.URLParam(r, "code")
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+	limit := 50
+	offset := 0
+	if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
+		limit = n
+	}
+	if n, err := strconv.Atoi(offsetStr); err == nil && n >= 0 {
+		offset = n
+	}
+	comments, err := h.service.GetComments(r.Context(), code, limit, offset)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	common.JSON(w, http.StatusOK, map[string]any{"comments": comments})
+}
+
+func (h *Handler) AddComment(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		common.JSONError(w, common.ErrUnauthorized("unauthorized"))
+		return
+	}
+	code := chi.URLParam(r, "code")
+	var req AddCommentRequest
+	if err := common.DecodeAndValidate(r, &req); err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	comment, err := h.service.AddComment(r.Context(), code, claims.UserID, req.Content)
+	if err != nil {
+		common.JSONError(w, err)
+		return
+	}
+	common.JSON(w, http.StatusCreated, comment)
 }
 
 func (h *Handler) serveSharePage(w http.ResponseWriter, code string, info *PublicShareResponse) {

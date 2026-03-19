@@ -35,14 +35,15 @@ class UploadViewModel @Inject constructor(
         }
     }
 
-    fun uploadFile(uri: Uri, fileName: String, fileSize: Long, mimeType: String) {
+    fun uploadFile(uri: Uri, fileName: String, fileSize: Long, mimeType: String, sharePublicly: Boolean = false) {
         viewModelScope.launch {
             uploadRepository.enqueueUpload(
                 localFileUri = uri.toString(),
                 fileName = fileName,
                 fileSize = fileSize,
                 mimeType = mimeType,
-                folderId = _uiState.value.currentFolderId
+                folderId = _uiState.value.currentFolderId,
+                sharePublicly = sharePublicly,
             )
         }
     }

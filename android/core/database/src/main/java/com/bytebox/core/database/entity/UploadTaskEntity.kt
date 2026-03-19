@@ -21,5 +21,6 @@ data class UploadTaskEntity(
     @ColumnInfo(name = "work_manager_id") val workManagerId: String? = null,
     @ColumnInfo(name = "server_file_id") val serverFileId: String? = null,
     @ColumnInfo(name = "share_url") val shareUrl: String? = null,
-    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis()
+    @ColumnInfo(name = "created_at") val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "share_publicly") val sharePublicly: Boolean = false,
 )

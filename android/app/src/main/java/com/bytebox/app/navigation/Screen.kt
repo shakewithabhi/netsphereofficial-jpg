@@ -6,9 +6,9 @@ sealed class Screen(val route: String) {
     data object Register : Screen("register")
     data object Dashboard : Screen("dashboard")
     data object Files : Screen("files")
-    data object Upload : Screen("upload?folderId={folderId}") {
-        fun createRoute(folderId: String?) =
-            if (folderId != null) "upload?folderId=$folderId" else "upload"
+    data object Upload : Screen("upload?folderId={folderId}&sharePublicly={sharePublicly}") {
+        fun createRoute(folderId: String?, sharePublicly: Boolean = false) =
+            "upload?folderId=${folderId ?: ""}&sharePublicly=$sharePublicly"
     }
     data object Downloads : Screen("downloads")
     data object Preview : Screen("preview/{fileId}/{mimeType}") {
@@ -29,5 +29,8 @@ sealed class Screen(val route: String) {
     data object Explore : Screen("explore")
     data object ShareView : Screen("share_view/{code}") {
         fun createRoute(code: String) = "share_view/$code"
+    }
+    data object ExploreVideo : Screen("explore_video/{code}") {
+        fun createRoute(code: String) = "explore_video/$code"
     }
 }

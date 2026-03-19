@@ -27,7 +27,8 @@ object DatabaseModule {
             ByteBoxDatabase.MIGRATION_2_3,
             ByteBoxDatabase.MIGRATION_3_4,
             ByteBoxDatabase.MIGRATION_4_5,
-            ByteBoxDatabase.MIGRATION_5_6
+            ByteBoxDatabase.MIGRATION_5_6,
+            ByteBoxDatabase.MIGRATION_6_7
         ).fallbackToDestructiveMigration().build()
 
     @Provides fun provideFileDao(db: ByteBoxDatabase): FileDao = db.fileDao()

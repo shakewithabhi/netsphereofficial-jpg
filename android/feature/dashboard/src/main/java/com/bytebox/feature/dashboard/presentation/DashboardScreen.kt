@@ -2,6 +2,7 @@ package com.bytebox.feature.dashboard.presentation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -130,7 +130,7 @@ fun DashboardScreen(
         floatingActionButton = { UploadFAB(onClick = onUploadClick) },
     ) { padding ->
         when {
-            uiState.isLoading -> FileListShimmer(
+            uiState.isLoading && uiState.recentFiles.isEmpty() && uiState.user == null -> FileListShimmer(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = padding.calculateTopPadding()),
@@ -152,18 +152,16 @@ fun DashboardScreen(
                 ) {
                     // ── Header ────────────────────────────────────────────────
                     item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-                                .background(Color(0xFF2563EB))
-                                .windowInsetsPadding(WindowInsets.statusBars),
-                        ) {
+                        Column {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                            ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 20.dp)
-                                    .padding(top = 4.dp, bottom = 10.dp),
+                                    .padding(top = 2.dp, bottom = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -171,7 +169,7 @@ fun DashboardScreen(
                                     Text(
                                         text = greeting,
                                         fontSize = 12.sp,
-                                        color = Color.White.copy(alpha = 0.80f),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     Text(
                                         text = uiState.user?.displayName?.ifBlank { null }
@@ -179,7 +177,7 @@ fun DashboardScreen(
                                             ?: "ByteBox",
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onBackground,
                                     )
                                 }
                                 Row(
@@ -191,7 +189,7 @@ fun DashboardScreen(
                                             Icon(
                                                 imageVector = Icons.Default.Notifications,
                                                 contentDescription = "Notifications",
-                                                tint = Color.White.copy(alpha = 0.85f),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         }
                                         // Notification badge
@@ -216,7 +214,7 @@ fun DashboardScreen(
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(Color.White.copy(alpha = 0.20f)),
+                                            .background(Color(0xFF2563EB)),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
@@ -229,10 +227,12 @@ fun DashboardScreen(
                                 }
                             }
                         }
+                        }
                     }
 
                     // ── Search bar ────────────────────────────────────────────
                     item {
+                        Spacer(modifier = Modifier.height(12.dp))
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -274,15 +274,21 @@ fun DashboardScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // ── Category scroll ───────────────────────────────────────
+                    // ── Category grid ─────────────────────────────────────────
                     item {
-                        CategoryScrollRow(
+                        CategoryGrid(
                             onFolderClick = onSeeAllFolders,
                             onFavoritesClick = onFavoritesClick,
                             onSharesClick = onSharesClick,
                             onCategoryFilter = { cats -> selectedFilter = cats },
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    // ── Premium upgrade card ───────────────────────────────────
+                    item {
+                        PremiumUpgradeCard(modifier = Modifier.padding(horizontal = 16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
 
                     // ── Tabs ──────────────────────────────────────────────────
@@ -340,6 +346,7 @@ fun DashboardScreen(
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp)
                                     .padding(bottom = ByteBoxTheme.spacing.xs),
+                                thumbnailUrl = file.thumbnailUrl,
                             )
                         }
                     } else {
@@ -352,12 +359,6 @@ fun DashboardScreen(
                         }
                     }
 
-                    // ── Premium upgrade card ───────────────────────────────────
-                    item {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        PremiumUpgradeCard(modifier = Modifier.padding(horizontal = 16.dp))
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
                 }
             }
         }
@@ -375,7 +376,7 @@ private data class CategoryTile(
 )
 
 @Composable
-private fun CategoryScrollRow(
+private fun CategoryGrid(
     onFolderClick: () -> Unit,
     onFavoritesClick: () -> Unit,
     onSharesClick: () -> Unit,
@@ -388,9 +389,7 @@ private fun CategoryScrollRow(
         CategoryTile("Videos", CoreR.drawable.ic_flat_videos, Color(0xFFDC2626), Color(0xFFFEF2F2)) {
             onCategoryFilter(setOf(FileCategory.VIDEO))
         },
-        CategoryTile(
-            "Docs", CoreR.drawable.ic_flat_docs, Color(0xFF2563EB), Color(0xFFEFF6FF),
-        ) {
+        CategoryTile("Docs", CoreR.drawable.ic_flat_docs, Color(0xFF2563EB), Color(0xFFEFF6FF)) {
             onCategoryFilter(
                 setOf(
                     FileCategory.DOCUMENT,
@@ -412,57 +411,52 @@ private fun CategoryScrollRow(
         CategoryTile("Shared", CoreR.drawable.ic_flat_shared, Color(0xFF0891B2), Color(0xFFECFEFF)) {
             onSharesClick()
         },
+        CategoryTile("More", CoreR.drawable.ic_flat_more, Color(0xFF6D28D9), Color(0xFFEDE9FE)) {},
     )
 
-    Box {
-        LazyRow(
-            contentPadding = PaddingValues(start = 16.dp, end = 40.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(tiles) { tile ->
-                Card(
-                modifier = Modifier
-                    .width(80.dp)
-                    .clickable(onClick = tile.onClick),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = tile.bgColor),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        tiles.chunked(4).forEach { rowTiles ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        painter = painterResource(tile.iconRes),
-                        contentDescription = tile.label,
-                        modifier = Modifier.size(46.dp),
-                        tint = Color.Unspecified,
-                    )
-                    Text(
-                        text = tile.label,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = tile.tintColor,
-                    )
+                rowTiles.forEach { tile ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(onClick = tile.onClick),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp)
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(tile.bgColor),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                painter = painterResource(tile.iconRes),
+                                contentDescription = tile.label,
+                                modifier = Modifier.size(32.dp),
+                                tint = Color.Unspecified,
+                            )
+                        }
+                        Text(
+                            text = tile.label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
                 }
             }
-            }
         }
-        // Right-edge fade hinting more content
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .width(48.dp)
-                .height(92.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(Color.Transparent, MaterialTheme.colorScheme.background),
-                    ),
-                ),
-        )
     }
 }
 
@@ -472,8 +466,8 @@ private fun PremiumUpgradeCard(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF2563EB))
-            .padding(20.dp),
+            .background(Color(0xFFDEEAFD))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -489,7 +483,7 @@ private fun PremiumUpgradeCard(modifier: Modifier = Modifier) {
                         color = Color(0xFF2563EB),
                     ) {
                         Text(
-                            text = "PRO",
+                            text = "Pro",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -497,18 +491,12 @@ private fun PremiumUpgradeCard(modifier: Modifier = Modifier) {
                         )
                     }
                     Text(
-                        text = "ByteBox Pro",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        text = "Upgrade to Pro — get 1 TB storage",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF2563EB),
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "1 TB · Faster uploads · No ads",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.65f),
-                )
             }
             Spacer(modifier = Modifier.width(12.dp))
             Button(

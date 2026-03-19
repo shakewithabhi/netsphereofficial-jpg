@@ -74,9 +74,10 @@ fun ShareScreen(
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
         },

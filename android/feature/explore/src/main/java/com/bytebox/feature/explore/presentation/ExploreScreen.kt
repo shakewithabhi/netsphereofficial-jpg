@@ -1,6 +1,5 @@
 package com.bytebox.feature.explore.presentation
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,13 +21,18 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -40,11 +44,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,16 +77,25 @@ private val categoryChips = listOf(
     CategoryChip("Images", "image"),
 )
 
+// Deterministic color for owner avatar based on name
+private fun avatarColor(name: String): Color {
+    val colors = listOf(
+        Color(0xFF2563EB), Color(0xFF059669), Color(0xFFDC2626),
+        Color(0xFF7C3AED), Color(0xFFD97706), Color(0xFF0891B2),
+    )
+    return colors[(name.hashCode() and 0x7FFFFFFF) % colors.size]
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
     onItemClick: (code: String) -> Unit,
+    onUploadClick: () -> Unit = {},
     viewModel: ExploreViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
-    // Trigger loadMore when near the end of the list
     val shouldLoadMore by remember {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -90,6 +106,13 @@ fun ExploreScreen(
 
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore) viewModel.loadMore()
+    }
+
+    // Refresh feed whenever the screen resumes (e.g. after uploading a new file)
+    // Uses refresh() to avoid clearing existing items while new data loads
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose {}
     }
 
     Scaffold(
@@ -103,15 +126,26 @@ fun ExploreScreen(
                         fontSize = 22.sp,
                     )
                 },
+                actions = {
+                    IconButton(onClick = onUploadClick) {
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = "Upload to Explore",
+                            tint = MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
+                },
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
         },
     ) { padding ->
         when {
-            uiState.isLoading -> FileListShimmer(modifier = Modifier.padding(padding))
+            uiState.isLoading && uiState.items.isEmpty() -> FileListShimmer(modifier = Modifier.padding(padding))
             uiState.errorMessage != null && uiState.items.isEmpty() -> ErrorState(
                 message = uiState.errorMessage!!,
                 onRetry = viewModel::load,
@@ -156,11 +190,10 @@ fun ExploreScreen(
                                 onClick = { onItemClick(item.code) },
                                 modifier = Modifier
                                     .padding(horizontal = 16.dp)
-                                    .padding(bottom = 12.dp),
+                                    .padding(bottom = 16.dp),
                             )
                         }
 
-                        // Loading more indicator
                         if (uiState.isLoadingMore) {
                             item {
                                 Box(
@@ -186,22 +219,23 @@ private fun ExploreCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val clipboardManager = LocalClipboardManager.current
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column {
-            // Thumbnail area (16:9)
+            // ── Thumbnail (16:9) ──────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
             ) {
                 if (item.thumbnailUrl != null) {
                     AsyncImage(
@@ -211,7 +245,6 @@ private fun ExploreCard(
                         contentScale = ContentScale.Crop,
                     )
                 } else {
-                    // Fallback colored background with icon
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -231,14 +264,14 @@ private fun ExploreCard(
                         Surface(
                             shape = CircleShape,
                             color = Color.Black.copy(alpha = 0.55f),
-                            modifier = Modifier.size(52.dp),
+                            modifier = Modifier.size(56.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = "Play",
                                     tint = Color.White,
-                                    modifier = Modifier.size(30.dp),
+                                    modifier = Modifier.size(32.dp),
                                 )
                             }
                         }
@@ -255,9 +288,9 @@ private fun ExploreCard(
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp),
+                        .padding(10.dp),
                     shape = RoundedCornerShape(6.dp),
-                    color = badgeColor,
+                    color = badgeColor.copy(alpha = 0.92f),
                 ) {
                     Text(
                         text = when (item.category) {
@@ -270,49 +303,133 @@ private fun ExploreCard(
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                     )
                 }
             }
 
-            // Info row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FileTypeIcon(category = item.category, containerSize = 36.dp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.fileName,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
+            // ── Info section ─────────────────────────────────────────────────
+            Column(modifier = Modifier.padding(12.dp)) {
+                // Owner avatar + file name + subtitle row
+                Row(verticalAlignment = Alignment.Top) {
+                    // Owner avatar
+                    val initials = item.ownerName
+                        .split(" ", limit = 2)
+                        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                        .take(2)
+                        .joinToString("")
+                        .ifEmpty { "?" }
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(avatarColor(item.ownerName)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = initials,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = item.fileName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = buildString {
+                                if (item.ownerName.isNotEmpty()) append("@${item.ownerName}")
+                                val time = try {
+                                    item.createdAt.toLocalDateTime().toRelativeTime()
+                                } catch (_: Exception) { "" }
+                                if (time.isNotEmpty()) {
+                                    if (isNotEmpty()) append("  ·  ")
+                                    append(time)
+                                }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = item.fileSize.toReadableFileSize(),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+
+                // ── Engagement row ────────────────────────────────────────────
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Like count
+                    Icon(
+                        imageVector = if (item.likeCount > 0) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (item.likeCount > 0) Color(0xFFE53935)
+                               else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        text = buildString {
-                            if (item.ownerName.isNotEmpty()) append("@${item.ownerName}  ·  ")
-                            append(try { item.createdAt.toLocalDateTime().toRelativeTime() } catch (_: Exception) { "" })
-                        },
-                        style = MaterialTheme.typography.bodySmall,
+                        text = formatCount(item.likeCount),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        modifier = Modifier.padding(start = 4.dp),
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Download / view count
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        text = buildString {
-                            append(item.fileSize.toReadableFileSize())
-                            if (item.downloadCount > 0) append("  ·  ${item.downloadCount} downloads")
-                        },
-                        fontSize = 11.sp,
+                        text = "${formatCount(item.downloadCount)} views",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        modifier = Modifier.padding(start = 4.dp),
                     )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Share icon (copies explore link to clipboard)
+                    IconButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(item.code))
+                        },
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun formatCount(count: Int): String = when {
+    count >= 1_000_000 -> "${count / 1_000_000}M"
+    count >= 1_000 -> "${count / 1_000}K"
+    else -> count.toString()
 }

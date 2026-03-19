@@ -12,6 +12,9 @@ data class ExploreItem(
     val ownerName: String,
     val downloadCount: Int,
     val createdAt: String,
+    val likeCount: Int = 0,
+    val commentCount: Int = 0,
+    val hlsUrl: String? = null,
 ) {
     val category: FileCategory
         get() = when {
