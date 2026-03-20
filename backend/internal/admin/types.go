@@ -289,14 +289,18 @@ type PlanChange struct {
 
 type SystemHealth struct {
 	Status        string            `json:"status"`
-	Uptime        int64             `json:"uptime_seconds"`
+	Uptime        string            `json:"uptime"`
+	UptimeSecs    int64             `json:"uptime_seconds"`
 	GoVersion     string            `json:"go_version"`
-	NumGoroutines int               `json:"num_goroutines"`
-	MemoryUsed    int64             `json:"memory_used_bytes"`
+	Goroutines    int               `json:"goroutines"`
+	MemoryUsed    int64             `json:"memory_used"`
+	MemoryTotal   int64             `json:"memory_total"`
 	MemoryAlloc   int64             `json:"memory_alloc_bytes"`
 	DBConnections int               `json:"db_connections"`
 	DBMaxConns    int               `json:"db_max_connections"`
 	Components    []ComponentHealth `json:"components"`
+	RecentErrors  []interface{}     `json:"recent_errors"`
+	ResponseTimes []interface{}     `json:"response_times"`
 }
 
 type ComponentHealth struct {

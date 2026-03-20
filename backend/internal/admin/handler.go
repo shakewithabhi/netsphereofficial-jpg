@@ -796,17 +796,35 @@ func (h *Handler) GetRevenueStats(w http.ResponseWriter, r *http.Request) {
 
 // ── 5. System Health ──
 
+func formatUptime(d time.Duration) string {
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	mins := int(d.Minutes()) % 60
+	if days > 0 {
+		return fmt.Sprintf("%dd %dh %dm", days, hours, mins)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh %dm", hours, mins)
+	}
+	return fmt.Sprintf("%dm", mins)
+}
+
 func (h *Handler) SystemHealth(w http.ResponseWriter, r *http.Request) {
+	uptime := time.Since(startTime)
 	health := SystemHealth{
 		Status:        "healthy",
-		Uptime:        int64(time.Since(startTime).Seconds()),
+		Uptime:        formatUptime(uptime),
+		UptimeSecs:    int64(uptime.Seconds()),
 		GoVersion:     runtime.Version(),
-		NumGoroutines: runtime.NumGoroutine(),
+		Goroutines:    runtime.NumGoroutine(),
+		RecentErrors:  []interface{}{},
+		ResponseTimes: []interface{}{},
 	}
 
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	health.MemoryUsed = int64(memStats.Sys)
+	health.MemoryUsed = int64(memStats.Alloc)
+	health.MemoryTotal = int64(memStats.Sys)
 	health.MemoryAlloc = int64(memStats.Alloc)
 
 	// Check DB health

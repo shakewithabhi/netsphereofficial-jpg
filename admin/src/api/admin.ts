@@ -375,7 +375,7 @@ export const adminApi = {
 
   // System health
   getSystemHealth: () =>
-    client.get<SystemHealth>('/admin/system/health'),
+    client.get<SystemHealth>('/admin/health'),
 
   // Exports
   exportUsers: () =>
