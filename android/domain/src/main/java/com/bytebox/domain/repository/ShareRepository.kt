@@ -37,4 +37,12 @@ interface ShareRepository {
     suspend fun toggleLike(code: String): Result<Pair<Boolean, Int>>
     suspend fun getComments(code: String, limit: Int = 50, offset: Int = 0): Result<List<ShareComment>>
     suspend fun addComment(code: String, content: String): Result<ShareComment>
+
+    // Create post for Explore
+    suspend fun createPost(
+        fileId: String,
+        caption: String,
+        category: String,
+        tags: List<String>,
+    ): Result<Unit>
 }

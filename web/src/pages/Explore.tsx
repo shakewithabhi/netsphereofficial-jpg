@@ -28,6 +28,7 @@ import {
   CATEGORIES,
 } from '../api/explore';
 import { useAuth } from '../store/auth';
+import { timeAgo } from '../utils/format';
 
 type Tab = 'foryou' | 'trending' | 'subscriptions' | 'myposts';
 
@@ -43,6 +44,7 @@ export default function Explore() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Post[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [watchingPost, setWatchingPost] = useState<Post | null>(null);
   const [fadeIn, setFadeIn] = useState(false);
@@ -72,6 +74,7 @@ export default function Explore() {
 
   async function loadContent() {
     setLoading(true);
+    setError('');
     try {
       // Load trending for all tabs
       const trending = await getTrendingFeed(10);
@@ -96,7 +99,7 @@ export default function Explore() {
 
       setFeedPosts(posts);
     } catch {
-      /* ignore */
+      setError('Failed to load content. Please try again.');
     }
     setLoading(false);
   }
@@ -108,10 +111,12 @@ export default function Explore() {
       return;
     }
     setSearching(true);
+    setError('');
     try {
       const results = await searchPosts(searchQuery.trim());
       setSearchResults(results);
     } catch {
+      setError('Search failed. Please try again.');
       setSearchResults([]);
     }
     setSearching(false);
@@ -150,16 +155,7 @@ export default function Explore() {
     );
   }
 
-  function relativeTime(dateStr: string): string {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    if (days < 30) return `${days}d ago`;
-    return `${Math.floor(days / 30)}mo ago`;
-  }
+  const relativeTime = timeAgo;
 
   const displayPosts = searchResults ?? feedPosts;
 
@@ -275,6 +271,20 @@ export default function Explore() {
         </div>
 
         <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-6">
+          {error && (
+            <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm">
+              <span className="flex-1">{error}</span>
+              <button
+                onClick={() => { setError(''); loadContent(); }}
+                className="px-3 py-1 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800 rounded-lg text-xs font-medium transition-colors"
+              >
+                Retry
+              </button>
+              <button onClick={() => setError('')}>
+                <X size={16} />
+              </button>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <div className="flex flex-col items-center gap-3">

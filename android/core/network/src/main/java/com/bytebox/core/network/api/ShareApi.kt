@@ -88,4 +88,7 @@ interface ShareApi {
         @Path("code") code: String,
         @Body request: AddCommentRequest,
     ): Response<ShareCommentDto>
+
+    @POST("explore/posts")
+    suspend fun createPost(@Body request: CreatePostRequest): Response<CreatePostResponse>
 }

@@ -40,8 +40,8 @@ class TokenRefreshInterceptor @Inject constructor(
             if (refreshResponse != null) {
                 runBlocking {
                     tokenManager.saveTokens(
-                        refreshResponse.accessToken,
-                        refreshResponse.refreshToken
+                        refreshResponse.accessToken ?: "",
+                        refreshResponse.refreshToken ?: ""
                     )
                 }
 

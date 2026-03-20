@@ -23,6 +23,9 @@ sealed class AppException(
     class ValidationError(message: String) :
         AppException(message)
 
+    class TwoFactorRequired(val tempToken: String, message: String = "Two-factor authentication required") :
+        AppException(message)
+
     class Unknown(message: String = "An unexpected error occurred", cause: Throwable? = null) :
         AppException(message, cause)
 }

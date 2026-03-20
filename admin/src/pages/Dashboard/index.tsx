@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Statistic, Spin, Typography } from 'antd';
+import { Alert, Card, Col, Row, Statistic, Spin, Typography } from 'antd';
 import {
   UserOutlined, FileOutlined, CloudOutlined, ShareAltOutlined,
   TeamOutlined, RiseOutlined, DeleteOutlined, UploadOutlined,
@@ -20,28 +20,36 @@ export default function DashboardPage() {
   const [signupTrends, setSignupTrends] = useState<DailySignupStat[]>([]);
   const [uploadTrends, setUploadTrends] = useState<DailyUploadStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const unwrap = (res: any) => res.data?.data ?? res.data;
 
   const fetchData = useCallback(() => {
+    setError(null);
     Promise.all([
-      adminApi.dashboard().then((res) => setStats(unwrap(res))).catch(() => {}),
+      adminApi.dashboard().then((res) => setStats(unwrap(res))).catch(() => {
+        setError('Failed to load dashboard data');
+      }),
       adminApi.signupTrends(30).then((res) => {
         const d = unwrap(res);
         setSignupTrends(Array.isArray(d) ? d : []);
-      }).catch(() => {}),
+      }).catch(() => {
+        setError('Failed to load dashboard data');
+      }),
       adminApi.uploadTrends(30).then((res) => {
         const d = unwrap(res);
         setUploadTrends(Array.isArray(d) ? d : []);
-      }).catch(() => {}),
+      }).catch(() => {
+        setError('Failed to load dashboard data');
+      }),
     ]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   usePolling(fetchData, 30000);
 
-  if (loading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
-  if (!stats) return null;
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 100 }}><Spin size="large" tip="Loading..." /></div>;
+  if (!stats) return <div style={{ display: 'flex', justifyContent: 'center', padding: 100 }}><Spin size="large" tip="Loading..." /></div>;
 
   const s = stats as any;
   const cards = [
@@ -73,6 +81,7 @@ export default function DashboardPage() {
 
   return (
     <div>
+      {error && <Alert type="error" message="Failed to load dashboard data" showIcon closable onClose={() => setError(null)} style={{ marginBottom: 16 }} />}
       <Title level={4}>Dashboard</Title>
       <Row gutter={[16, 16]}>
         {cards.map((c) => (

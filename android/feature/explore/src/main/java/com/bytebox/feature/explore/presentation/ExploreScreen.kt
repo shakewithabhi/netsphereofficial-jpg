@@ -43,11 +43,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -125,7 +128,6 @@ private fun avatarColor(name: String): Color {
 @Composable
 fun ExploreScreen(
     onItemClick: (code: String) -> Unit,
-    onUploadClick: () -> Unit = {},
     viewModel: ExploreViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -196,7 +198,7 @@ fun ExploreScreen(
                                 modifier = Modifier.size(22.dp),
                             )
                         }
-                        IconButton(onClick = onUploadClick) {
+                        IconButton(onClick = { /* TODO: upload */ }) {
                             Box(
                                 modifier = Modifier
                                     .size(30.dp)

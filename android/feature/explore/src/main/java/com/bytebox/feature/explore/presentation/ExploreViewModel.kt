@@ -4,9 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.onError
 import com.bytebox.core.common.onSuccess
+import com.bytebox.domain.model.ExploreItem
+import com.bytebox.domain.model.FileItem
 import com.bytebox.domain.model.Post
 import com.bytebox.domain.model.PostComment
 import com.bytebox.domain.repository.ExploreRepository
+import com.bytebox.domain.repository.FileRepository
+import com.bytebox.domain.repository.ShareRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,6 +25,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
     private val exploreRepository: ExploreRepository,
+    private val shareRepository: ShareRepository,
+    private val fileRepository: FileRepository,
 ) : ViewModel() {
 
     data class UiState(
@@ -45,6 +51,9 @@ class ExploreViewModel @Inject constructor(
         val searchQuery: String = "",
         val searchResults: List<Post> = emptyList(),
         val isSearchActive: Boolean = false,
+        val isSearching: Boolean = false,
+        val suggestions: List<ExploreItem> = emptyList(),
+        val showSuggestions: Boolean = false,
 
         // Loading states
         val isLoading: Boolean = false,
@@ -56,9 +65,22 @@ class ExploreViewModel @Inject constructor(
         // Trending tags
         val trendingTags: List<Pair<String, Long>> = emptyList(),
 
-        // Create post
+        // Create post (remote)
         val isCreatingPost: Boolean = false,
         val createPostSuccess: Boolean = false,
+
+        // Post creation (HEAD)
+        val showCreatePost: Boolean = false,
+        val createPostStep: Int = 1,
+        val userVideoFiles: List<FileItem> = emptyList(),
+        val isLoadingFiles: Boolean = false,
+        val selectedFile: FileItem? = null,
+        val caption: String = "",
+        val postCategory: String = "Entertainment",
+        val tagInput: String = "",
+        val tags: List<String> = emptyList(),
+        val isPosting: Boolean = false,
+        val postError: String? = null,
     )
 
     enum class FeedTab {
@@ -395,5 +417,97 @@ class ExploreViewModel @Inject constructor(
 
     fun loadMore() {
         // No-op for now (pagination can be added later)
+    }
+
+    // ── Post creation ────────────────────────────────────────────────────
+
+    fun openCreatePost() {
+        _uiState.update {
+            it.copy(
+                showCreatePost = true,
+                createPostStep = 1,
+                selectedFile = null,
+                caption = "",
+                postCategory = "Entertainment",
+                tags = emptyList(),
+                tagInput = "",
+                postError = null,
+            )
+        }
+        loadUserFiles()
+    }
+
+    fun dismissCreatePost() {
+        _uiState.update { it.copy(showCreatePost = false) }
+    }
+
+    private fun loadUserFiles() {
+        _uiState.update { it.copy(isLoadingFiles = true) }
+        viewModelScope.launch {
+            fileRepository.getFolderContents(folderId = null, sort = "updated_at", order = "desc")
+                .onSuccess { contents ->
+                    val videos = contents.files.filter { it.mimeType.startsWith("video/") }
+                    _uiState.update { it.copy(userVideoFiles = videos, isLoadingFiles = false) }
+                }
+                .onError {
+                    _uiState.update { it.copy(isLoadingFiles = false, postError = "Failed to load files") }
+                }
+        }
+    }
+
+    fun selectFile(file: FileItem) {
+        _uiState.update { it.copy(selectedFile = file) }
+    }
+
+    fun goToStep2() {
+        if (_uiState.value.selectedFile != null) {
+            _uiState.update { it.copy(createPostStep = 2) }
+        }
+    }
+
+    fun goToStep1() {
+        _uiState.update { it.copy(createPostStep = 1) }
+    }
+
+    fun onCaptionChanged(caption: String) {
+        if (caption.length <= 500) {
+            _uiState.update { it.copy(caption = caption) }
+        }
+    }
+
+    fun onPostCategoryChanged(category: String) {
+        _uiState.update { it.copy(postCategory = category) }
+    }
+
+    fun onTagInputChanged(input: String) {
+        _uiState.update { it.copy(tagInput = input) }
+    }
+
+    fun addTag(tag: String) {
+        val cleaned = tag.trim().removePrefix("#")
+        if (cleaned.isNotEmpty() && cleaned !in _uiState.value.tags) {
+            _uiState.update { it.copy(tags = it.tags + cleaned, tagInput = "") }
+        }
+    }
+
+    fun removeTag(tag: String) {
+        _uiState.update { it.copy(tags = it.tags - tag) }
+    }
+
+    fun submitPost() {
+        val state = _uiState.value
+        val file = state.selectedFile ?: return
+        if (state.caption.isBlank()) return
+        _uiState.update { it.copy(isPosting = true, postError = null) }
+        viewModelScope.launch {
+            shareRepository.createPost(file.id, state.caption.trim(), state.postCategory, state.tags)
+                .onSuccess {
+                    _uiState.update { it.copy(showCreatePost = false, isPosting = false) }
+                    refresh()
+                }
+                .onError { error ->
+                    _uiState.update { it.copy(isPosting = false, postError = error.message ?: "Failed to create post") }
+                }
+        }
     }
 }

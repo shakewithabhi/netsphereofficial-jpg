@@ -4,6 +4,7 @@ import com.bytebox.core.common.Result
 import com.bytebox.core.common.map
 import com.bytebox.core.network.api.ShareApi
 import com.bytebox.core.network.dto.AddCommentRequest
+import com.bytebox.core.network.dto.CreatePostRequest
 import com.bytebox.core.network.dto.CreateShareRequest
 import com.bytebox.core.network.dto.ExploreItemDto
 import com.bytebox.core.network.dto.ShareCommentDto
@@ -116,6 +117,17 @@ class ShareRepositoryImpl @Inject constructor(
 
     override suspend fun addComment(code: String, content: String): Result<ShareComment> {
         return safeApiCall { shareApi.addComment(code, AddCommentRequest(content)) }.map { it.toDomain() }
+    }
+
+    override suspend fun createPost(
+        fileId: String,
+        caption: String,
+        category: String,
+        tags: List<String>,
+    ): Result<Unit> {
+        return safeApiCall {
+            shareApi.createPost(CreatePostRequest(fileId, caption, category, tags))
+        }.map { }
     }
 
     private fun ShareDto.toDomain() = ShareLink(

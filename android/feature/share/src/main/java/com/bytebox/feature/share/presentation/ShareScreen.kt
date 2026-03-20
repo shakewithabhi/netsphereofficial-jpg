@@ -124,11 +124,44 @@ fun ShareScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Handle share creation result
+    // Handle share creation result — share via target app or copy to clipboard
     LaunchedEffect(uiState.createdShareLink) {
         uiState.createdShareLink?.let { link ->
-            clipboardManager.setText(AnnotatedString(link.shareUrl))
-            snackbarHostState.showSnackbar("Link copied to clipboard!")
+            val target = uiState.pendingShareTarget
+            when {
+                // "Copy link" was tapped
+                target == "copy" -> {
+                    clipboardManager.setText(AnnotatedString(link.shareUrl))
+                    snackbarHostState.showSnackbar("Link copied to clipboard!")
+                }
+                // "More" was tapped — open system share sheet
+                target == null -> {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, link.shareUrl)
+                    }
+                    context.startActivity(Intent.createChooser(intent, "Share link"))
+                }
+                // Specific app (WhatsApp / Telegram)
+                else -> {
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, link.shareUrl)
+                        setPackage(target)
+                    }
+                    try {
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        // App not installed — fall back to system share sheet
+                        val fallback = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, link.shareUrl)
+                        }
+                        context.startActivity(Intent.createChooser(fallback, "Share link"))
+                        snackbarHostState.showSnackbar("App not installed, opening share menu")
+                    }
+                }
+            }
             viewModel.clearShareResult()
         }
     }
@@ -244,11 +277,12 @@ fun ShareScreen(
             uiState = uiState,
             onDismiss = { viewModel.closeShareOptions() },
             onTogglePrivateLink = { viewModel.togglePrivateLink() },
-            onCopyLink = { viewModel.executeShare() },
+            onExtractionCodeChange = { viewModel.updateExtractionCode(it) },
+            onValidityClick = { viewModel.toggleValidityPicker() },
+            onValiditySelected = { viewModel.selectValidity(it) },
+            onCopyLink = { viewModel.executeShare("copy") },
             onShareVia = { packageName ->
-                viewModel.executeShare()
-                // The LaunchedEffect above handles clipboard copy;
-                // for specific apps, we fire an intent after creation
+                viewModel.executeShare(packageName)
             },
         )
     }
@@ -597,11 +631,13 @@ private fun ShareToBottomSheet(
     uiState: ShareUiState,
     onDismiss: () -> Unit,
     onTogglePrivateLink: () -> Unit,
+    onExtractionCodeChange: (String) -> Unit,
+    onValidityClick: () -> Unit,
+    onValiditySelected: (ShareValidity) -> Unit,
     onCopyLink: () -> Unit,
     onShareVia: (String?) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -643,7 +679,7 @@ private fun ShareToBottomSheet(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .clickable {
+                            .clickable(enabled = !uiState.isCreatingShare) {
                                 if (target.packageName == null && target.label == "Copy link") {
                                     onCopyLink()
                                 } else if (target.label == "More") {
@@ -683,10 +719,11 @@ private fun ShareToBottomSheet(
             HorizontalDivider(modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.md))
             Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.xs))
 
-            // Validity row
+            // Validity row — clickable to open picker
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { onValidityClick() }
                     .padding(horizontal = ByteBoxTheme.spacing.md, vertical = ByteBoxTheme.spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -696,14 +733,50 @@ private fun ShareToBottomSheet(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    "Permanently Valid",
+                    uiState.selectedValidity.label,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    " >",
+                    if (uiState.showValidityPicker) " ▼" else " >",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            // Validity options dropdown
+            AnimatedVisibility(visible = uiState.showValidityPicker) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = ByteBoxTheme.spacing.lg),
+                ) {
+                    ShareValidity.entries.forEach { validity ->
+                        val isSelected = validity == uiState.selectedValidity
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(ByteBoxTheme.radius.sm))
+                                .clickable { onValiditySelected(validity) }
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else Color.Transparent,
+                                )
+                                .padding(
+                                    horizontal = ByteBoxTheme.spacing.md,
+                                    vertical = ByteBoxTheme.spacing.sm,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                validity.label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        }
+                    }
+                }
             }
 
             // Private link toggle
@@ -724,7 +797,7 @@ private fun ShareToBottomSheet(
                 )
             }
 
-            // Extraction code (visible when private link is on)
+            // Extraction code — editable field when private link is on
             AnimatedVisibility(visible = uiState.isPrivateLink) {
                 Row(
                     modifier = Modifier
@@ -737,15 +810,18 @@ private fun ShareToBottomSheet(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        uiState.extractionCode,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        " >",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    OutlinedTextField(
+                        value = uiState.extractionCode,
+                        onValueChange = onExtractionCodeChange,
+                        modifier = Modifier.width(120.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            fontSize = 14.sp,
+                        ),
+                        singleLine = true,
+                        shape = RoundedCornerShape(ByteBoxTheme.radius.sm),
                     )
                 }
             }

@@ -2,7 +2,9 @@ package com.bytebox.feature.auth.presentation.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.bytebox.core.common.AppException
 import com.bytebox.core.common.Result
+import com.bytebox.domain.repository.AuthRepository
 import com.bytebox.domain.usecase.GoogleLoginUseCase
 import com.bytebox.domain.usecase.LoginUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,13 +21,18 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isPasswordVisible: Boolean = false,
-    val loginSuccess: Boolean = false
+    val loginSuccess: Boolean = false,
+    val show2FA: Boolean = false,
+    val tempToken: String? = null,
+    val twoFactorError: String? = null,
+    val is2FALoading: Boolean = false
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
-    private val googleLoginUseCase: GoogleLoginUseCase
+    private val googleLoginUseCase: GoogleLoginUseCase,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -52,11 +59,43 @@ class LoginViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, loginSuccess = true) }
                 }
                 is Result.Error -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = result.exception.message) }
+                    val exception = result.exception
+                    if (exception is AppException.TwoFactorRequired) {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                show2FA = true,
+                                tempToken = exception.tempToken
+                            )
+                        }
+                    } else {
+                        _uiState.update { it.copy(isLoading = false, errorMessage = exception.message) }
+                    }
                 }
                 is Result.Loading -> {}
             }
         }
+    }
+
+    fun verify2FA(code: String) {
+        val tempToken = _uiState.value.tempToken ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(is2FALoading = true, twoFactorError = null) }
+
+            when (val result = authRepository.verify2FALogin(tempToken, code)) {
+                is Result.Success -> {
+                    _uiState.update { it.copy(is2FALoading = false, show2FA = false, loginSuccess = true) }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(is2FALoading = false, twoFactorError = result.exception.message) }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun dismiss2FA() {
+        _uiState.update { it.copy(show2FA = false, tempToken = null, twoFactorError = null) }
     }
 
     fun googleLogin(idToken: String) {

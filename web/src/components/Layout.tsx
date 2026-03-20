@@ -52,8 +52,20 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
     try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
   });
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const searchRef = useRef<HTMLInputElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   useEffect(() => {
     setSearchQuery('');
@@ -269,7 +281,13 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white dark:bg-slate-900">
+    <div className="flex flex-col h-screen overflow-hidden bg-white dark:bg-slate-900">
+      {isOffline && (
+        <div className="bg-red-600 text-white text-center text-sm py-2 px-4 font-medium shrink-0">
+          You are offline. Some features may not work.
+        </div>
+      )}
+      <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex lg:flex-col lg:shrink-0">
         {renderSidebar(false)}
@@ -460,6 +478,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
           }}
         />
       )}
+      </div>
     </div>
   );
 }

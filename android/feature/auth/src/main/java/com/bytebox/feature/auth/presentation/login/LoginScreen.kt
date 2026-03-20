@@ -74,6 +74,15 @@ fun LoginScreen(
         if (uiState.loginSuccess) onLoginSuccess()
     }
 
+    if (uiState.show2FA) {
+        TwoFactorVerifyDialog(
+            isLoading = uiState.is2FALoading,
+            errorMessage = uiState.twoFactorError,
+            onVerify = viewModel::verify2FA,
+            onDismiss = viewModel::dismiss2FA,
+        )
+    }
+
     val onGoogleSignIn: () -> Unit = {
         coroutineScope.launch {
             try {

@@ -12,21 +12,9 @@ import {
 import type { FolderItem, FileItem } from '../api/files';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
+import { timeAgo } from '../utils/format';
 
-function timeAgo(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const seconds = Math.floor((now - then) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
+const trashThumbnailCache = new Map<string, string>();
 
 export default function Trash() {
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -113,26 +101,33 @@ export default function Trash() {
   }
 
   // Cache thumbnail URLs per file id
-  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>(
+    () => Object.fromEntries(trashThumbnailCache)
+  );
 
   useEffect(() => {
     const imageFiles = files.filter(
-      (f) => f.mime_type.startsWith('image/') && !thumbnailUrls[f.id]
+      (f) => f.mime_type.startsWith('image/') && !thumbnailUrls[f.id] && !trashThumbnailCache.has(f.id)
     );
     if (imageFiles.length === 0) return;
     let cancelled = false;
     (async () => {
       const entries: Record<string, string> = {};
-      await Promise.allSettled(
-        imageFiles.map(async (f) => {
-          try {
-            const url = await getDownloadUrl(f.id);
-            entries[f.id] = url;
-          } catch {
-            // skip failed thumbnails
-          }
-        })
-      );
+      // Process in batches of 5 to limit concurrency
+      for (let i = 0; i < imageFiles.length; i += 5) {
+        const batch = imageFiles.slice(i, i + 5);
+        await Promise.allSettled(
+          batch.map(async (f) => {
+            try {
+              const url = await getDownloadUrl(f.id);
+              entries[f.id] = url;
+              trashThumbnailCache.set(f.id, url);
+            } catch {
+              // skip failed thumbnails
+            }
+          })
+        );
+      }
       if (!cancelled) {
         setThumbnailUrls((prev) => ({ ...prev, ...entries }));
       }

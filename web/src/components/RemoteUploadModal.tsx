@@ -24,6 +24,32 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
     }
   }
 
+  function isPrivateUrl(value: string): boolean {
+    try {
+      const parsed = new URL(value);
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0' ||
+        hostname === '[::1]' ||
+        hostname === '::1'
+      ) {
+        return true;
+      }
+      // Check private IP ranges
+      const parts = hostname.split('.').map(Number);
+      if (parts.length === 4 && parts.every((p) => !isNaN(p))) {
+        if (parts[0] === 10) return true; // 10.x.x.x
+        if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true; // 172.16-31.x.x
+        if (parts[0] === 192 && parts[1] === 168) return true; // 192.168.x.x
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -36,6 +62,10 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
     }
     if (!isValidUrl(trimmedUrl)) {
       setError('Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+    if (isPrivateUrl(trimmedUrl)) {
+      setError('URLs pointing to private/internal network addresses are not allowed.');
       return;
     }
 

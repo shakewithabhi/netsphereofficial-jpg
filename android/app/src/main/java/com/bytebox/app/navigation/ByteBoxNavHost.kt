@@ -60,6 +60,7 @@ import com.bytebox.feature.share.presentation.ShareViewScreen
 import com.bytebox.feature.explore.presentation.ExploreScreen
 import com.bytebox.feature.explore.presentation.ExploreVideoScreen
 import com.bytebox.feature.files.presentation.favorites.FavoritesScreen
+import com.bytebox.feature.settings.presentation.NotificationPanel
 import com.bytebox.feature.files.presentation.notifications.NotificationsScreen
 import com.bytebox.feature.trash.presentation.TrashScreen
 import com.bytebox.feature.upload.presentation.UploadScreen
@@ -80,6 +81,8 @@ fun ByteBoxNavHost(
             navController.navigate(Screen.ShareView.createRoute(deepLinkShareCode))
         }
     }
+
+    var showNotificationPanel by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -227,8 +230,7 @@ fun ByteBoxNavHost(
                         navController.navigate(Screen.Shares.route)
                     },
                     onNotificationsClick = {
-                        // TODO: Navigate to Notifications screen when implemented
-                        android.widget.Toast.makeText(navController.context, "Notifications coming soon!", android.widget.Toast.LENGTH_SHORT).show()
+                        showNotificationPanel = true
                     },
                     onProfileClick = {
                         navController.navigate(Screen.Profile.route) {
@@ -420,9 +422,6 @@ fun ByteBoxNavHost(
                     onItemClick = { code ->
                         navController.navigate(Screen.ExploreVideo.createRoute(code))
                     },
-                    onUploadClick = {
-                        navController.navigate(Screen.Upload.createRoute(null, sharePublicly = true))
-                    },
                 )
             }
 
@@ -461,5 +460,12 @@ fun ByteBoxNavHost(
                 )
             }
         }
+    }
+
+    // Notification panel bottom sheet
+    if (showNotificationPanel) {
+        NotificationPanel(
+            onDismiss = { showNotificationPanel = false },
+        )
     }
 }

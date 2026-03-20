@@ -71,7 +71,7 @@ export default function UsersPage() {
       }
 
       setUsers(userList);
-      setTotal(inner.total ?? userList.length + (page - 1) * pageSize);
+      setTotal(inner.total ?? (userList.length + (page - 1) * pageSize));
     } catch {
       message.error('Failed to load users');
     } finally {
@@ -133,7 +133,7 @@ export default function UsersPage() {
     });
   };
 
-  const handleSave = async () => {
+  const doSave = async () => {
     if (!editUser) return;
     try {
       const values = form.getFieldsValue();
@@ -149,6 +149,22 @@ export default function UsersPage() {
       fetchUsers();
     } catch {
       message.error('Failed to update user');
+    }
+  };
+
+  const handleSave = async () => {
+    if (!editUser) return;
+    const values = form.getFieldsValue();
+    const newStorageLimit = values.storage_limit * 1024 * 1024 * 1024;
+    if (newStorageLimit !== editUser.storage_limit) {
+      Modal.confirm({
+        title: 'Confirm storage limit change',
+        content: 'Changing storage limit may affect this user\'s ability to upload. Continue?',
+        okText: 'Continue',
+        onOk: doSave,
+      });
+    } else {
+      doSave();
     }
   };
 

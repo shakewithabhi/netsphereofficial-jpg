@@ -27,4 +27,10 @@ interface AuthApi {
 
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<MessageResponse>
+
+    @POST("auth/2fa/verify-login")
+    suspend fun verify2FALogin(@Body request: TwoFactorLoginRequest): Response<AuthResponse>
+
+    @POST("auth/change-password")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<MessageResponse>
 }

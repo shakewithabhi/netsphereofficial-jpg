@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Table, Typography, Input, Select, Space, Button, Tag, message,
   Modal, Form, Tooltip, AutoComplete, Card, Col, Row, Statistic,
@@ -65,6 +65,8 @@ export default function NotificationsPage() {
   const [form] = Form.useForm();
   const [recipientType, setRecipientType] = useState<string>('all');
   const [stats, setStats] = useState({ total_sent: 0, read_rate: 0, unread_count: 0 });
+  const [searchUsers, setSearchUsers] = useState<{ value: string; label: string }[]>([]);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pageSize = 20;
 
   const fetchNotifications = useCallback(async () => {
@@ -341,7 +343,33 @@ export default function NotificationsPage() {
           </Form.Item>
           {recipientType === 'user' && (
             <Form.Item label="User Email" name="user_email" rules={[{ required: true, message: 'Please enter user email' }]}>
-              <AutoComplete placeholder="Enter user email" options={[]} />
+              <AutoComplete
+                placeholder="Enter user email"
+                options={searchUsers}
+                onSearch={(value) => {
+                  if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+                  if (!value || value.length < 2) {
+                    setSearchUsers([]);
+                    return;
+                  }
+                  searchTimerRef.current = setTimeout(async () => {
+                    try {
+                      const res = await adminApi.listUsers({ limit: 10, offset: 0, search: value });
+                      const d = res.data as any;
+                      const inner = d.data ?? d;
+                      const userList = inner.users ?? inner.data ?? [];
+                      setSearchUsers(
+                        (Array.isArray(userList) ? userList : []).map((u: any) => ({
+                          value: u.email,
+                          label: u.email,
+                        }))
+                      );
+                    } catch {
+                      setSearchUsers([]);
+                    }
+                  }, 300);
+                }}
+              />
             </Form.Item>
           )}
           <Form.Item label="Type" name="type" rules={[{ required: true, message: 'Please select type' }]}>

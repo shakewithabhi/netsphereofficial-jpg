@@ -16,9 +16,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 data class PickerBreadcrumb(val folderId: String?, val name: String)
+
+enum class ShareValidity(val label: String, val hours: Long?) {
+    PERMANENT("Permanently Valid", null),
+    ONE_DAY("1 Day", 24),
+    SEVEN_DAYS("7 Days", 24 * 7),
+    THIRTY_DAYS("30 Days", 24 * 30),
+}
 
 data class ShareUiState(
     // Existing share list
@@ -41,8 +51,11 @@ data class ShareUiState(
     val showShareOptions: Boolean = false,
     val isPrivateLink: Boolean = false,
     val extractionCode: String = "",
+    val selectedValidity: ShareValidity = ShareValidity.PERMANENT,
+    val showValidityPicker: Boolean = false,
     val isCreatingShare: Boolean = false,
     val createdShareLink: ShareLink? = null,
+    val pendingShareTarget: String? = null, // package name or null for copy/more
 ) {
     val currentFolderId: String? get() = pickerFolderStack.lastOrNull()?.folderId
     val selectionCount: Int get() = selectedFileIds.size + selectedFolderIds.size
@@ -238,19 +251,38 @@ class ShareViewModel @Inject constructor(
         }
     }
 
-    fun executeShare() {
+    fun updateExtractionCode(code: String) {
+        if (code.length <= 8) {
+            _uiState.update { it.copy(extractionCode = code) }
+        }
+    }
+
+    fun selectValidity(validity: ShareValidity) {
+        _uiState.update { it.copy(selectedValidity = validity, showValidityPicker = false) }
+    }
+
+    fun toggleValidityPicker() {
+        _uiState.update { it.copy(showValidityPicker = !it.showValidityPicker) }
+    }
+
+    fun executeShare(targetPackage: String? = null) {
         val state = _uiState.value
         val fileId = state.selectedFileIds.firstOrNull()
         val folderId = state.selectedFolderIds.firstOrNull()
         if (fileId == null && folderId == null) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isCreatingShare = true) }
+            _uiState.update { it.copy(isCreatingShare = true, pendingShareTarget = targetPackage) }
             val password = if (state.isPrivateLink) state.extractionCode else null
+            val expiresAt = state.selectedValidity.hours?.let { hours ->
+                val expiry = Instant.now().plusSeconds(hours * 3600)
+                DateTimeFormatter.ISO_INSTANT.format(expiry)
+            }
             val result = shareRepository.createShare(
                 fileId = fileId,
                 folderId = folderId,
                 password = password,
+                expiresAt = expiresAt,
             )
             when (result) {
                 is Result.Success -> {
@@ -264,7 +296,7 @@ class ShareViewModel @Inject constructor(
                 }
                 is Result.Error -> {
                     _uiState.update {
-                        it.copy(isCreatingShare = false, errorMessage = result.exception.message)
+                        it.copy(isCreatingShare = false, pendingShareTarget = null, errorMessage = result.exception.message)
                     }
                 }
                 is Result.Loading -> {}
@@ -278,10 +310,13 @@ class ShareViewModel @Inject constructor(
                 showShareOptions = false,
                 showFilePicker = false,
                 createdShareLink = null,
+                pendingShareTarget = null,
                 selectedFileIds = emptySet(),
                 selectedFolderIds = emptySet(),
                 isPrivateLink = false,
                 extractionCode = "",
+                selectedValidity = ShareValidity.PERMANENT,
+                showValidityPicker = false,
                 pickerSearchQuery = "",
             )
         }

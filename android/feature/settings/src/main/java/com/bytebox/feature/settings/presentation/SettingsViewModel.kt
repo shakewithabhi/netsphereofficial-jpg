@@ -1,6 +1,7 @@
 package com.bytebox.feature.settings.presentation
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.Result
@@ -23,9 +24,13 @@ import javax.inject.Inject
 data class SettingsUiState(
     val user: User? = null,
     val isLoading: Boolean = false,
+    val isUploadingAvatar: Boolean = false,
     val uploadOnWifiOnly: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val autoUploadEnabled: Boolean = false
+    val autoUploadEnabled: Boolean = false,
+    val isChangingPassword: Boolean = false,
+    val changePasswordError: String? = null,
+    val changePasswordSuccess: Boolean = false
 )
 
 @HiltViewModel
@@ -90,8 +95,51 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun uploadAvatar(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingAvatar = true) }
+            when (authRepository.uploadAvatar(uri)) {
+                is Result.Success -> loadProfile()
+                is Result.Error -> _uiState.update { it.copy(isUploadingAvatar = false) }
+                is Result.Loading -> {}
+            }
+            _uiState.update { it.copy(isUploadingAvatar = false) }
+        }
+    }
+
+    fun deleteAvatar() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isUploadingAvatar = true) }
+            when (authRepository.deleteAvatar()) {
+                is Result.Success -> loadProfile()
+                is Result.Error -> {}
+                is Result.Loading -> {}
+            }
+            _uiState.update { it.copy(isUploadingAvatar = false) }
+        }
+    }
+
     fun runBackupNow() {
         backupManager.runBackupNow()
+    }
+
+    fun changePassword(oldPassword: String, newPassword: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isChangingPassword = true, changePasswordError = null, changePasswordSuccess = false) }
+            when (val result = authRepository.changePassword(oldPassword, newPassword)) {
+                is Result.Success -> {
+                    _uiState.update { it.copy(isChangingPassword = false, changePasswordSuccess = true) }
+                }
+                is Result.Error -> {
+                    _uiState.update { it.copy(isChangingPassword = false, changePasswordError = result.exception.message) }
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    fun clearChangePasswordState() {
+        _uiState.update { it.copy(changePasswordError = null, changePasswordSuccess = false) }
     }
 
     fun logout(onLoggedOut: () -> Unit) {

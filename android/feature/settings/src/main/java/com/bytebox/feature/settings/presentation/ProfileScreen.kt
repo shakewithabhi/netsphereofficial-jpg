@@ -1,5 +1,8 @@
 package com.bytebox.feature.settings.presentation
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,11 +66,18 @@ fun ProfileScreen(
     onNavigateToShares: () -> Unit,
     onNavigateToTrash: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {},
     onLoggedOut: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutDialog by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { viewModel.uploadAvatar(it) }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -100,6 +111,13 @@ fun ProfileScreen(
                     displayName = user.displayName ?: "User",
                     email = user.email,
                     plan = user.plan,
+                    avatarUrl = user.avatarUrl,
+                    isUploadingAvatar = uiState.isUploadingAvatar,
+                    onAvatarClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
                     modifier = Modifier.padding(horizontal = ByteBoxTheme.spacing.md),
                 )
                 Spacer(modifier = Modifier.height(ByteBoxTheme.spacing.md))
@@ -233,6 +251,12 @@ fun ProfileScreen(
                         icon = Icons.Default.Settings,
                         label = "Settings",
                         onClick = onNavigateToSettings,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ProfileMenuItem(
+                        icon = Icons.Default.Password,
+                        label = "Change Password",
+                        onClick = onNavigateToChangePassword,
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     ProfileMenuItem(

@@ -22,7 +22,8 @@ export default function LoginPage() {
 
     if (!data.user.is_admin) {
       message.error('Access denied. Admin privileges required.');
-      localStorage.clear();
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       return;
     }
 

@@ -67,6 +67,11 @@ export async function renameFolder(id: string, name: string): Promise<FolderItem
   return res.data.data ?? res.data;
 }
 
+export async function renameFile(id: string, name: string): Promise<FileItem> {
+  const res = await client.put(`/files/${id}`, { name });
+  return res.data.data ?? res.data;
+}
+
 export async function trashFolder(id: string): Promise<void> {
   await client.post(`/folders/${id}/trash`);
 }

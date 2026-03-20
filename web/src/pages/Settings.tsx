@@ -124,18 +124,22 @@ export default function Settings() {
     // Validation
     if (!currentPassword) {
       setPasswordError('Current password is required.');
+      setPasswordSaving(false);
       return;
     }
     if (newPassword.length < 8) {
       setPasswordError('New password must be at least 8 characters.');
+      setPasswordSaving(false);
       return;
     }
     if (newPassword !== confirmPassword) {
       setPasswordError('New passwords do not match.');
+      setPasswordSaving(false);
       return;
     }
     if (currentPassword === newPassword) {
       setPasswordError('New password must be different from current password.');
+      setPasswordSaving(false);
       return;
     }
 

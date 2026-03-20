@@ -14,6 +14,8 @@ import com.bytebox.domain.model.FolderContents
 import com.bytebox.domain.repository.FileRepository
 import com.bytebox.domain.repository.ShareRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,6 +64,7 @@ class FileListViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(FileListUiState())
     val uiState: StateFlow<FileListUiState> = _uiState.asStateFlow()
+    private var searchJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -295,13 +298,15 @@ class FileListViewModel @Inject constructor(
 
     fun search(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+        searchJob?.cancel()
         if (query.isBlank()) {
             _uiState.update { it.copy(isSearching = false) }
             loadContents()
             return
         }
 
-        viewModelScope.launch {
+        searchJob = viewModelScope.launch {
+            delay(300) // debounce
             _uiState.update { it.copy(isSearching = true, isLoading = true) }
             when (val result = fileRepository.searchFiles(query)) {
                 is Result.Success -> {
@@ -309,7 +314,7 @@ class FileListViewModel @Inject constructor(
                         it.copy(
                             files = result.data.files,
                             folders = result.data.folders,
-                            isLoading = false
+                            isLoading = false,
                         )
                     }
                 }

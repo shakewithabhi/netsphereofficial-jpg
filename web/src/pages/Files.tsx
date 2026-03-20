@@ -39,6 +39,7 @@ import {
   getFolderContents,
   createFolder,
   renameFolder,
+  renameFile,
   trashFolder,
   trashFile,
   copyFile,
@@ -146,6 +147,9 @@ export default function Files() {
   const [selectedFolders, setSelectedFolders] = useState<Set<string>>(new Set());
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
+
+  // Bulk operation loading state
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Drag & drop move state
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -305,6 +309,61 @@ export default function Files() {
     return () => document.removeEventListener('click', close);
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Don't fire shortcuts when typing in an input/textarea
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'Escape') {
+        clearSelection();
+        setContextMenu(null);
+        setRenamingId(null);
+        return;
+      }
+
+      if (e.ctrlKey && e.key === 'a') {
+        e.preventDefault();
+        selectAll();
+        return;
+      }
+
+      if (e.key === 'Delete') {
+        if (totalSelected > 0) {
+          handleBulkTrash();
+        }
+        return;
+      }
+
+      if (e.key === 'F2') {
+        e.preventDefault();
+        // Rename first selected item
+        if (selectedFolders.size > 0) {
+          const id = Array.from(selectedFolders)[0];
+          const folder = folders.find((f) => f.id === id);
+          if (folder) { setRenamingId(id); setRenamingName(folder.name); }
+        } else if (selectedFiles.size > 0) {
+          const id = Array.from(selectedFiles)[0];
+          const file = files.find((f) => f.id === id);
+          if (file) { setRenamingId(id); setRenamingName(file.name); }
+        }
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        if (selectedFiles.size > 0) {
+          const id = Array.from(selectedFiles)[0];
+          const file = files.find((f) => f.id === id);
+          if (file) setPreviewFile(file);
+        }
+        return;
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [folders, files, selectedFiles, selectedFolders, totalSelected]);
+
   // All items as a flat list for shift-click range selection
   const allItems: { type: 'folder' | 'file'; id: string }[] = [
     ...sortedFolders.map((f) => ({ type: 'folder' as const, id: f.id })),
@@ -383,39 +442,52 @@ export default function Files() {
   }
 
   async function handleBulkTrash() {
+    setBulkLoading(true);
     try {
       await batchTrash(Array.from(selectedFiles), Array.from(selectedFolders));
       clearSelection();
       refresh();
     } catch {
       setError('Failed to trash selected items.');
+    } finally {
+      setBulkLoading(false);
     }
   }
 
   async function handleBulkDownload() {
-    for (const fileId of selectedFiles) {
-      try {
-        const url = await getDownloadUrl(fileId);
-        window.open(url, '_blank');
-      } catch {
-        // continue with others
+    setBulkLoading(true);
+    try {
+      for (const fileId of selectedFiles) {
+        try {
+          const url = await getDownloadUrl(fileId);
+          window.open(url, '_blank');
+        } catch {
+          // continue with others
+        }
       }
+    } finally {
+      setBulkLoading(false);
     }
   }
 
   async function handleBulkToggleStar() {
-    for (const fileId of selectedFiles) {
-      const file = files.find((f) => f.id === fileId);
-      if (!file) continue;
-      try {
-        if (file.is_starred) await unstarFile(fileId);
-        else await starFile(fileId);
-      } catch {
-        // continue
+    setBulkLoading(true);
+    try {
+      for (const fileId of selectedFiles) {
+        const file = files.find((f) => f.id === fileId);
+        if (!file) continue;
+        try {
+          if (file.is_starred) await unstarFile(fileId);
+          else await starFile(fileId);
+        } catch {
+          // continue
+        }
       }
+      clearSelection();
+      refresh();
+    } finally {
+      setBulkLoading(false);
     }
-    clearSelection();
-    refresh();
   }
 
   async function handleCreateFolder() {
@@ -445,6 +517,21 @@ export default function Files() {
       refresh();
     } catch {
       setError('Failed to rename folder.');
+    }
+  }
+
+  async function handleRenameFile(id: string) {
+    if (!renamingName.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    try {
+      await renameFile(id, renamingName.trim());
+      setRenamingId(null);
+      setRenamingName('');
+      refresh();
+    } catch {
+      setError('Failed to rename file.');
     }
   }
 
@@ -879,7 +966,8 @@ export default function Files() {
             {selectedFiles.size > 0 && (
               <button
                 onClick={handleBulkDownload}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                disabled={bulkLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Download selected files"
               >
                 <Download size={16} />
@@ -889,7 +977,8 @@ export default function Files() {
             {selectedFiles.size > 0 && (
               <button
                 onClick={handleBulkToggleStar}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                disabled={bulkLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Toggle star"
               >
                 <Star size={16} />
@@ -898,7 +987,8 @@ export default function Files() {
             )}
             <button
               onClick={handleBulkTrash}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+              disabled={bulkLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Move to trash"
             >
               <Trash2 size={16} />

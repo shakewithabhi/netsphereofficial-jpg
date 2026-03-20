@@ -143,3 +143,13 @@ data class ShareCommentsResponseDto(
 data class AddCommentRequest(
     val content: String,
 )
+
+@JsonClass(generateAdapter = true)
+data class CreatePostResponse(
+    val id: String,
+    @Json(name = "file_id") val fileId: String,
+    val caption: String,
+    val category: String,
+    val tags: List<String>,
+    @Json(name = "created_at") val createdAt: String,
+)

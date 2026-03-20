@@ -104,9 +104,9 @@ private val filterGroups = listOf(
     FilterGroup("Audio", setOf(FileCategory.AUDIO)),
 )
 
-// Premium gradient colors
+// Header uses transparent/surface background (no gradient)
 private val headerGradient = Brush.verticalGradient(
-    listOf(Color(0xFF1E40AF), Color(0xFF3B82F6), Color(0xFF60A5FA))
+    listOf(Color.Transparent, Color.Transparent)
 )
 private val premiumGradient = Brush.horizontalGradient(
     listOf(Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFA78BFA))
@@ -548,8 +548,8 @@ private fun CategoryGrid(
         CategoryTile("Folders", CoreR.drawable.ic_flat_folder, Color(0xFFF59E0B), Color(0xFF713F12)) {
             onFolderClick()
         },
-        CategoryTile("Starred", CoreR.drawable.ic_flat_starred, Color(0xFFF97316), Color(0xFF7C2D12)) {
-            onFavoritesClick()
+        CategoryTile("Public", CoreR.drawable.ic_flat_shared, Color(0xFFF97316), Color(0xFF7C2D12)) {
+            onPublicClick()
         },
         CategoryTile("Shared", CoreR.drawable.ic_flat_shared, Color(0xFF06B6D4), Color(0xFF164E63)) {
             onSharesClick()
@@ -557,38 +557,46 @@ private fun CategoryGrid(
         CategoryTile("More", CoreR.drawable.ic_flat_more, Color(0xFF6D28D9), Color(0xFFEDE9FE)) {},
     )
 
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    // 4x2 grid layout
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        items(tiles) { tile ->
-            Card(
-                modifier = Modifier
-                    .width(78.dp)
-                    .clickable(onClick = tile.onClick),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = tile.bgColor),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        for (row in tiles.chunked(4)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        painter = painterResource(tile.iconRes),
-                        contentDescription = tile.label,
-                        modifier = Modifier.size(38.dp),
-                        tint = Color.Unspecified,
-                    )
-                    Text(
-                        text = tile.label,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.9f),
-                    )
+                for (tile in row) {
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(onClick = tile.onClick),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = tile.bgColor),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                painter = painterResource(tile.iconRes),
+                                contentDescription = tile.label,
+                                modifier = Modifier.size(48.dp),
+                                tint = Color.Unspecified,
+                            )
+                            Text(
+                                text = tile.label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White.copy(alpha = 0.9f),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -602,71 +610,46 @@ private fun PremiumUpgradeCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(premiumGradient)
-                .padding(20.dp),
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = Color(0xFF3B82F6),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color.White.copy(alpha = 0.2f),
-                        ) {
-                            Text(
-                                text = "PRO",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White,
-                                letterSpacing = 1.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            )
-                        }
-                        Text(
-                            text = "ByteBox Pro",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "1 TB · Faster uploads · No ads",
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.7f),
-                    )
-                }
-                Surface(
-                    modifier = Modifier.clickable(onClick = onUploadClick),
-                    shape = RoundedCornerShape(12.dp),
+                Text(
+                    text = "Pro",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
                     color = Color.White,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = Color(0xFF6366F1),
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            "Upload",
-                            fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+                        }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Upgrade to Pro — get 1 TB storage",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+            }
+            Surface(
+                modifier = Modifier.clickable(onClick = onUploadClick),
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF3B82F6),
+            ) {
+                Text(
+                    "Upgrade",
+                    fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF6366F1),
                         )

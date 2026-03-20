@@ -3,6 +3,8 @@ import type { DragEvent, ChangeEvent } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, CloudUpload, Ban } from 'lucide-react';
 import { uploadFile, formatBytes } from '../api/files';
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
 interface UploadItem {
   file: File;
   progress: number;
@@ -21,9 +23,26 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
   const [items, setItems] = useState<UploadItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sizeError, setSizeError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function addFiles(files: FileList | File[]) {
+    const oversized = Array.from(files).filter((f) => f.size > MAX_FILE_SIZE);
+    if (oversized.length > 0) {
+      const names = oversized.map((f) => f.name).join(', ');
+      setSizeError(`File${oversized.length > 1 ? 's' : ''} too large (max 100MB): ${names}`);
+      // Still add the files that are within limits
+      const valid = Array.from(files).filter((f) => f.size <= MAX_FILE_SIZE);
+      if (valid.length === 0) return;
+      const newItems: UploadItem[] = valid.map((file) => ({
+        file,
+        progress: 0,
+        status: 'pending',
+      }));
+      setItems((prev) => [...prev, ...newItems]);
+      return;
+    }
+    setSizeError('');
     const newItems: UploadItem[] = Array.from(files).map((file) => ({
       file,
       progress: 0,
@@ -164,6 +183,15 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
               onChange={handleFileInput}
             />
           </div>
+
+          {/* File size error */}
+          {sizeError && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/30 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm">
+              <AlertCircle size={16} className="shrink-0" />
+              <span className="flex-1">{sizeError}</span>
+              <button onClick={() => setSizeError('')}><X size={14} /></button>
+            </div>
+          )}
 
           {/* Overall progress bar */}
           {uploading && items.length > 1 && (

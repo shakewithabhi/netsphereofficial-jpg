@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Card, Col, Row, Statistic, Table, Typography, Spin, Tag, Space } from 'antd';
+import { Alert, Card, Col, Row, Statistic, Table, Typography, Spin, Tag, Space } from 'antd';
 import {
   DollarOutlined, TeamOutlined, RiseOutlined, FallOutlined,
   CrownOutlined,
@@ -58,6 +58,7 @@ const generateMockBillingData = (revenueStats: RevenueStats | null): BillingStat
 export default function BillingPage() {
   const [billing, setBilling] = useState<BillingStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dataStale, setDataStale] = useState(false);
 
   const unwrap = (res: any) => res.data?.data ?? res.data;
 
@@ -66,8 +67,10 @@ export default function BillingPage() {
       // Try billing endpoint first
       const { data } = await adminApi.getBillingStats();
       setBilling(unwrap({ data }) as BillingStats);
+      setDataStale(false);
     } catch {
       // Fallback: build from revenue stats
+      setDataStale(true);
       try {
         const { data } = await adminApi.getRevenueStats();
         const revStats = unwrap({ data }) as RevenueStats;
@@ -82,8 +85,8 @@ export default function BillingPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
   usePolling(fetchData, 30000);
 
-  if (loading) return <Spin size="large" style={{ display: 'block', margin: '100px auto' }} />;
-  if (!billing) return null;
+  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 100 }}><Spin size="large" tip="Loading..." /></div>;
+  if (!billing) return <div style={{ display: 'flex', justifyContent: 'center', padding: 100 }}><Spin size="large" tip="Loading..." /></div>;
 
   const b = billing;
 
@@ -125,6 +128,7 @@ export default function BillingPage() {
 
   return (
     <div>
+      {dataStale && <Alert type="warning" message="Unable to load live billing data. Showing cached/sample data." showIcon closable style={{ marginBottom: 16 }} />}
       <Title level={4}><DollarOutlined /> Billing / Revenue Dashboard</Title>
 
       {/* Stats cards */}
