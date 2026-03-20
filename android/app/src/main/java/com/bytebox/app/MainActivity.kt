@@ -31,10 +31,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize AdMob
+        // Initialize AdMob and preload all ad types
         AdManager.initialize(this)
         AdManager.loadInterstitial(this)
         AdManager.loadRewarded(this)
+        AdManager.loadLaunchAd(this)
+        AdManager.loadPreviewAd(this)
+        AdManager.loadSpeedBoostAd(this)
+
+        // Show launch interstitial once per session (after a short delay)
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(2000)
+            AdManager.showLaunchAd(this@MainActivity)
+        }
 
         // Observe user plan to toggle ads (only show for free-tier users)
         lifecycleScope.launch {

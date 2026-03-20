@@ -118,46 +118,6 @@ class ShareRepositoryImpl @Inject constructor(
         return safeApiCall { shareApi.addComment(code, AddCommentRequest(content)) }.map { it.toDomain() }
     }
 
-    override suspend fun getPublicShareInfo(code: String): Result<ShareInfo> {
-        return safeApiCall { shareApi.getPublicShareInfo(code) }.map { dto ->
-            ShareInfo(
-                shareType = dto.shareType,
-                fileName = dto.fileName,
-                fileSize = dto.fileSize,
-                mimeType = dto.mimeType,
-                folderName = dto.folderName,
-                hasPassword = dto.hasPassword,
-                isVideo = dto.isVideo,
-                thumbnailUrl = dto.thumbnailUrl,
-                videoThumbnailUrl = dto.videoThumbnailUrl,
-                hlsUrl = dto.hlsUrl,
-                likeCount = dto.likeCount,
-                commentCount = dto.commentCount,
-                isLiked = dto.isLiked,
-                ownerName = dto.ownerName,
-                downloadCount = dto.downloadCount,
-            )
-        }
-    }
-
-    override suspend fun getPublicDownloadUrl(code: String): Result<String> {
-        return safeApiCall { shareApi.downloadPublicShare(code) }.map { it.url }
-    }
-
-    override suspend fun toggleLike(code: String): Result<Pair<Boolean, Int>> {
-        return safeApiCall { shareApi.toggleLike(code) }.map { it.liked to it.likeCount }
-    }
-
-    override suspend fun getComments(code: String, limit: Int, offset: Int): Result<List<ShareComment>> {
-        return safeApiCall { shareApi.getComments(code, limit, offset) }.map { resp ->
-            resp.comments.map { it.toDomain() }
-        }
-    }
-
-    override suspend fun addComment(code: String, content: String): Result<ShareComment> {
-        return safeApiCall { shareApi.addComment(code, AddCommentRequest(content)) }.map { it.toDomain() }
-    }
-
     private fun ShareDto.toDomain() = ShareLink(
         id = id, fileId = fileId, code = code, shareUrl = shareUrl,
         hasPassword = hasPassword, expiresAt = expiresAt, maxDownloads = maxDownloads,

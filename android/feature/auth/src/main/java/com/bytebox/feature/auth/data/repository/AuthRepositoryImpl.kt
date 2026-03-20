@@ -7,16 +7,12 @@ import com.bytebox.core.database.dao.UploadTaskDao
 import com.bytebox.core.datastore.TokenManager
 import com.bytebox.core.network.api.AuthApi
 import com.bytebox.core.network.api.UserApi
-import com.bytebox.core.network.dto.ChangePasswordRequest
 import com.bytebox.core.network.dto.ForgotPasswordRequest
 import com.bytebox.core.network.dto.GoogleLoginRequest
 import com.bytebox.core.network.dto.LoginRequest
 import com.bytebox.core.network.dto.RegisterRequest
 import com.bytebox.core.network.dto.ResetPasswordRequest
 import com.bytebox.core.network.safeApiCall
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import com.bytebox.domain.model.User
 import com.bytebox.domain.repository.AuthRepository
 import com.bytebox.core.common.map
@@ -127,28 +123,6 @@ class AuthRepositoryImpl @Inject constructor(
             is Result.Error -> result
             is Result.Loading -> result
         }
-    }
-
-    override suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> {
-        val result = safeApiCall {
-            authApi.changePassword(ChangePasswordRequest(currentPassword, newPassword))
-        }
-        return when (result) {
-            is Result.Success -> Result.Success(Unit)
-            is Result.Error -> result
-            is Result.Loading -> result
-        }
-    }
-
-    override suspend fun uploadAvatar(imageBytes: ByteArray, fileName: String): Result<User> {
-        val mediaType = when {
-            fileName.endsWith(".png", ignoreCase = true) -> "image/png"
-            fileName.endsWith(".webp", ignoreCase = true) -> "image/webp"
-            else -> "image/jpeg"
-        }.toMediaTypeOrNull()
-        val requestBody = imageBytes.toRequestBody(mediaType)
-        val part = MultipartBody.Part.createFormData("avatar", fileName, requestBody)
-        return safeApiCall { userApi.uploadAvatar(part) }.map { it.toDomain() }
     }
 
     private fun com.bytebox.core.network.dto.UserDto.toDomain() = User(

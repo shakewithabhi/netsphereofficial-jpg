@@ -13,6 +13,4 @@ interface AuthRepository {
     suspend fun getProfile(): Result<User>
     suspend fun forgotPassword(email: String): Result<String?>
     suspend fun resetPassword(token: String, newPassword: String): Result<Unit>
-    suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit>
-    suspend fun uploadAvatar(imageBytes: ByteArray, fileName: String): Result<User>
 }

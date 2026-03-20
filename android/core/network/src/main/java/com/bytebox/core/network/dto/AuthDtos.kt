@@ -57,12 +57,6 @@ data class MessageResponse(
 )
 
 @JsonClass(generateAdapter = true)
-data class ChangePasswordRequest(
-    @Json(name = "current_password") val currentPassword: String,
-    @Json(name = "new_password") val newPassword: String
-)
-
-@JsonClass(generateAdapter = true)
 data class UserDto(
     val id: String,
     val email: String,

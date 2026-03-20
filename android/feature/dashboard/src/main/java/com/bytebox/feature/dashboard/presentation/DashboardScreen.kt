@@ -520,8 +520,8 @@ private fun CategoryGrid(
     onFolderClick: () -> Unit,
     onPublicClick: () -> Unit,
     onSharesClick: () -> Unit,
-    onFavoritesClick: () -> Unit = {},
     onCategoryFilter: (Set<FileCategory>?) -> Unit,
+    onFavoritesClick: () -> Unit = {},
 ) {
     val tiles = listOf(
         CategoryTile("Photos", CoreR.drawable.ic_flat_photos, Color(0xFF059669), Color(0xFF065F46)) {

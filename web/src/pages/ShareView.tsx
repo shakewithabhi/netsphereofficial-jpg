@@ -24,6 +24,7 @@ import {
 import { FileIcon } from '../components/FileIcon';
 import { formatBytes } from '../api/files';
 import { useTheme } from '../hooks/useTheme';
+import { HeaderAd, SidebarAd } from '../components/AdBanner';
 import type {
   ShareInfo,
   SharePreview,
@@ -791,6 +792,11 @@ export default function ShareView() {
         />
       )}
 
+      {/* Top Ad Banner on Share Page */}
+      <div className="w-full max-w-3xl mx-auto px-4 mt-4">
+        <HeaderAd />
+      </div>
+
       {/* Main Content */}
       {shareInfo && !needsPassword && (
         <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 animate-fadeIn">
@@ -1292,6 +1298,11 @@ export default function ShareView() {
           )}
         </main>
       )}
+
+      {/* Bottom Ad Banner on Share Page */}
+      <div className="w-full max-w-3xl mx-auto px-4 mb-4">
+        <SidebarAd />
+      </div>
 
       {/* Footer */}
       <footer

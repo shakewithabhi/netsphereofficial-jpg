@@ -248,7 +248,6 @@ fun ExploreVideoScreen(
                             )
                         }
                     },
-                    windowInsets = androidx.compose.foundation.layout.WindowInsets(0),
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Black,
                         navigationIconContentColor = Color.White,

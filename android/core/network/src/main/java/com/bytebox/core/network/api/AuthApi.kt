@@ -4,7 +4,6 @@ import com.bytebox.core.network.dto.*
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
-import retrofit2.http.PUT
 
 interface AuthApi {
 
@@ -28,7 +27,4 @@ interface AuthApi {
 
     @POST("auth/reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest): Response<MessageResponse>
-
-    @PUT("auth/password")
-    suspend fun changePassword(@Body request: ChangePasswordRequest): Response<MessageResponse>
 }

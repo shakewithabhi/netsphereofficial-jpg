@@ -66,9 +66,6 @@ fun TrashScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var deleteConfirmFileId by remember { mutableStateOf<String?>(null) }
-    var showEmptyTrashConfirm by remember { mutableStateOf(false) }
-    var showRestoreAllConfirm by remember { mutableStateOf(false) }
-    val hasItems = uiState.files.isNotEmpty() || uiState.folders.isNotEmpty()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -84,32 +81,6 @@ fun TrashScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (hasItems && !uiState.isLoading) {
-                        IconButton(
-                            onClick = { showRestoreAllConfirm = true },
-                            enabled = !uiState.isBulkOperationInProgress,
-                        ) {
-                            Icon(
-                                Icons.Default.RestoreFromTrash,
-                                contentDescription = "Restore all",
-                            )
-                        }
-                        IconButton(
-                            onClick = { showEmptyTrashConfirm = true },
-                            enabled = !uiState.isBulkOperationInProgress,
-                        ) {
-                            Icon(
-                                Icons.Default.DeleteForever,
-                                contentDescription = "Empty trash",
-                                tint = if (uiState.isBulkOperationInProgress)
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                else
-                                    MaterialTheme.colorScheme.error,
-                            )
-                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -190,34 +161,6 @@ fun TrashScreen(
                 deleteConfirmFileId = null
             },
             onDismiss = { deleteConfirmFileId = null },
-        )
-    }
-
-    if (showEmptyTrashConfirm) {
-        ConfirmationDialog(
-            title = "Empty trash?",
-            message = "All ${uiState.files.size + uiState.folders.size} items will be permanently deleted. This action cannot be undone.",
-            confirmText = "Empty trash",
-            isDestructive = true,
-            onConfirm = {
-                viewModel.emptyTrash()
-                showEmptyTrashConfirm = false
-            },
-            onDismiss = { showEmptyTrashConfirm = false },
-        )
-    }
-
-    if (showRestoreAllConfirm) {
-        ConfirmationDialog(
-            title = "Restore all items?",
-            message = "All ${uiState.files.size + uiState.folders.size} items will be restored to their original locations.",
-            confirmText = "Restore all",
-            isDestructive = false,
-            onConfirm = {
-                viewModel.restoreAll()
-                showRestoreAllConfirm = false
-            },
-            onDismiss = { showRestoreAllConfirm = false },
         )
     }
 

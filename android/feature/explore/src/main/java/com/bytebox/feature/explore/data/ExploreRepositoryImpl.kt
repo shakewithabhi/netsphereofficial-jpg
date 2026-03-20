@@ -113,8 +113,12 @@ class ExploreRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getTrendingTags(): Result<List<Pair<String, Long>>> {
-        return safeApiCall { exploreApi.getTrendingTags() }
-            .map { it.tags.map { tag -> tag.name to tag.count } }
+        return try {
+            safeApiCall { exploreApi.getTrendingTags() }
+                .map { it.tags.map { tag -> tag.name to tag.count } }
+        } catch (_: Exception) {
+            Result.Success(emptyList())
+        }
     }
 
     private fun PostDto.toDomain() = Post(

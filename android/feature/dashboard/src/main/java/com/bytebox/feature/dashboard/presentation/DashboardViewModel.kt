@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.bytebox.core.common.AdManager
 import com.bytebox.core.common.Result
-import com.bytebox.core.datastore.UserPreferences
 import com.bytebox.core.database.dao.UploadTaskDao
+import com.bytebox.core.datastore.UserPreferences
 import com.bytebox.domain.model.FileItem
 import com.bytebox.domain.model.Folder
 import com.bytebox.domain.model.User
@@ -35,8 +35,8 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val fileRepository: FileRepository,
-    private val userPreferences: UserPreferences,
     private val uploadTaskDao: UploadTaskDao,
+    private val userPreferences: UserPreferences,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
