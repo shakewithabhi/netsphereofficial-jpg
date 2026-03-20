@@ -78,15 +78,15 @@ export default function Downloads() {
             <p className="text-sm mt-1">Files you download will appear here</p>
           </div>
         ) : (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-200 dark:border-white/[0.05] overflow-hidden shadow-sm">
             {history.map((record, index) => (
               <div
                 key={`${record.id}-${record.downloaded_at}`}
-                className={`flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group ${
-                  index > 0 ? 'border-t border-slate-100 dark:border-slate-700' : ''
+                className={`flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors group ${
+                  index > 0 ? 'border-t border-slate-100 dark:border-white/[0.05]' : ''
                 }`}
               >
-                <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 bg-slate-100 dark:bg-[#1E293B] rounded-xl flex items-center justify-center shrink-0">
                   <FileIcon mimeType={record.mime_type} size={20} />
                 </div>
                 <div className="flex-1 min-w-0">

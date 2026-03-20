@@ -3,7 +3,7 @@ import { HardDrive, ArrowLeft } from 'lucide-react';
 
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19]">
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="mb-8">
           <Link
@@ -24,7 +24,7 @@ export default function Privacy() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-8 space-y-8">
+        <div className="bg-white dark:bg-[#0F172A] rounded-2xl border border-slate-100 dark:border-white/[0.05] p-8 space-y-8">
           <section>
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">
               Information We Collect
@@ -141,7 +141,7 @@ export default function Privacy() {
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               If you have questions about this Privacy Policy or wish to exercise your data rights, please contact us at:
             </p>
-            <div className="mt-3 p-4 bg-slate-50 dark:bg-slate-700 rounded-xl">
+            <div className="mt-3 p-4 bg-slate-50 dark:bg-[#1E293B] rounded-xl">
               <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">ByteBox Privacy Team</p>
               <p className="text-sm text-slate-500 dark:text-slate-400">Email: privacy@byteboxapp.com</p>
               <p className="text-sm text-slate-500 dark:text-slate-400">Website: byteboxapp.com</p>

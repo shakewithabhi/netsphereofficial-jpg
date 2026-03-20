@@ -132,9 +132,19 @@ export async function getTrash(): Promise<FolderContents> {
   return res.data.data;
 }
 
-export async function searchFiles(q: string): Promise<FolderContents> {
-  const res = await client.get('/files/search', { params: { q, limit: 50 } });
+export async function searchFiles(q: string, mimeType?: string): Promise<FolderContents> {
+  const res = await client.get('/files/search', { params: { q, mime_type: mimeType, limit: 50 } });
   return res.data.data;
+}
+
+export async function listByCategory(category: string): Promise<{ files: FileItem[]; has_more: boolean }> {
+  const res = await client.get(`/files/category/${category}`, { params: { limit: 100 } });
+  const data = res.data.data;
+  // API returns array directly, wrap it
+  if (Array.isArray(data)) {
+    return { files: data, has_more: false };
+  }
+  return data;
 }
 
 export async function remoteUpload(url: string, folder_id?: string, file_name?: string): Promise<FileItem> {
@@ -201,8 +211,8 @@ export async function deleteComment(fileId: string, commentId: string): Promise<
   await client.delete(`/files/${fileId}/comments/${commentId}`);
 }
 
-export async function moveFile(id: string, folderId: string | null): Promise<void> {
-  await client.put(`/files/${id}`, { folder_id: folderId });
+export async function moveFile(id: string, folderId?: string): Promise<void> {
+  await client.post(`/files/${id}/move`, { folder_id: folderId || null });
 }
 
 export async function batchTrash(fileIds: string[], folderIds: string[]): Promise<void> {

@@ -9,6 +9,7 @@ import {
 import type { FileItem } from '../api/files';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
+import { EmptyState } from '../components/EmptyState';
 
 export default function Favorites() {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -56,7 +57,7 @@ export default function Favorites() {
 
   return (
     <Layout onRefresh={refresh}>
-      <div className="p-6 dark:bg-slate-900 min-h-full">
+      <div className="p-6 dark:bg-[#0B0F19] min-h-full">
         <div className="flex items-center justify-between mb-6">
           <Breadcrumb crumbs={[{ label: 'Favorites' }]} />
           {!isEmpty && (
@@ -75,22 +76,16 @@ export default function Favorites() {
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <Star size={64} className="text-slate-200 dark:text-slate-700 mb-4" />
-            <p className="text-lg font-medium text-slate-600 dark:text-slate-400">No favorites yet</p>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-              Star files to quickly access them here
-            </p>
-          </div>
+          <EmptyState type="favorites" />
         ) : (
           <div className="space-y-1">
             {files.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl group hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors cursor-pointer"
+                className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-xl group hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors cursor-pointer"
                 onClick={() => handleDownload(file.id)}
               >
                 <Star size={16} className="text-yellow-500 fill-yellow-500 shrink-0" />

@@ -137,7 +137,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
       {step === 'idle' && !isEnabled && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-slate-100 dark:bg-[#1E293B] rounded-xl flex items-center justify-center">
               <ShieldOff size={20} className="text-slate-400" />
             </div>
             <div>
@@ -204,7 +204,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
               value={disableCode}
               onChange={(e) => handleDisableCodeChange(e.target.value)}
               placeholder="000000"
-              className="w-40 px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-center font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+              className="w-40 px-4 py-2.5 border border-slate-200 dark:border-white/[0.08] rounded-xl text-sm text-center font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200"
               maxLength={6}
               autoFocus
             />
@@ -217,7 +217,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
             </button>
             <button
               onClick={reset}
-              className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-slate-100 dark:bg-[#1E293B] hover:bg-slate-200 dark:hover:bg-white/[0.1] text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors"
             >
               Cancel
             </button>
@@ -239,10 +239,10 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                 <img
                   src={qrImageUrl}
                   alt="2FA QR Code"
-                  className="w-48 h-48 rounded-xl border border-slate-200 dark:border-slate-600 bg-white p-2"
+                  className="w-48 h-48 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-white p-2"
                 />
               ) : (
-                <div className="w-48 h-48 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 animate-pulse" />
+                <div className="w-48 h-48 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-slate-50 dark:bg-[#1E293B] animate-pulse" />
               )}
             </div>
           </div>
@@ -251,7 +251,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
               Or enter this secret key manually:
             </p>
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 rounded-xl px-4 py-2.5">
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#1E293B] rounded-xl px-4 py-2.5">
               <code className="flex-1 text-sm font-mono text-slate-800 dark:text-slate-200 break-all">
                 {showSecret ? secret : '••••••••••••••••'}
               </code>
@@ -287,7 +287,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
                 value={code}
                 onChange={(e) => handleCodeChange(e.target.value)}
                 placeholder="000000"
-                className="w-40 px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-center font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                className="w-40 px-4 py-2.5 border border-slate-200 dark:border-white/[0.08] rounded-xl text-sm text-center font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200"
                 maxLength={6}
                 autoFocus
               />
@@ -300,7 +300,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
               </button>
               <button
                 onClick={reset}
-                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-slate-100 dark:bg-[#1E293B] hover:bg-slate-200 dark:hover:bg-white/[0.1] text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -324,12 +324,12 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
                 Save these backup codes in a safe place. Each code can only be used once if you lose access to your authenticator app.
               </p>
-              <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4 mb-3">
+              <div className="bg-slate-50 dark:bg-[#1E293B] rounded-xl p-4 mb-3">
                 <div className="grid grid-cols-2 gap-2">
                   {backupCodes.map((bc, i) => (
                     <code
                       key={i}
-                      className="text-sm font-mono text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-600 px-3 py-1.5 rounded-lg text-center"
+                      className="text-sm font-mono text-slate-800 dark:text-slate-200 bg-white dark:bg-white/[0.1] px-3 py-1.5 rounded-lg text-center"
                     >
                       {bc}
                     </code>
@@ -338,7 +338,7 @@ export function TwoFactorSetup({ isEnabled, onStatusChange }: TwoFactorSetupProp
               </div>
               <button
                 onClick={copyBackupCodes}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-[#1E293B] hover:bg-slate-200 dark:hover:bg-white/[0.1] text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium transition-colors"
               >
                 {copiedBackup ? <Check size={16} /> : <Copy size={16} />}
                 {copiedBackup ? 'Copied!' : 'Copy backup codes'}

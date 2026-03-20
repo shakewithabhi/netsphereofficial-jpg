@@ -33,6 +33,10 @@ import {
   ChevronDown,
   Compass,
   ExternalLink,
+  Play,
+  AudioWaveform,
+  FileText as FileTextIcon,
+  Eye,
 } from 'lucide-react';
 import {
   getRootContents,
@@ -52,6 +56,7 @@ import {
   moveFile,
   batchTrash,
   batchMove,
+  listByCategory,
 } from '../api/files';
 import { createPost, CATEGORIES } from '../api/explore';
 import { trackDownload } from '../utils/downloadHistory';
@@ -63,7 +68,11 @@ import { UploadModal } from '../components/UploadModal';
 import { RemoteUploadModal } from '../components/RemoteUploadModal';
 import { CommentsDialog } from '../components/CommentsDialog';
 import { FilePreview } from '../components/FilePreview';
+import { ContextMenu } from '../components/ContextMenu';
+import type { ContextMenuItem as ContextMenuItemType } from '../components/ContextMenu';
 import { HeaderAd, InFeedAd } from '../components/AdBanner';
+import { FileGridSkeleton, FileListSkeletonGroup } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useAuth } from '../store/auth';
 
 interface BreadcrumbItem {
@@ -121,6 +130,8 @@ export default function Files() {
   } | null>(null);
 
   const [shareFile, setShareFile] = useState<FileItem | null>(null);
+  const [moveFileId, setMoveFileId] = useState<string | null>(null);
+  const [moveFolders, setMoveFolders] = useState<FolderItem[]>([]);
   const [commentsFile, setCommentsFile] = useState<FileItem | null>(null);
   const [exploreFile, setExploreFile] = useState<FileItem | null>(null);
   const [exploreCaption, setExploreCaption] = useState('');
@@ -245,26 +256,27 @@ export default function Files() {
             { label: `Search: "${searchQuery}"` },
           ]);
         } else if (categoryFilter) {
-          // Load all files and filter by category
-          const data = await getRootContents();
-          setFolders([]);
-          const categoryMap: Record<string, string[]> = {
-            image: ['image/'],
-            video: ['video/'],
-            audio: ['audio/'],
-            document: ['application/pdf', 'application/msword', 'application/vnd', 'text/'],
-            other: [],
+          // Use backend category endpoint to get all files of this type
+          const categoryApiMap: Record<string, string> = {
+            image: 'images',
+            video: 'videos',
+            audio: 'audio',
+            document: 'documents',
           };
-          const prefixes = categoryMap[categoryFilter] ?? [];
-          const filtered = (data.files ?? []).filter((f: FileItem) => {
-            if (categoryFilter === 'other') {
-              return !['image/', 'video/', 'audio/', 'application/pdf', 'application/msword', 'application/vnd', 'text/'].some(
+          const apiCategory = categoryApiMap[categoryFilter];
+          setFolders([]);
+          if (apiCategory) {
+            const data = await listByCategory(apiCategory);
+            setFiles(data.files ?? []);
+          } else {
+            // "other" — fallback to root filter
+            const allData = await getRootContents();
+            setFiles((allData.files ?? []).filter((f: FileItem) =>
+              !['image/', 'video/', 'audio/', 'application/pdf', 'application/msword', 'application/vnd', 'text/'].some(
                 (p) => f.mime_type.startsWith(p)
-              );
-            }
-            return prefixes.some((p) => f.mime_type.startsWith(p));
-          });
-          setFiles(filtered);
+              )
+            ));
+          }
           const labels: Record<string, string> = { image: 'Pictures', video: 'Videos', audio: 'Music', document: 'Documents', other: 'Other' };
           setBreadcrumbs([
             { label: 'My Files', to: '/' },
@@ -291,7 +303,7 @@ export default function Files() {
       }
     }
     load();
-  }, [folderId, searchQuery, refreshKey]);
+  }, [folderId, searchQuery, categoryFilter, refreshKey]);
 
   useEffect(() => {
     if (newFolderMode) newFolderRef.current?.focus();
@@ -308,6 +320,8 @@ export default function Files() {
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
+
+  const totalSelected = selectedFiles.size + selectedFolders.size;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -369,8 +383,6 @@ export default function Files() {
     ...sortedFolders.map((f) => ({ type: 'folder' as const, id: f.id })),
     ...sortedFiles.map((f) => ({ type: 'file' as const, id: f.id })),
   ];
-
-  const totalSelected = selectedFiles.size + selectedFolders.size;
 
   function toggleSelectFile(fileId: string, index: number, shiftKey: boolean) {
     if (shiftKey && lastClickedIndex !== null) {
@@ -553,6 +565,9 @@ export default function Files() {
     }
   }
 
+  const downloadCountRef = useRef(0);
+  const [adOverlay, setAdOverlay] = useState<{ url: string; countdown: number } | null>(null);
+
   async function handleDownload(id: string) {
     try {
       const url = await getDownloadUrl(id);
@@ -560,11 +575,27 @@ export default function Files() {
       if (file) {
         trackDownload({ id: file.id, name: file.name, size: file.size, mime_type: file.mime_type });
       }
-      window.open(url, '_blank');
+      downloadCountRef.current += 1;
+      const isPaid = user?.plan && user.plan !== 'free';
+      // Show ad overlay every 3rd download for free users
+      if (!isPaid && downloadCountRef.current % 3 === 0) {
+        setAdOverlay({ url, countdown: 5 });
+      } else {
+        window.open(url, '_blank');
+      }
     } catch {
       setError('Failed to get download link.');
     }
   }
+
+  // Ad countdown timer
+  useEffect(() => {
+    if (!adOverlay || adOverlay.countdown <= 0) return;
+    const timer = setTimeout(() => {
+      setAdOverlay((prev) => prev ? { ...prev, countdown: prev.countdown - 1 } : null);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [adOverlay]);
 
   async function handleCopy(id: string) {
     try {
@@ -724,28 +755,77 @@ export default function Files() {
   return (
     <Layout onRefresh={refresh} currentFolderId={folderId}>
       <div
-        className={`p-6 min-h-full h-full transition-colors bg-slate-50 dark:bg-slate-900 ${
+        className={`p-6 min-h-full h-full transition-colors bg-slate-50 dark:bg-[#0B0F19] ${
           dragOver ? 'bg-blue-50 dark:bg-blue-950 drop-zone-active' : ''
         }`}
         onDrop={handleFileDrop}
         onDragOver={(e) => { e.preventDefault(); if (!draggedItemId) setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div
-            className="flex-1"
-            onDragOver={(e) => { if (draggedItemId) { e.preventDefault(); setDropTargetId('breadcrumb'); } }}
-            onDragLeave={() => setDropTargetId(null)}
-            onDrop={(e) => handleBreadcrumbDrop(e, breadcrumbs[0]?.to === '/' ? undefined : folderId)}
-          >
-            <Breadcrumb crumbs={breadcrumbs} />
+        {/* Breadcrumb */}
+        <div
+          className="mb-4"
+          onDragOver={(e) => { if (draggedItemId) { e.preventDefault(); setDropTargetId('breadcrumb'); } }}
+          onDragLeave={() => setDropTargetId(null)}
+          onDrop={(e) => handleBreadcrumbDrop(e, breadcrumbs[0]?.to === '/' ? undefined : folderId)}
+        >
+          <Breadcrumb crumbs={breadcrumbs} />
+        </div>
+
+        {/* Quick Access */}
+        {!folderId && !searchQuery && !categoryFilter && files.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Quick Access</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {files.slice(0, 4).map((file, i) => (
+                <button
+                  key={file.id}
+                  onClick={() => setPreviewFile(file)}
+                  className="quick-access-card card-lift-enter flex items-center gap-3 p-3 bg-white dark:bg-[#111118] rounded-xl border border-gray-100 dark:border-white/[0.06] text-left"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                >
+                  <FileIcon mimeType={file.mime_type} size={20} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{file.name}</p>
+                    <p className="text-xs text-slate-400">{formatBytes(file.size)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Content area header - TeraBox style: action buttons left, controls right */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-blue-500 hover:from-violet-700 hover:to-blue-600 text-white transition-colors text-sm font-medium shadow-sm"
+            >
+              <CloudUpload size={18} />
+              <span>Upload</span>
+            </button>
+            <button
+              onClick={() => { setNewFolderMode(true); setNewFolderName(''); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 hover:bg-violet-50/50 hover:border-violet-300 hover:text-violet-600 dark:hover:bg-white/[0.08] transition-all duration-200 text-sm font-medium bg-white dark:bg-[#0F172A]"
+            >
+              <FolderPlus size={18} />
+              <span>New Folder</span>
+            </button>
+            <button
+              onClick={() => setShowRemoteUpload(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 hover:bg-violet-50/50 hover:border-violet-300 hover:text-violet-600 dark:hover:bg-white/[0.08] transition-all duration-200 text-sm font-medium bg-white dark:bg-[#0F172A]"
+              title="Upload from URL"
+            >
+              <Link2 size={18} />
+              <span className="hidden sm:inline">URL</span>
+            </button>
           </div>
           <div className="flex items-center gap-2">
             {selectionMode && (
               <button
                 onClick={selectAll}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-white/[0.08] transition-colors text-sm font-medium"
                 title={totalSelected === allItems.length ? 'Deselect all' : 'Select all'}
               >
                 {totalSelected === allItems.length ? <CheckSquare size={18} /> : <Square size={18} />}
@@ -756,7 +836,7 @@ export default function Files() {
             )}
             <button
               onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors"
               title={viewMode === 'grid' ? 'List view' : 'Grid view'}
             >
               {viewMode === 'grid' ? <List size={18} /> : <Grid3x3 size={18} />}
@@ -765,7 +845,7 @@ export default function Files() {
             <div className="relative" ref={sortRef}>
               <button
                 onClick={() => setShowSortMenu((v) => !v)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-white/[0.08] transition-colors text-sm font-medium"
                 title="Sort files"
               >
                 <ArrowUpDown size={16} />
@@ -773,15 +853,15 @@ export default function Files() {
                 <ChevronDown size={14} className={`transition-transform ${showSortMenu ? 'rotate-180' : ''}`} />
               </button>
               {showSortMenu && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-30 py-1">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-white/[0.05] rounded-lg shadow-lg z-30 py-1">
                   {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
                     <button
                       key={option}
                       onClick={() => { setSortBy(option); setShowSortMenu(false); }}
                       className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                         sortBy === option
-                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                          ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.08]'
                       }`}
                     >
                       {SORT_LABELS[option]}
@@ -790,28 +870,6 @@ export default function Files() {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => { setNewFolderMode(true); setNewFolderName(''); }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
-            >
-              <FolderPlus size={18} />
-              <span className="hidden sm:inline">New folder</span>
-            </button>
-            <button
-              onClick={() => setShowRemoteUpload(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
-              title="Upload from URL"
-            >
-              <Link2 size={18} />
-              <span className="hidden sm:inline">URL</span>
-            </button>
-            <button
-              onClick={() => setShowUpload(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors text-sm font-medium"
-            >
-              <CloudUpload size={18} />
-              <span className="hidden sm:inline">Upload</span>
-            </button>
           </div>
         </div>
 
@@ -826,38 +884,18 @@ export default function Files() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          </div>
+          viewMode === 'grid' ? <FileGridSkeleton /> : <FileListSkeletonGroup />
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            {searchQuery ? (
-              <>
-                <Search size={64} className="text-slate-200 dark:text-slate-700 mb-4" />
-                <p className="text-lg font-medium text-slate-600 dark:text-slate-400">No results for "{searchQuery}"</p>
-                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Try a different search term</p>
-              </>
-            ) : (
-              <>
-                <Folder size={64} className="text-slate-200 dark:text-slate-700 mb-4" />
-                <p className="text-lg font-medium text-slate-600 dark:text-slate-400">This folder is empty</p>
-                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                  Upload files or create a folder to get started
-                </p>
-                <button
-                  onClick={() => setShowUpload(true)}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-                >
-                  Upload files
-                </button>
-              </>
-            )}
-          </div>
+          searchQuery ? (
+            <EmptyState type="search" />
+          ) : (
+            <EmptyState type="files" onAction={() => setShowUpload(true)} />
+          )
         ) : (
           <div
             className={
               viewMode === 'grid'
-                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3'
+                ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4'
                 : 'space-y-1'
             }
           >
@@ -866,8 +904,8 @@ export default function Files() {
               <div
                 className={
                   viewMode === 'grid'
-                    ? 'flex flex-col items-center p-4 bg-white dark:bg-slate-800 border-2 border-blue-400 rounded-xl'
-                    : 'flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 border-2 border-blue-400 rounded-xl'
+                    ? 'flex flex-col items-center p-4 bg-white dark:bg-[#0F172A] border-2 border-blue-400 rounded-xl'
+                    : 'flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0F172A] border-2 border-blue-400 rounded-xl'
                 }
               >
                 <Folder
@@ -896,6 +934,7 @@ export default function Files() {
                 key={folder.id}
                 folder={folder}
                 viewMode={viewMode}
+                animIndex={idx}
                 renamingId={renamingId}
                 renamingName={renamingName}
                 renameRef={renameRef}
@@ -924,6 +963,7 @@ export default function Files() {
                 <FileCard
                   file={file}
                   viewMode={viewMode}
+                  animIndex={sortedFolders.length + index}
                   onContextMenu={(e) => openContextMenu(e, 'file', file)}
                   onMenuClick={(e) => openContextMenu(e, 'file', file)}
                   onClick={() => handleFileClick(file)}
@@ -934,6 +974,12 @@ export default function Files() {
                   isDragging={draggedItemId === file.id}
                   onDragStart={(e) => handleItemDragStart(e, 'file', file.id)}
                   onDragEnd={handleItemDragEnd}
+                  renamingId={renamingId}
+                  renamingName={renamingName}
+                  renameRef={renameRef}
+                  setRenamingName={setRenamingName}
+                  onRename={handleRenameFile}
+                  onCancelRename={() => { setRenamingId(null); setRenamingName(''); }}
                 />
                 {(!user?.plan || user.plan === 'free') &&
                   (index + 1) % 8 === 0 &&
@@ -949,8 +995,8 @@ export default function Files() {
 
         {/* Drag overlay hint (for file upload from desktop) */}
         {dragOver && !draggedItemId && (
-          <div className="fixed inset-0 z-30 flex items-center justify-center pointer-events-none">
-            <div className="bg-blue-600 text-white px-8 py-4 rounded-2xl shadow-2xl text-lg font-semibold">
+          <div className="drop-overlay pointer-events-none">
+            <div className="bg-gradient-to-r from-violet-600 to-blue-500 text-white px-8 py-4 rounded-2xl shadow-2xl shadow-violet-500/30 text-lg font-semibold">
               Drop files to upload
             </div>
           </div>
@@ -958,7 +1004,7 @@ export default function Files() {
 
         {/* Bulk action bar */}
         {totalSelected > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-800 dark:bg-slate-700 text-white rounded-2xl shadow-2xl px-6 py-3 flex items-center gap-4 animate-fade-in">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#18181b] dark:bg-[#1e1e2e] backdrop-blur-xl border border-white/[0.06] shadow-2xl shadow-black/20 text-white rounded-2xl px-6 py-3 flex items-center gap-4 animate-fade-in">
             <span className="text-sm font-medium">
               {totalSelected} selected
             </span>
@@ -967,7 +1013,7 @@ export default function Files() {
               <button
                 onClick={handleBulkDownload}
                 disabled={bulkLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-[#2a3654] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Download selected files"
               >
                 <Download size={16} />
@@ -978,7 +1024,7 @@ export default function Files() {
               <button
                 onClick={handleBulkToggleStar}
                 disabled={bulkLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-slate-700 dark:hover:bg-[#2a3654] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Toggle star"
               >
                 <Star size={16} />
@@ -997,7 +1043,7 @@ export default function Files() {
             <div className="w-px h-5 bg-slate-600" />
             <button
               onClick={clearSelection}
-              className="p-1.5 hover:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-slate-700 dark:hover:bg-[#2a3654] rounded-lg transition-colors"
               title="Clear selection"
             >
               <X size={16} />
@@ -1008,117 +1054,63 @@ export default function Files() {
 
       {/* Context Menu */}
       {contextMenu && (
-        <div
-          className="fixed z-50 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 py-1 min-w-44 animate-fade-in"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {contextMenu.type === 'file' ? (
-            <>
-              <ContextMenuItem
-                icon={<Download size={15} />}
-                label="Download"
-                onClick={() => {
-                  handleDownload(contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              />
-              <ContextMenuItem
-                icon={<Share2 size={15} />}
-                label="Share"
-                onClick={() => {
-                  setShareFile(contextMenu.item as FileItem);
-                  setContextMenu(null);
-                }}
-              />
-              <ContextMenuItem
-                icon={<Copy size={15} />}
-                label="Make a copy"
-                onClick={() => {
-                  handleCopy(contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              />
-              <ContextMenuItem
-                icon={(contextMenu.item as FileItem).is_starred ? <StarOff size={15} /> : <Star size={15} />}
-                label={(contextMenu.item as FileItem).is_starred ? 'Unstar' : 'Star'}
-                onClick={() => {
-                  handleToggleStar(contextMenu.item as FileItem);
-                  setContextMenu(null);
-                }}
-              />
-              <ContextMenuItem
-                icon={<MessageCircle size={15} />}
-                label="Comments"
-                onClick={() => {
-                  setCommentsFile(contextMenu.item as FileItem);
-                  setContextMenu(null);
-                }}
-              />
-              {(contextMenu.item as FileItem).mime_type?.startsWith('video/') && (
-                <ContextMenuItem
-                  icon={<Compass size={15} />}
-                  label="Share to Explore"
-                  onClick={() => {
-                    setExploreFile(contextMenu.item as FileItem);
-                    setExploreCaption('');
-                    setExploreCategory('Entertainment');
-                    setExploreError('');
-                    setContextMenu(null);
-                  }}
-                />
-              )}
-              <ContextMenuItem
-                icon={<ExternalLink size={15} />}
-                label="Share via..."
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={contextMenu.type === 'file' ? [
+            { label: 'Open', icon: Eye, onClick: () => handleFileClick(contextMenu.item as FileItem) },
+            { label: 'Download', icon: Download, onClick: () => handleDownload(contextMenu.item.id) },
+            { label: 'Share', icon: Share2, onClick: () => setShareFile(contextMenu.item as FileItem) },
+            { label: 'Rename', icon: Edit2, onClick: () => { setRenamingId(contextMenu.item.id); setRenamingName(contextMenu.item.name); } },
+            { label: 'Move to', icon: Move, onClick: () => { setMoveFileId(contextMenu.item.id); getRootContents().then(r => setMoveFolders((r as any).folders || [])).catch(() => {}); } },
+            { label: (contextMenu.item as FileItem).is_starred ? 'Unstar' : 'Star', icon: (contextMenu.item as FileItem).is_starred ? StarOff : Star, onClick: () => handleToggleStar(contextMenu.item as FileItem) },
+            { label: 'Move to Trash', icon: Trash2, onClick: () => handleTrashFile(contextMenu.item.id), danger: true, divider: true },
+          ] as ContextMenuItemType[] : [
+            { label: 'Rename', icon: Edit2, onClick: () => { setRenamingId(contextMenu.item.id); setRenamingName(contextMenu.item.name); } },
+            { label: 'Move to Trash', icon: Trash2, onClick: () => handleTrashFolder(contextMenu.item.id), danger: true, divider: true },
+          ] as ContextMenuItemType[]}
+        />
+      )}
+
+      {/* Move File Dialog */}
+      {moveFileId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMoveFileId(null)} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Move to folder</h3>
+              <button onClick={() => setMoveFileId(null)} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 max-h-60 overflow-y-auto space-y-1">
+              <button
                 onClick={async () => {
-                  const file = contextMenu.item as FileItem;
-                  const shareUrl = `${window.location.origin}/s/${file.id}`;
-                  if (navigator.share) {
-                    try {
-                      await navigator.share({ title: file.name, text: `Check out ${file.name} on ByteBox`, url: shareUrl });
-                    } catch { /* user cancelled */ }
-                  } else if (navigator.clipboard) {
-                    await navigator.clipboard.writeText(shareUrl);
-                    setError('');
-                  }
-                  setContextMenu(null);
+                  try { await moveFile(moveFileId, undefined); refresh(); setMoveFileId(null); } catch { setError('Failed to move file.'); }
                 }}
-              />
-              <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-              <ContextMenuItem
-                icon={<Trash2 size={15} />}
-                label="Move to trash"
-                danger
-                onClick={() => {
-                  handleTrashFile(contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              />
-            </>
-          ) : (
-            <>
-              <ContextMenuItem
-                icon={<Edit2 size={15} />}
-                label="Rename"
-                onClick={() => {
-                  setRenamingId(contextMenu.item.id);
-                  setRenamingName(contextMenu.item.name);
-                  setContextMenu(null);
-                }}
-              />
-              <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-              <ContextMenuItem
-                icon={<Trash2 size={15} />}
-                label="Move to trash"
-                danger
-                onClick={() => {
-                  handleTrashFolder(contextMenu.item.id);
-                  setContextMenu(null);
-                }}
-              />
-            </>
-          )}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-left transition-colors"
+              >
+                <Folder size={18} className="text-blue-500" />
+                <span className="text-sm text-slate-700 dark:text-slate-200">Root (My Files)</span>
+              </button>
+              {moveFolders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={async () => {
+                    try { await moveFile(moveFileId, f.id); refresh(); setMoveFileId(null); } catch { setError('Failed to move file.'); }
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-left transition-colors"
+                >
+                  <Folder size={18} className="text-yellow-500" />
+                  <span className="text-sm text-slate-700 dark:text-slate-200">{f.name}</span>
+                </button>
+              ))}
+              {moveFolders.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">No folders found. Create a folder first.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1141,8 +1133,8 @@ export default function Files() {
       {exploreFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExploreFile(null)} />
-          <div className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="relative w-full max-w-md bg-white dark:bg-[#0F172A] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/[0.05]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
                   <Compass size={16} className="text-white" />
@@ -1154,7 +1146,7 @@ export default function Files() {
               </div>
               <button
                 onClick={() => setExploreFile(null)}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors"
               >
                 <X size={20} />
               </button>
@@ -1168,7 +1160,7 @@ export default function Files() {
                   placeholder="Write a caption for your post..."
                   rows={3}
                   maxLength={500}
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-colors"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#1E293B]/50 border border-slate-200 dark:border-white/[0.08] rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-colors"
                 />
                 <p className="text-xs text-slate-400 mt-1 text-right">{exploreCaption.length}/500</p>
               </div>
@@ -1177,7 +1169,7 @@ export default function Files() {
                 <select
                   value={exploreCategory}
                   onChange={(e) => setExploreCategory(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#1E293B]/50 border border-slate-200 dark:border-white/[0.08] rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 >
                   {CATEGORIES.filter((c) => c !== 'All').map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -1188,7 +1180,7 @@ export default function Files() {
                 <p className="text-sm text-red-500 bg-red-50 dark:bg-red-500/10 px-4 py-2 rounded-lg">{exploreError}</p>
               )}
             </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-white/[0.05] bg-slate-50 dark:bg-[#0F172A]/50">
               <button
                 onClick={() => setExploreFile(null)}
                 className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
@@ -1244,6 +1236,38 @@ export default function Files() {
         />
       )}
 
+      {/* Download Ad Overlay */}
+      {adOverlay && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="p-6 text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Your download will start shortly</p>
+              <div className="my-4 min-h-[100px] flex items-center justify-center bg-slate-100 dark:bg-[#1E293B] rounded-lg text-xs text-slate-400">
+                Advertisement
+              </div>
+              {adOverlay.countdown > 0 ? (
+                <button disabled className="w-full py-2.5 rounded-xl bg-slate-200 dark:bg-white/[0.1] text-slate-500 dark:text-slate-400 font-medium">
+                  Download in {adOverlay.countdown}s
+                </button>
+              ) : (
+                <button
+                  onClick={() => { window.open(adOverlay.url, '_blank'); setAdOverlay(null); }}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+                >
+                  Download Now
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setAdOverlay(null)}
+              className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 border-t border-slate-100 dark:border-white/[0.05]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {previewFile && (
         <FilePreview
           file={previewFile}
@@ -1256,35 +1280,10 @@ export default function Files() {
   );
 }
 
-function ContextMenuItem({
-  icon,
-  label,
-  onClick,
-  danger,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-left ${
-        danger
-          ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30'
-          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
 function FolderCard({
   folder,
   viewMode,
+  animIndex = 0,
   renamingId,
   renamingName,
   renameRef,
@@ -1307,6 +1306,7 @@ function FolderCard({
 }: {
   folder: FolderItem;
   viewMode: 'grid' | 'list';
+  animIndex?: number;
   renamingId: string | null;
   renamingName: string;
   renameRef: React.RefObject<HTMLInputElement | null>;
@@ -1328,6 +1328,7 @@ function FolderCard({
   onDrop: (e: React.DragEvent) => void;
 }) {
   const isRenaming = renamingId === folder.id;
+  const animDelay = `${Math.min(animIndex * 20, 200)}ms`;
 
   if (viewMode === 'list') {
     return (
@@ -1339,13 +1340,14 @@ function FolderCard({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onContextMenu={onContextMenu}
-        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border cursor-pointer group transition-all ${
+        className={`file-card-enter flex items-center gap-3 px-4 py-2.5 rounded-xl border cursor-pointer group transition-colors duration-150 ${
           isDropTarget
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400'
+            ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/30 ring-2 ring-violet-400'
             : isSelected
-            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-            : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
+            ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700 ring-2 ring-violet-500/50 dark:ring-violet-400/50'
+            : 'bg-white dark:bg-[#0F172A] hover:bg-violet-50/30 dark:hover:bg-white/[0.08] border-gray-100 dark:border-white/[0.05]'
         } ${isDragging ? 'opacity-50' : ''}`}
+        style={{ animationDelay: animDelay }}
         onClick={!isRenaming ? (e: React.MouseEvent) => {
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
@@ -1409,13 +1411,14 @@ function FolderCard({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onContextMenu={onContextMenu}
-      className={`flex flex-col items-center p-4 rounded-xl border cursor-pointer group transition-all relative ${
+      className={`file-card-enter flex flex-col items-center p-4 rounded-2xl border cursor-pointer group transition-all duration-200 relative ${
         isDropTarget
-          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-400'
+          ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/30 ring-2 ring-violet-400'
           : isSelected
-          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-          : 'bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
+          ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700 ring-2 ring-violet-500/50 dark:ring-violet-400/50'
+          : 'bg-white dark:bg-[#0F172A] hover:bg-violet-50/30 dark:hover:bg-white/[0.08] border-gray-100 dark:border-white/[0.06] hover:shadow-md hover:-translate-y-0.5 dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]'
       } ${isDragging ? 'opacity-50' : ''}`}
+      style={{ animationDelay: animDelay }}
       onClick={!isRenaming ? (e: React.MouseEvent) => {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
@@ -1441,7 +1444,7 @@ function FolderCard({
       ) : null}
       <button
         onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-all"
       >
         <MoreVertical size={14} />
       </button>
@@ -1496,9 +1499,11 @@ function FileThumbnail({
   const [loaded, setLoaded] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
   const isImage = file.mime_type.startsWith('image/');
+  const isVideo = file.mime_type.startsWith('video/');
+  const isPreviewable = isImage || isVideo;
 
   useEffect(() => {
-    if (!isImage || thumbnailCache.has(file.id)) return;
+    if (!isPreviewable || thumbnailCache.has(file.id)) return;
     let cancelled = false;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1513,18 +1518,33 @@ function FileThumbnail({
     );
     if (imgRef.current) observer.observe(imgRef.current);
     return () => { cancelled = true; observer.disconnect(); };
-  }, [file.id, isImage]);
+  }, [file.id, isPreviewable]);
 
-  if (!isImage || error) {
+  if (!isPreviewable || error) {
     return <FileIcon mimeType={file.mime_type} size={size === 'large' ? 40 : 20} className={className} />;
   }
 
   return (
-    <div ref={imgRef} className={`${size === 'small' ? 'shrink-0 w-10 h-10' : 'w-full h-24 mb-2'} rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 flex items-center justify-center`}>
+    <div ref={imgRef} className={`${size === 'small' ? 'shrink-0 w-10 h-10' : 'w-full h-24 mb-2'} rounded-lg overflow-hidden bg-slate-100 dark:bg-[#1E293B] flex items-center justify-center relative`}>
       {thumbUrl ? (
-        <img src={thumbUrl} alt={file.name} loading="lazy"
-          onError={() => setError(true)} onLoad={() => setLoaded(true)}
-          className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`} />
+        isVideo ? (
+          <>
+            <video src={thumbUrl + '#t=1'} preload="metadata" muted playsInline
+              onLoadedData={() => setLoaded(true)}
+              className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`} />
+            {loaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 bg-black/50 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  <Play size={14} className="text-white ml-0.5" />
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <img src={thumbUrl} alt={file.name} loading="lazy"
+            onError={() => setError(true)} onLoad={() => setLoaded(true)}
+            className={`w-full h-full object-cover transition-opacity ${loaded ? 'opacity-100' : 'opacity-0'}`} />
+        )
       ) : (
         <FileIcon mimeType={file.mime_type} size={size === 'large' ? 24 : 16} />
       )}
@@ -1535,6 +1555,7 @@ function FileThumbnail({
 function FileCard({
   file,
   viewMode,
+  animIndex = 0,
   onContextMenu,
   onMenuClick,
   onClick,
@@ -1545,9 +1566,16 @@ function FileCard({
   isDragging,
   onDragStart,
   onDragEnd,
+  renamingId,
+  renamingName,
+  renameRef,
+  setRenamingName,
+  onRename,
+  onCancelRename,
 }: {
   file: FileItem;
   viewMode: 'grid' | 'list';
+  animIndex?: number;
   onContextMenu: (e: React.MouseEvent) => void;
   onMenuClick: (e: React.MouseEvent) => void;
   onClick: () => void;
@@ -1558,8 +1586,34 @@ function FileCard({
   isDragging: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
+  renamingId: string | null;
+  renamingName: string;
+  renameRef: React.RefObject<HTMLInputElement | null>;
+  setRenamingName: (v: string) => void;
+  onRename: (id: string) => void;
+  onCancelRename: () => void;
 }) {
   const isImage = file.mime_type.startsWith('image/');
+  const isVideo = file.mime_type.startsWith('video/');
+  const isAudio = file.mime_type.startsWith('audio/');
+  const isPdf = file.mime_type === 'application/pdf';
+  const isRenaming = renamingId === file.id;
+  const animDelay = `${Math.min(animIndex * 20, 200)}ms`;
+  const [hovered, setHovered] = useState(false);
+  const [showHoverInfo, setShowHoverInfo] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fileExt = file.name.includes('.') ? file.name.split('.').pop()?.toUpperCase() ?? '' : '';
+
+  function handleMouseEnter() {
+    setHovered(true);
+    hoverTimerRef.current = setTimeout(() => setShowHoverInfo(true), 200);
+  }
+  function handleMouseLeave() {
+    setHovered(false);
+    setShowHoverInfo(false);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }
 
   if (viewMode === 'list') {
     return (
@@ -1568,11 +1622,12 @@ function FileCard({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onContextMenu={onContextMenu}
-        className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border cursor-pointer group transition-all ${
+        className={`file-card-enter flex items-center gap-3 px-4 py-3.5 rounded-xl border cursor-pointer group transition-colors duration-150 ${
           isSelected
-            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-            : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
+            ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700 ring-2 ring-violet-500/50 dark:ring-violet-400/50'
+            : 'bg-white dark:bg-[#0F172A] hover:bg-violet-50/30 dark:hover:bg-white/[0.08] border-gray-100 dark:border-white/[0.05]'
         } ${isDragging ? 'opacity-50' : ''}`}
+        style={{ animationDelay: animDelay }}
         onClick={(e: React.MouseEvent) => { e.preventDefault(); onToggleSelect(e); }}
       >
         <button
@@ -1580,9 +1635,9 @@ function FileCard({
           className="shrink-0 p-0.5"
         >
           {isSelected ? (
-            <CheckSquare size={16} className="text-blue-600" />
+            <CheckSquare size={18} className="text-blue-600" />
           ) : (
-            <Square size={16} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+            <Square size={18} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
           )}
         </button>
         <button
@@ -1591,20 +1646,41 @@ function FileCard({
           title={file.is_starred ? 'Unstar' : 'Star'}
         >
           {file.is_starred ? (
-            <Star size={16} className="text-yellow-500 fill-yellow-500" />
+            <Star size={18} className="text-yellow-500 fill-yellow-500" />
           ) : (
-            <Star size={16} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Star size={18} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </button>
-        {isImage ? (
+        {(isImage || isVideo) ? (
           <FileThumbnail file={file} size="small" />
         ) : (
           <FileIcon mimeType={file.mime_type} size={20} />
         )}
-        <span
-          className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate hover:text-blue-600 dark:hover:text-blue-400 hover:underline cursor-pointer"
-          onClick={(e) => { e.stopPropagation(); onClick(); }}
-        >{file.name}</span>
+        {isRenaming ? (
+          <input
+            ref={renameRef}
+            type="text"
+            value={renamingName}
+            onChange={(e) => setRenamingName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onRename(file.id);
+              if (e.key === 'Escape') onCancelRename();
+            }}
+            onBlur={() => onRename(file.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 text-sm border border-blue-400 rounded px-2 py-0.5 outline-none bg-transparent text-slate-800 dark:text-slate-200"
+          />
+        ) : (
+          <span
+            className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-200 truncate hover:text-blue-600 dark:hover:text-blue-400 hover:underline cursor-pointer"
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+          >{file.name}</span>
+        )}
+        {fileExt && (
+          <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded">
+            {fileExt}
+          </span>
+        )}
         <span className="text-xs text-slate-400 shrink-0">{formatBytes(file.size)}</span>
         <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
           {new Date(file.created_at).toLocaleDateString()}
@@ -1619,56 +1695,150 @@ function FileCard({
     );
   }
 
+  // Determine thumbnail background color based on file type
+  const thumbBgColor = isVideo ? 'bg-slate-200 dark:bg-[#1E293B]'
+    : isAudio ? 'bg-slate-100 dark:bg-[#1E293B]'
+    : isPdf ? 'bg-slate-100 dark:bg-[#1E293B]'
+    : 'bg-slate-100 dark:bg-[#1E293B]';
+
   return (
     <div
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onContextMenu={onContextMenu}
-      className={`flex flex-col items-center p-4 rounded-xl border cursor-pointer group transition-all relative ${
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`file-card-enter flex flex-col rounded-2xl cursor-pointer group transition-all duration-200 relative overflow-hidden ${
         isSelected
-          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-          : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 border-slate-100 dark:border-slate-700'
+          ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 ring-2 ring-violet-500/50 dark:ring-violet-400/50'
+          : 'bg-white dark:bg-[#0F172A] hover:bg-violet-50/30 dark:hover:bg-white/[0.08] shadow-sm hover:shadow-md border border-gray-100 dark:border-white/[0.06] hover:border-violet-200/60 dark:hover:border-violet-500/20 hover:shadow-xl hover:shadow-violet-500/[0.07] dark:hover:shadow-violet-500/[0.15] hover:-translate-y-0.5 dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)]'
       } ${isDragging ? 'opacity-50' : ''}`}
+      style={{ animationDelay: animDelay }}
       onClick={(e: React.MouseEvent) => { e.preventDefault(); onToggleSelect(e); }}
       onDoubleClick={() => onClick()}
     >
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
-        className="absolute top-2 left-2 p-0.5 z-10"
-      >
-        {isSelected ? (
-          <CheckSquare size={14} className="text-blue-600" />
+      {/* Thumbnail area */}
+      <div className={`relative w-full flex items-center justify-center ${thumbBgColor}`} style={{ aspectRatio: '1' }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}
+          className="absolute top-2 left-2 p-0.5 z-10"
+        >
+          {isSelected ? (
+            <CheckSquare size={14} className="text-blue-600" />
+          ) : (
+            <Square size={14} className="text-slate-400 group-hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
+          className="absolute top-2 right-8 p-0.5 transition-colors z-10"
+          title={file.is_starred ? 'Unstar' : 'Star'}
+        >
+          {file.is_starred ? (
+            <Star size={14} className="text-yellow-500 fill-yellow-500" />
+          ) : (
+            <Star size={14} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all" />
+          )}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-white/70 dark:hover:bg-white/[0.08] transition-all z-10"
+        >
+          <MoreVertical size={14} />
+        </button>
+
+        {isImage ? (
+          <FileThumbnail file={file} size="large" className="w-full h-full" />
+        ) : isVideo ? (
+          <div className="relative flex items-center justify-center w-full h-full">
+            <FileIcon mimeType={file.mime_type} size={40} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full bg-white/90 dark:bg-white/[0.15] dark:backdrop-blur-md backdrop-blur-sm flex items-center justify-center shadow-lg">
+                <Play size={20} className="text-slate-700 dark:text-white ml-0.5" fill="currentColor" />
+              </div>
+            </div>
+          </div>
+        ) : isAudio ? (
+          <div className="flex flex-col items-center justify-center gap-1">
+            <AudioWaveform size={36} className="text-pink-500" />
+            {fileExt && <span className="text-xs font-semibold text-pink-500">{fileExt}</span>}
+          </div>
+        ) : isPdf ? (
+          <FileTextIcon size={40} className="text-red-600" />
         ) : (
-          <Square size={14} className="text-slate-400 group-hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <FileIcon mimeType={file.mime_type} size={40} />
         )}
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onToggleStar(); }}
-        className="absolute top-2 right-8 p-0.5 transition-colors z-10"
-        title={file.is_starred ? 'Unstar' : 'Star'}
-      >
-        {file.is_starred ? (
-          <Star size={14} className="text-yellow-500 fill-yellow-500" />
+
+        {/* File extension badge */}
+        {fileExt && (
+          <span className="absolute bottom-2 right-2 px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-white/90 dark:bg-white/[0.12] text-slate-600 dark:text-white/90 backdrop-blur-md z-10">
+            {fileExt}
+          </span>
+        )}
+
+        {/* Hover info overlay (grid only) */}
+        {showHoverInfo && viewMode === 'grid' && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10 transition-opacity duration-200 flex flex-col justify-between p-2.5">
+            {/* Action icons - centered */}
+            <div className="flex items-center justify-center gap-2 flex-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); onPreview(file); }}
+                className="w-9 h-9 rounded-full bg-white/[0.15] backdrop-blur-md flex items-center justify-center text-white hover:bg-white/[0.25] transition-all hover:scale-110"
+                title="Preview"
+              >
+                <Eye size={16} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDownload(file.id); }}
+                className="w-9 h-9 rounded-full bg-white/[0.15] backdrop-blur-md flex items-center justify-center text-white hover:bg-white/[0.25] transition-all hover:scale-110"
+                title="Download"
+              >
+                <Download size={16} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onContextMenu(e as unknown as React.MouseEvent, file); }}
+                className="w-9 h-9 rounded-full bg-white/[0.15] backdrop-blur-md flex items-center justify-center text-white hover:bg-white/[0.25] transition-all hover:scale-110"
+                title="More"
+              >
+                <MoreVertical size={16} />
+              </button>
+            </div>
+            {/* File info at bottom */}
+            <div className="text-white">
+              <p className="text-xs font-medium truncate">{file.name}</p>
+              <p className="text-[10px] text-white/70 mt-0.5">
+                {formatBytes(file.size)} &middot; {new Date(file.updated_at).toLocaleDateString()} &middot; {fileExt || file.mime_type.split('/')[1]}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Info area below thumbnail */}
+      <div className="px-3 py-2.5">
+        {isRenaming ? (
+          <div className="w-full" onClick={(e) => e.stopPropagation()}>
+            <input
+              ref={renameRef}
+              type="text"
+              value={renamingName}
+              onChange={(e) => setRenamingName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onRename(file.id);
+                if (e.key === 'Escape') onCancelRename();
+              }}
+              onBlur={() => onRename(file.id)}
+              className="w-full text-xs text-center border border-blue-400 rounded px-1 py-0.5 outline-none bg-transparent text-slate-800 dark:text-slate-200"
+            />
+          </div>
         ) : (
-          <Star size={14} className="text-slate-300 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-all" />
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate w-full leading-tight">
+            {file.name}
+          </p>
         )}
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); onMenuClick(e); }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-all z-10"
-      >
-        <MoreVertical size={14} />
-      </button>
-      {isImage ? (
-        <FileThumbnail file={file} size="large" />
-      ) : (
-        <FileIcon mimeType={file.mime_type} size={40} className="mb-2" />
-      )}
-      <p className="text-xs font-medium text-slate-700 dark:text-slate-300 text-center truncate w-full leading-tight">
-        {file.name}
-      </p>
-      <p className="text-xs text-slate-400 mt-1">{formatBytes(file.size)}</p>
+        <p className="text-xs text-slate-400 mt-0.5">{formatBytes(file.size)}</p>
+      </div>
     </div>
   );
 }

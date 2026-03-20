@@ -90,9 +90,9 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+      <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-2xl w-full max-w-md mx-4">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-white/[0.05]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-xl flex items-center justify-center">
               <Link2 size={20} className="text-blue-600 dark:text-blue-400" />
@@ -109,7 +109,7 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
           <button
             onClick={onClose}
             disabled={loading}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50"
           >
             <X size={18} className="text-slate-500" />
           </button>
@@ -127,7 +127,7 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com/file.zip"
               disabled={loading || !!success}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm disabled:opacity-50"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm disabled:opacity-50"
               autoFocus
             />
           </div>
@@ -142,7 +142,7 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
               onChange={(e) => setFileName(e.target.value)}
               placeholder="Auto-detect from URL"
               disabled={loading || !!success}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm disabled:opacity-50"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-white/[0.08] bg-white dark:bg-[#1E293B] text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm disabled:opacity-50"
             />
           </div>
 
@@ -178,7 +178,7 @@ export function RemoteUploadModal({ folderId, onClose, onUploaded }: RemoteUploa
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

@@ -501,6 +501,9 @@ export default function ShareView() {
   // Mobile banner
   const [showBanner] = useState(isMobile());
 
+  // Video ad countdown
+  const [videoAdCountdown, setVideoAdCountdown] = useState<number | null>(null);
+
   // Save state
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -827,6 +830,21 @@ export default function ShareView() {
             {/* ---------- Video Preview ---------- */}
             {category === 'video' && preview && (
               <div className="relative">
+                {/* Video Ad Countdown Overlay */}
+                {videoAdCountdown !== null && videoAdCountdown > 0 && (
+                  <div className="absolute inset-0 z-30 bg-black/90 flex flex-col items-center justify-center animate-fadeIn">
+                    <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-72 text-center mb-4">
+                      <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Advertisement</p>
+                      <div className="w-full h-40 bg-slate-700 rounded-lg flex items-center justify-center mb-3">
+                        <span className="text-slate-500 text-sm">Ad Placeholder</span>
+                      </div>
+                    </div>
+                    <p className="text-white text-sm font-medium">
+                      Video will play in {videoAdCountdown}s
+                    </p>
+                  </div>
+                )}
+
                 {/* Preview Timer Badge */}
                 {timeRemaining !== null && !previewEnded && (
                   <div className="absolute top-4 right-4 z-10 px-3 py-1.5 bg-black/70 backdrop-blur-sm rounded-full text-xs text-white font-medium flex items-center gap-1.5">
@@ -848,7 +866,23 @@ export default function ShareView() {
                   }}
                   onPause={() => setIsPlaying(false)}
                   onLoadedData={() => {
-                    videoRef.current?.play().catch(() => {});
+                    if (!loggedIn) {
+                      // Show ad countdown before autoplay for non-logged-in users
+                      videoRef.current?.pause();
+                      let count = 5;
+                      setVideoAdCountdown(count);
+                      const adTimer = setInterval(() => {
+                        count -= 1;
+                        setVideoAdCountdown(count);
+                        if (count <= 0) {
+                          clearInterval(adTimer);
+                          setVideoAdCountdown(null);
+                          videoRef.current?.play().catch(() => {});
+                        }
+                      }, 1000);
+                    } else {
+                      videoRef.current?.play().catch(() => {});
+                    }
                   }}
                 />
 

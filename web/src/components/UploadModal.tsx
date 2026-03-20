@@ -137,8 +137,8 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-lg mx-4 animate-fade-in">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+      <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-xl w-full max-w-lg mx-4 animate-fade-in">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/[0.05]">
           <div className="flex items-center gap-2">
             <CloudUpload size={18} className="text-blue-600" />
             <h2 className="font-semibold text-slate-800 dark:text-slate-200">Upload Files</h2>
@@ -151,7 +151,7 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
           <button
             onClick={onClose}
             disabled={uploading}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-40"
           >
             <X size={18} />
           </button>
@@ -166,7 +166,7 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
             className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
               dragging
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
-                : 'border-slate-200 dark:border-slate-600 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                : 'border-blue-200 dark:border-white/[0.08] hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-white/[0.08]'
             }`}
           >
             <Upload size={32} className="mx-auto mb-3 text-slate-400" />
@@ -200,7 +200,7 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
                 <span>Overall progress</span>
                 <span>{overallProgress}%</span>
               </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2">
+              <div className="w-full bg-slate-200 dark:bg-white/[0.1] rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full transition-all"
                   style={{ width: `${overallProgress}%` }}
@@ -216,8 +216,8 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
                   key={index}
                   className={`flex items-center gap-3 p-3 rounded-lg ${
                     item.status === 'cancelled'
-                      ? 'bg-slate-100 dark:bg-slate-700 opacity-50'
-                      : 'bg-slate-50 dark:bg-slate-700'
+                      ? 'bg-slate-100 dark:bg-[#1E293B] opacity-50'
+                      : 'bg-slate-50 dark:bg-[#1E293B]'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
@@ -234,7 +234,7 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
                       </span>
                     </div>
                     {(item.status === 'uploading' || item.status === 'done') && (
-                      <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-1.5">
+                      <div className="w-full bg-slate-200 dark:bg-white/[0.1] rounded-full h-1.5">
                         <div
                           className={`h-1.5 rounded-full transition-all ${
                             item.status === 'done' ? 'bg-green-500' : 'bg-blue-600'
@@ -299,7 +299,7 @@ export function UploadModal({ folderId, onClose, onUploaded }: UploadModalProps)
                 <button
                   onClick={onClose}
                   disabled={uploading}
-                  className="flex-1 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-40"
+                  className="flex-1 py-2.5 border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 rounded-lg font-medium text-sm hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors disabled:opacity-40"
                 >
                   Cancel
                 </button>

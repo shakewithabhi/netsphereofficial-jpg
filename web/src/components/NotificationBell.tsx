@@ -138,7 +138,7 @@ export function NotificationBell() {
       <button
         ref={buttonRef}
         onClick={() => setOpen((v) => !v)}
-        className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+        className="relative p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/[0.08] transition-colors"
         title="Notifications"
       >
         <Bell size={18} />
@@ -152,10 +152,10 @@ export function NotificationBell() {
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-80 sm:w-96 max-h-[28rem] bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden animate-fade-in"
+          className="absolute right-0 top-full mt-2 w-80 sm:w-96 max-h-[28rem] bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden animate-fade-in"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/[0.05]">
             <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200">
               Notifications
             </h3>
@@ -200,9 +200,9 @@ export function NotificationBell() {
                       handleMarkRead(notification.id);
                     }
                   }}
-                  className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-b border-slate-50 dark:border-slate-700/50 last:border-b-0 ${
+                  className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors border-b border-slate-50 dark:border-white/[0.05]/50 last:border-b-0 ${
                     notification.is_read
-                      ? 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750'
+                      ? 'bg-white dark:bg-[#0F172A] hover:bg-slate-50 dark:hover:bg-white/[0.08]'
                       : 'bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                   }`}
                 >

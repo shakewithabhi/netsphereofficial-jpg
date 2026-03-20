@@ -102,3 +102,22 @@ export async function changePassword(
     new_password: newPassword,
   });
 }
+
+// Referral stats
+
+export interface ReferralStats {
+  referral_code: string;
+  total_referrals: number;
+  storage_earned: number;
+}
+
+export async function getReferralStats(): Promise<ReferralStats> {
+  const res = await client.get('/auth/referral/stats');
+  return res.data.data;
+}
+
+// Delete account
+
+export async function deleteAccount(): Promise<void> {
+  await client.delete('/auth/me');
+}

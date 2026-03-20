@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  HardDrive,
+  Box,
   Home,
   Star,
   Trash2,
@@ -12,7 +12,6 @@ import {
   Search,
   X,
   ChevronRight,
-  Menu,
   Moon,
   Sun,
   Image,
@@ -24,15 +23,17 @@ import {
   Crown,
   User,
   ChevronDown,
+  Download,
+  HelpCircle,
   PanelLeftClose,
   PanelLeftOpen,
-  Download,
 } from 'lucide-react';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import { UploadModal } from './UploadModal';
 import { NotificationBell } from './NotificationBell';
 import { useTheme } from '../hooks/useTheme';
+import { CommandPalette } from './CommandPalette';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -48,11 +49,15 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
   const [showUpload, setShowUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem('sidebar-collapsed') === 'true'; } catch { return false; }
-  });
   const [profileOpen, setProfileOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('bytebox_sidebar') === 'collapsed'; } catch { return false; }
+  });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(() => {
+    try { return user?.avatar_url || localStorage.getItem('bytebox_avatar'); } catch { return null; }
+  });
   const searchRef = useRef<HTMLInputElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +71,12 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
       window.removeEventListener('online', handleOnline);
     };
   }, []);
+
+  // Re-check avatar when navigating (picks up changes from Settings page)
+  useEffect(() => {
+    const stored = user?.avatar_url || (() => { try { return localStorage.getItem('bytebox_avatar'); } catch { return null; } })();
+    if (stored !== avatarUrl) setAvatarUrl(stored);
+  });
 
   useEffect(() => {
     setSearchQuery('');
@@ -82,19 +93,30 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  function toggleSidebarCollapse() {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try { localStorage.setItem('sidebar-collapsed', String(next)); } catch {}
-      return next;
-    });
-  }
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((v) => !v);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/?search=${encodeURIComponent(searchQuery.trim())}`);
     }
+  }
+
+  function toggleSidebar() {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('bytebox_sidebar', next ? 'collapsed' : 'open'); } catch {}
+      return next;
+    });
   }
 
   function clearSearch() {
@@ -137,82 +159,78 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
   }
 
   const planLabel = user?.plan === 'premium' ? 'Premium' : user?.plan === 'pro' ? 'Pro' : 'Free';
-  const planColor = user?.plan === 'premium' ? 'bg-gradient-to-r from-amber-500 to-orange-500' : user?.plan === 'pro' ? 'bg-blue-500' : 'bg-slate-400';
+  const planColor = user?.plan === 'premium' ? 'bg-gradient-to-r from-amber-500 to-orange-500' : user?.plan === 'pro' ? 'bg-violet-500' : 'bg-slate-400';
 
   const renderSidebar = (mobile = false) => {
-    const collapsed = !mobile && sidebarCollapsed;
-
     return (
       <aside
-        className={`bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col h-full transition-all duration-300 ease-in-out ${
-          mobile ? 'w-64' : collapsed ? 'w-16' : 'w-64'
-        }`}
+        className="bg-white dark:bg-[#111827] border-r border-gray-200/60 dark:border-white/[0.05] flex flex-col h-full w-64"
       >
         {/* Logo */}
-        <div className={`py-4 border-b border-slate-100 dark:border-slate-700 ${collapsed ? 'px-3' : 'px-5'}`}>
+        <div className="px-5 py-4 flex items-center justify-between">
           <Link
             to="/"
-            className={`flex items-center group ${collapsed ? 'justify-center' : 'gap-3'}`}
+            className="flex items-center gap-3 group"
             onClick={() => setSidebarOpen(false)}
-            title={collapsed ? 'ByteBox' : undefined}
           >
-            <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-md shrink-0">
-              <HardDrive size={18} className="text-white" />
+            <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-blue-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25 dark:shadow-[0_0_20px_rgba(139,92,246,0.4)] shrink-0 group-hover:scale-105 transition-transform">
+              <Box size={20} className="text-white" fill="rgba(255,255,255,0.2)" />
             </div>
-            {!collapsed && (
-              <div>
-                <span className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">ByteBox</span>
-              </div>
-            )}
+            <span className="font-bold text-slate-900 dark:text-white text-lg tracking-tight">ByteBox</span>
           </Link>
+          {!mobile && (
+            <button onClick={toggleSidebar} className="p-1.5 rounded-lg text-slate-400 hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-colors" title="Collapse sidebar">
+              <PanelLeftClose size={18} />
+            </button>
+          )}
         </div>
 
         {/* Main navigation */}
-        <nav className={`flex-1 py-3 overflow-y-auto ${collapsed ? 'px-2' : 'px-3'}`}>
+        <nav className="flex-1 py-3 overflow-y-auto px-3 scrollbar-thin">
           {/* All Files */}
           {mainNav.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
               onClick={() => setSidebarOpen(false)}
-              title={collapsed ? label : undefined}
-              className={`flex items-center rounded-xl text-sm font-medium transition-colors mb-1 ${
-                collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
-              } ${
+              className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 mb-1 px-3 py-2.5 ${
                 isActive(to)
-                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                  ? 'bg-violet-50 dark:bg-gradient-to-r dark:from-purple-500/10 dark:to-blue-500/10 dark:shadow-[inset_3px_0_0_rgba(139,92,246,0.8)] text-violet-700 dark:text-purple-400 border-l-[3px] border-violet-500 dark:border-transparent -ml-px'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-gray-100/70 dark:hover:bg-white/[0.05] hover:translate-x-0.5'
               }`}
             >
               <Icon size={20} className="shrink-0" />
-              {!collapsed && label}
+              {label}
             </Link>
           ))}
 
+          {/* Category section label */}
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 mt-4 mb-1.5">Categories</p>
+
           {/* Category filters */}
-          <div className="mt-1 space-y-0.5">
+          <div className="space-y-0.5">
             {categoryNav.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
                 onClick={() => setSidebarOpen(false)}
-                title={collapsed ? label : undefined}
-                className={`flex items-center rounded-xl text-sm font-medium transition-colors ${
-                  collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
-                } ${
+                className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 px-3 py-2.5 ${
                   isActive(to)
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    ? 'bg-violet-50 dark:bg-gradient-to-r dark:from-purple-500/10 dark:to-blue-500/10 dark:shadow-[inset_3px_0_0_rgba(139,92,246,0.8)] text-violet-600 dark:text-purple-400 border-l-[3px] border-violet-500 dark:border-transparent -ml-px'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.05] hover:translate-x-0.5'
                 }`}
               >
                 <Icon size={20} className="shrink-0" />
-                {!collapsed && label}
+                {label}
               </Link>
             ))}
           </div>
 
           {/* Divider */}
-          <div className={`my-3 border-t border-slate-100 dark:border-slate-700 ${collapsed ? 'mx-1' : ''}`} />
+          <div className="my-3 mx-3 border-t border-gray-100 dark:border-white/[0.05]" />
+
+          {/* Library section label */}
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 mb-1.5">Library</p>
 
           {/* Explore, Starred, Recycle Bin */}
           <div className="space-y-0.5">
@@ -221,67 +239,57 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
                 key={to}
                 to={to}
                 onClick={() => setSidebarOpen(false)}
-                title={collapsed ? label : undefined}
-                className={`flex items-center rounded-xl text-sm font-medium transition-colors ${
-                  collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
-                } ${
+                className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 px-3 py-2.5 ${
                   isActive(to)
-                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    ? 'bg-violet-50 dark:bg-gradient-to-r dark:from-purple-500/10 dark:to-blue-500/10 dark:shadow-[inset_3px_0_0_rgba(139,92,246,0.8)] text-violet-600 dark:text-purple-400 border-l-[3px] border-violet-500 dark:border-transparent -ml-px'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-gray-100/70 dark:hover:bg-white/[0.05] hover:translate-x-0.5'
                 }`}
               >
                 <Icon size={20} className="shrink-0" />
-                {!collapsed && label}
+                {label}
               </Link>
             ))}
           </div>
         </nav>
 
-        {/* Storage bar - hidden when collapsed */}
-        {!collapsed && (
-          <div className="px-4 pb-3 space-y-3">
-            <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
-              <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
-                <span>{formatBytes(storageUsed)} / {formatBytes(storageLimit)}</span>
-              </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all ${
-                    storagePercent > 90 ? 'bg-red-500' : 'bg-blue-500'
-                  }`}
-                  style={{ width: `${storagePercent}%` }}
-                />
-              </div>
-              {user?.plan === 'free' && (
-                <button className="mt-2 text-xs text-blue-500 hover:text-blue-600 font-medium">
-                  Expand Capacity
-                </button>
-              )}
+        {/* Storage bar */}
+        <div className="px-4 pb-4 pt-2">
+          <div className="bg-gradient-to-br from-violet-50/80 to-blue-50/80 dark:from-violet-500/[0.06] dark:to-blue-500/[0.06] border border-violet-100/50 dark:border-violet-500/10 rounded-xl p-3">
+            <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 mb-2 font-medium">
+              <span>{formatBytes(storageUsed)} / {formatBytes(storageLimit)}</span>
+              <span>{storagePercent}%</span>
             </div>
+            <div className="w-full bg-slate-200 dark:bg-white/[0.1] rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all dark:shadow-[0_0_10px_rgba(123,97,255,0.3)] ${
+                  storagePercent > 90 ? 'bg-red-500' : 'storage-gradient'
+                }`}
+                style={{ width: `${storagePercent}%` }}
+              />
+            </div>
+            {(!user?.plan || user.plan === 'free') ? (
+              <button
+                onClick={() => navigate('/settings')}
+                className="mt-2.5 w-full py-2 text-xs font-semibold text-white rounded-lg upgrade-cta dark:shadow-[0_0_15px_rgba(123,97,255,0.2)]"
+              >
+                Upgrade Plan
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/settings')}
+                className="mt-2.5 text-xs text-violet-500 hover:text-violet-600 font-medium hover:underline"
+              >
+                Manage Plan
+              </button>
+            )}
           </div>
-        )}
-
-        {/* Collapse toggle - desktop only */}
-        {!mobile && (
-          <div className={`border-t border-slate-100 dark:border-slate-700 ${collapsed ? 'px-2 py-2' : 'px-3 py-2'}`}>
-            <button
-              onClick={toggleSidebarCollapse}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className={`flex items-center rounded-xl text-sm font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors w-full ${
-                collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'
-              }`}
-            >
-              {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-              {!collapsed && <span>Collapse</span>}
-            </button>
-          </div>
-        )}
+        </div>
       </aside>
     );
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-white dark:bg-slate-900">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#f8f9fb] dark:bg-[#0B0F19]">
       {isOffline && (
         <div className="bg-red-600 text-white text-center text-sm py-2 px-4 font-medium shrink-0">
           You are offline. Some features may not work.
@@ -289,7 +297,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
       )}
       <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex lg:flex-col lg:shrink-0">
+      <div className={`hidden lg:flex lg:flex-col lg:shrink-0 transition-all duration-300 ${sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'}`}>
         {renderSidebar(false)}
       </div>
 
@@ -297,10 +305,10 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setSidebarOpen(false)}
           />
-          <div className="relative w-64 h-full flex flex-col">
+          <div className="relative w-64 h-full flex flex-col animate-slide-in-right">
             {renderSidebar(true)}
           </div>
         </div>
@@ -308,35 +316,47 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 lg:px-6 py-2.5 flex items-center gap-3 shrink-0">
+        {/* Top bar - Glassmorphism */}
+        <header className="glass-header sticky top-0 z-30 px-4 lg:px-6 py-3 flex items-center gap-4 shrink-0">
+          {/* Mobile sidebar trigger */}
           <button
-            className="lg:hidden p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            className="lg:hidden p-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-colors"
             onClick={() => setSidebarOpen(true)}
           >
-            <Menu size={20} />
+            <Box size={20} />
           </button>
 
+          {/* Desktop sidebar expand button (when collapsed) */}
+          {sidebarCollapsed && (
+            <button
+              className="hidden lg:flex p-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-colors"
+              onClick={toggleSidebar}
+              title="Open sidebar"
+            >
+              <PanelLeftOpen size={20} />
+            </button>
+          )}
+
           {/* Search bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-xl">
-            <div className="relative">
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-auto">
+            <div className="relative group">
               <Search
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-violet-500 pointer-events-none transition-colors"
               />
               <input
                 ref={searchRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="search your files"
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors placeholder:text-slate-400 text-slate-800 dark:text-slate-200"
+                placeholder="Search files, folders..."
+                className="w-full pl-11 pr-10 py-2.5 bg-gray-50 dark:bg-white/[0.03] dark:shadow-inner border border-gray-200 dark:border-white/[0.05] focus:border-violet-400 focus:bg-white dark:focus:bg-[#111118] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 transition-all placeholder:text-slate-400 text-slate-800 dark:text-slate-200 shadow-sm"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={clearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                 >
                   <X size={14} />
                 </button>
@@ -344,12 +364,12 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
             </div>
           </form>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <NotificationBell />
 
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+              className="p-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-colors"
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
@@ -358,32 +378,40 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
             {/* Upload button */}
             <button
               onClick={() => setShowUpload(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm shrink-0 ml-1"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-violet-500/25 dark:shadow-[0_0_25px_rgba(139,92,246,0.3)] shrink-0"
             >
               <Upload size={16} />
               <span className="hidden sm:inline">Upload</span>
             </button>
 
-            {/* Profile dropdown */}
-            <div className="relative ml-1" ref={profileRef}>
+            {/* Profile avatar */}
+            <div className="relative ml-0.5" ref={profileRef}>
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                className="relative p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/[0.05] hover:scale-105 transition-all"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                  {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
-                </div>
-                <ChevronDown size={14} className="text-slate-400 hidden sm:block" />
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full object-cover shadow-sm" />
+                ) : (
+                  <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                    {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
+                  </div>
+                )}
+                <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-[#111827] dark:shadow-[0_0_6px_rgba(34,197,94,0.6)]" />
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#0F172A] rounded-xl shadow-xl shadow-black/[0.08] dark:shadow-black/40 border border-gray-200 dark:border-white/[0.05] z-[100] overflow-hidden animate-slide-down">
                   {/* User info */}
-                  <div className="p-4 border-b border-slate-100 dark:border-slate-700">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/[0.05]">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0">
-                        {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
-                      </div>
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-blue-500 rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0">
+                          {user?.display_name?.[0]?.toUpperCase() ?? 'U'}
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-slate-900 dark:text-white truncate">{user?.display_name}</p>
@@ -398,12 +426,12 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
 
                   {/* Premium upsell for free users */}
                   {(!user?.plan || user.plan === 'free') && (
-                    <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
+                    <div className="px-4 py-3 border-b border-gray-100 dark:border-white/[0.05] bg-gradient-to-r from-violet-50 to-blue-50 dark:from-purple-900/30 dark:to-blue-900/30">
                       <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-2">Enjoy over 10 benefits with Premium</p>
                       <div className="flex justify-center gap-6 mb-2">
                         <div className="flex flex-col items-center">
-                          <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-1">
-                            <HardDrive size={16} className="text-blue-500" />
+                          <div className="w-10 h-10 bg-violet-100 dark:bg-white/[0.06] rounded-full flex items-center justify-center mb-1">
+                            <Box size={16} className="text-violet-500" />
                           </div>
                           <span className="text-[10px] text-slate-500">More storage</span>
                         </div>
@@ -420,18 +448,34 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
                           <span className="text-[10px] text-slate-500">More</span>
                         </div>
                       </div>
-                      <button className="w-full py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                      <button className="w-full py-2 text-white rounded-lg text-sm font-medium upgrade-cta">
                         Premium
                       </button>
                     </div>
                   )}
 
+                  {/* Storage bar */}
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-white/[0.05]">
+                    <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1.5">
+                      <span>Storage: {formatBytes(storageUsed)} / {formatBytes(storageLimit)}</span>
+                      <span>{storagePercent}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 dark:bg-white/[0.1] rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all ${
+                          storagePercent > 90 ? 'bg-red-500' : 'storage-gradient'
+                        }`}
+                        style={{ width: `${Math.max(storagePercent, 1)}%` }}
+                      />
+                    </div>
+                  </div>
+
                   {/* Menu items */}
                   <div className="py-1">
                     <Link
-                      to="/settings"
+                      to="/user-center"
                       onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <User size={16} className="text-slate-400" />
                       Personal Center
@@ -439,18 +483,35 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
                     <Link
                       to="/settings"
                       onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
                     >
                       <Settings size={16} className="text-slate-400" />
                       Settings
                     </Link>
+                    <Link
+                      to="/help"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
+                    >
+                      <HelpCircle size={16} className="text-slate-400" />
+                      Help & Feedback
+                    </Link>
+                    <div className="my-1 border-t border-gray-100 dark:border-white/[0.05]" />
+                    <Link
+                      to="/settings#delete"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                      Delete Account
+                    </Link>
                   </div>
 
                   {/* Logout */}
-                  <div className="border-t border-slate-100 dark:border-slate-700 py-1">
+                  <div className="border-t border-gray-100 dark:border-white/[0.05] py-1">
                     <button
                       onClick={() => { logout(); setProfileOpen(false); }}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors w-full"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors w-full"
                     >
                       <LogOut size={16} className="text-slate-400" />
                       Sign Out
@@ -463,7 +524,7 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900">
+        <main className="flex-1 overflow-y-auto bg-[#f8f9fb] dark:bg-[#0B0F19]">
           {children}
         </main>
       </div>
@@ -478,6 +539,13 @@ export function Layout({ children, onRefresh, currentFolderId }: LayoutProps) {
           }}
         />
       )}
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onUpload={() => setShowUpload(true)}
+        toggleTheme={toggleTheme}
+      />
       </div>
     </div>
   );
@@ -496,12 +564,12 @@ export function Breadcrumb({
           {crumb.to ? (
             <Link
               to={crumb.to}
-              className="hover:text-blue-600 transition-colors"
+              className="hover:text-violet-600 transition-colors"
             >
               {crumb.label}
             </Link>
           ) : (
-            <span className="text-slate-800 dark:text-slate-200 font-medium">{crumb.label}</span>
+            <span className="text-2xl font-bold text-slate-800 dark:text-slate-200 tracking-tight">{crumb.label}</span>
           )}
         </span>
       ))}

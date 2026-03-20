@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Form, Input, InputNumber, Switch, Button, Typography, message, Spin, Space, Row, Col } from 'antd';
-import { SaveOutlined, DollarOutlined } from '@ant-design/icons';
+import { SaveOutlined, MoneyCollectOutlined } from '@ant-design/icons';
 import { adminApi, type AdSettings } from '../../api/admin';
 
 const { Title, Text } = Typography;
@@ -51,7 +51,7 @@ export default function AdSettingsPage() {
   return (
     <div>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}><DollarOutlined /> Ad Settings</Title>
+        <Title level={4} style={{ margin: 0 }}><MoneyCollectOutlined /> Ad Settings</Title>
         <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
           Save Changes
         </Button>
@@ -153,6 +153,15 @@ export default function AdSettingsPage() {
               <Form.Item label="Share Page Sidebar Slot" name="web_share_sidebar_slot_id">
                 <Input placeholder="1234567890" />
               </Form.Item>
+              <Form.Item label="Explore Feed Slot" name="web_explore_feed_slot_id">
+                <Input placeholder="1234567890" />
+              </Form.Item>
+              <Form.Item label="Video Player Banner Slot" name="web_video_player_slot_id">
+                <Input placeholder="1234567890" />
+              </Form.Item>
+              <Form.Item label="Landing Page Slot" name="web_landing_slot_id">
+                <Input placeholder="1234567890" />
+              </Form.Item>
             </Card>
 
             <Card title="Ad Behavior" style={{ marginBottom: 16 }}>
@@ -183,6 +192,27 @@ export default function AdSettingsPage() {
                 extra="How long the speed boost lasts after watching a rewarded ad."
               >
                 <InputNumber min={5} max={120} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item
+                label="Video Ad Countdown (seconds)"
+                name="video_ad_countdown"
+                extra="Countdown before shared video plays for non-logged-in users."
+              >
+                <InputNumber min={3} max={15} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item
+                label="Download Ad Countdown (seconds)"
+                name="download_ad_countdown"
+                extra="Countdown before download starts (every Nth download for free users)."
+              >
+                <InputNumber min={3} max={10} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item
+                label="Download Ad Frequency"
+                name="download_ad_frequency"
+                extra="Show download ad every Nth download."
+              >
+                <InputNumber min={1} max={10} style={{ width: '100%' }} />
               </Form.Item>
             </Card>
           </Col>

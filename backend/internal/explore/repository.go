@@ -25,16 +25,19 @@ const postColumns = `
 	p.id, p.user_id, p.file_id, p.caption, p.category,
 	COALESCE(p.tags, '{}'), p.view_count, p.like_count, p.comment_count,
 	p.duration_seconds, p.status, p.created_at, p.updated_at,
-	u.display_name, UPPER(LEFT(u.display_name, 1)),
-	COALESCE(f.name, ''), COALESCE(f.mime_type, ''), COALESCE(f.size, 0), COALESCE(f.storage_key, '')`
+	COALESCE(u.display_name, ''), UPPER(LEFT(COALESCE(u.display_name, ''), 1)),
+	COALESCE(u.avatar_key, ''),
+	COALESCE(f.name, ''), COALESCE(f.mime_type, ''), COALESCE(f.size, 0),
+	COALESCE(f.storage_key, ''), COALESCE(f.thumbnail_key, '')`
 
 func scanPost(row pgx.Row, p *Post) error {
 	return row.Scan(
 		&p.ID, &p.UserID, &p.FileID, &p.Caption, &p.Category,
 		&p.Tags, &p.ViewCount, &p.LikeCount, &p.CommentCount,
 		&p.DurationSeconds, &p.Status, &p.CreatedAt, &p.UpdatedAt,
-		&p.UserName, &p.UserAvatarInitial,
-		&p.FileName, &p.FileMimeType, &p.FileSize, &p.FileStorageKey,
+		&p.UserName, &p.UserAvatarInitial, &p.UserAvatarKey,
+		&p.FileName, &p.FileMimeType, &p.FileSize,
+		&p.FileStorageKey, &p.FileThumbnailKey,
 	)
 }
 
@@ -46,8 +49,9 @@ func scanPostRows(rows pgx.Rows) ([]Post, error) {
 			&p.ID, &p.UserID, &p.FileID, &p.Caption, &p.Category,
 			&p.Tags, &p.ViewCount, &p.LikeCount, &p.CommentCount,
 			&p.DurationSeconds, &p.Status, &p.CreatedAt, &p.UpdatedAt,
-			&p.UserName, &p.UserAvatarInitial,
-			&p.FileName, &p.FileMimeType, &p.FileSize, &p.FileStorageKey,
+			&p.UserName, &p.UserAvatarInitial, &p.UserAvatarKey,
+			&p.FileName, &p.FileMimeType, &p.FileSize,
+			&p.FileStorageKey, &p.FileThumbnailKey,
 		); err != nil {
 			return nil, fmt.Errorf("scan post: %w", err)
 		}

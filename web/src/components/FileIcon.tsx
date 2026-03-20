@@ -20,7 +20,7 @@ export function FileIcon({ mimeType, size = 24, className = '' }: FileIconProps)
   const props = { size, className };
 
   if (mimeType.startsWith('image/')) {
-    return <FileImage {...props} className={`text-purple-500 ${className}`} />;
+    return <FileImage {...props} className={`text-violet-500 ${className}`} />;
   }
   if (mimeType.startsWith('video/')) {
     return <FileVideo {...props} className={`text-red-500 ${className}`} />;
@@ -59,7 +59,7 @@ export function FileIcon({ mimeType, size = 24, className = '' }: FileIconProps)
     mimeType.includes('html') ||
     mimeType.includes('css')
   ) {
-    return <FileCode {...props} className={`text-blue-500 ${className}`} />;
+    return <FileCode {...props} className={`text-cyan-500 ${className}`} />;
   }
   if (mimeType.includes('word') || mimeType.includes('document')) {
     return <FileText {...props} className={`text-blue-600 ${className}`} />;

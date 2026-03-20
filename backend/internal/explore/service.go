@@ -280,26 +280,45 @@ func (s *Service) toResponse(ctx context.Context, p *Post) (*PostResponse, error
 		}
 	}
 
+	thumbnailURL := ""
+	if p.FileThumbnailKey != "" {
+		url, err := s.storage.PresignGetURL(ctx, s.storage.BucketThumbs(), p.FileThumbnailKey, s.storage.PresignExpiry())
+		if err == nil {
+			thumbnailURL = url
+		}
+	}
+
+	creatorAvatar := ""
+	if p.UserAvatarKey != "" {
+		url, err := s.storage.PresignGetURL(ctx, s.storage.BucketFiles(), p.UserAvatarKey, s.storage.PresignExpiry())
+		if err == nil {
+			creatorAvatar = url
+		}
+	}
+
 	return &PostResponse{
-		ID:               p.ID,
-		UserID:           p.UserID,
-		Caption:          p.Caption,
-		Category:         p.Category,
-		Tags:             p.Tags,
-		ViewCount:        p.ViewCount,
-		LikeCount:        p.LikeCount,
-		CommentCount:     p.CommentCount,
-		DurationSeconds:  p.DurationSeconds,
-		VideoURL:         videoURL,
-		UserName:         p.UserName,
+		ID:                p.ID,
+		UserID:            p.UserID,
+		Caption:           p.Caption,
+		Category:          p.Category,
+		Tags:              p.Tags,
+		ViewCount:         p.ViewCount,
+		LikeCount:         p.LikeCount,
+		CommentCount:      p.CommentCount,
+		DurationSeconds:   p.DurationSeconds,
+		VideoURL:          videoURL,
+		ThumbnailURL:      thumbnailURL,
+		CreatorName:       p.UserName,
+		CreatorAvatar:     creatorAvatar,
+		UserName:          p.UserName,
 		UserAvatarInitial: p.UserAvatarInitial,
-		FileName:         p.FileName,
-		FileMimeType:     p.FileMimeType,
-		FileSize:         p.FileSize,
-		IsLiked:          p.IsLiked,
-		IsSubscribed:     p.IsSubscribed,
-		SubscriberCount:  p.SubscriberCount,
-		CreatedAt:        p.CreatedAt,
+		FileName:          p.FileName,
+		FileMimeType:      p.FileMimeType,
+		FileSize:          p.FileSize,
+		IsLiked:           p.IsLiked,
+		IsSubscribed:      p.IsSubscribed,
+		SubscriberCount:   p.SubscriberCount,
+		CreatedAt:         p.CreatedAt,
 	}, nil
 }
 

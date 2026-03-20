@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Alert, Card, Col, Row, Statistic, Table, Typography, Spin, Tag, Space } from 'antd';
 import {
-  DollarOutlined, TeamOutlined, RiseOutlined, FallOutlined,
+  MoneyCollectOutlined, TeamOutlined, RiseOutlined, FallOutlined,
   CrownOutlined,
 } from '@ant-design/icons';
 import {
@@ -106,7 +106,7 @@ export default function BillingPage() {
       title: 'Amount',
       dataIndex: 'amount',
       width: 100,
-      render: (v: number) => `₹{(v ?? 0).toFixed(2)}`,
+      render: (v: number) => `₹${(v ?? 0).toFixed(2)}`,
     },
     {
       title: 'Date',
@@ -129,7 +129,7 @@ export default function BillingPage() {
   return (
     <div>
       {dataStale && <Alert type="warning" message="Unable to load live billing data. Showing cached/sample data." showIcon closable style={{ marginBottom: 16 }} />}
-      <Title level={4}><DollarOutlined /> Billing / Revenue Dashboard</Title>
+      <Title level={4}><MoneyCollectOutlined /> Billing / Revenue Dashboard</Title>
 
       {/* Stats cards */}
       <Row gutter={[16, 16]}>
@@ -148,7 +148,7 @@ export default function BillingPage() {
             <Statistic
               title="Total Revenue"
               value={b.total_revenue ?? 0}
-              prefix={<DollarOutlined style={{ color: '#1677ff' }} />}
+              prefix={<MoneyCollectOutlined style={{ color: '#1677ff' }} />}
               precision={2}
             />
           </Card>
@@ -182,8 +182,8 @@ export default function BillingPage() {
             <LineChart data={b.revenue_over_time}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
-              <YAxis tickFormatter={(v) => `₹{v}`} />
-              <Tooltip formatter={(v: number) => [`₹{v.toFixed(2)}`, 'Revenue']} />
+              <YAxis tickFormatter={(v) => `₹${v}`} />
+              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)}`, 'Revenue']} />
               <Legend />
               <Line type="monotone" dataKey="revenue" stroke="#52c41a" name="Revenue" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
@@ -231,13 +231,13 @@ export default function BillingPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
-                    label={({ plan, revenue }) => `${planLabel(plan)}: ₹{revenue.toFixed(0)}`}
+                    label={({ plan, revenue }) => `${planLabel(plan)}: ₹${revenue.toFixed(0)}`}
                   >
                     {(b.revenue_by_plan ?? []).map((entry, index) => (
                       <Cell key={index} fill={PLAN_COLORS[entry.plan] || PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => [`₹{v.toFixed(2)}`, 'Revenue']} />
+                  <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)}`, 'Revenue']} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (

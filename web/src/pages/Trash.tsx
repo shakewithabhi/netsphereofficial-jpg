@@ -12,9 +12,18 @@ import {
 import type { FolderItem, FileItem } from '../api/files';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { FileIcon } from '../components/FileIcon';
+import { EmptyState } from '../components/EmptyState';
 import { timeAgo } from '../utils/format';
 
 const trashThumbnailCache = new Map<string, string>();
+
+function daysRemaining(trashedAt: string): number {
+  const trashedDate = new Date(trashedAt);
+  const now = new Date();
+  const diffMs = now.getTime() - trashedDate.getTime();
+  const daysSinceTrashed = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return Math.max(0, 30 - daysSinceTrashed);
+}
 
 export default function Trash() {
   const [folders, setFolders] = useState<FolderItem[]>([]);
@@ -173,7 +182,7 @@ export default function Trash() {
 
   return (
     <Layout onRefresh={refresh}>
-      <div className="p-6 dark:bg-slate-900 min-h-full">
+      <div className="p-6 dark:bg-[#0B0F19] min-h-full">
         <div className="flex items-center justify-between mb-6">
           <Breadcrumb crumbs={[{ label: 'Trash' }]} />
           {!isEmpty && (
@@ -210,23 +219,17 @@ export default function Trash() {
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <Trash2 size={64} className="text-slate-200 dark:text-slate-700 mb-4" />
-            <p className="text-lg font-medium text-slate-600 dark:text-slate-400">Trash is empty</p>
-            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-              Items you delete will appear here for 30 days
-            </p>
-          </div>
+          <EmptyState type="trash" />
         ) : (
           <div className="space-y-3">
             {/* Trashed Folders */}
             {folders.map((folder) => (
               <div
                 key={folder.id}
-                className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl group hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors"
+                className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-xl group hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors"
               >
                 <Folder size={20} className="text-slate-400 shrink-0" />
                 <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-300 truncate line-through decoration-slate-300 dark:decoration-slate-600">
@@ -266,7 +269,7 @@ export default function Trash() {
               return (
                 <div
                   key={file.id}
-                  className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl group hover:border-slate-200 dark:hover:border-slate-600 hover:shadow-sm transition-all overflow-hidden"
+                  className="bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-xl group hover:border-slate-200 dark:hover:border-[#2a3654] hover:shadow-sm transition-all overflow-hidden"
                 >
                   <div className="flex items-start gap-3 p-4">
                     {/* Thumbnail / Icon */}
@@ -274,7 +277,7 @@ export default function Trash() {
                       {isImage && thumbUrl ? (
                         <button
                           onClick={() => handlePreview(file)}
-                          className="relative block w-14 h-14 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700 hover:opacity-90 transition-opacity"
+                          className="relative block w-14 h-14 rounded-lg overflow-hidden bg-slate-100 dark:bg-[#1E293B] hover:opacity-90 transition-opacity"
                         >
                           <img
                             src={thumbUrl}
@@ -286,7 +289,7 @@ export default function Trash() {
                           </div>
                         </button>
                       ) : (
-                        <div className="w-14 h-14 rounded-lg bg-slate-50 dark:bg-slate-700 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-lg bg-slate-50 dark:bg-[#1E293B] flex items-center justify-center">
                           <FileIcon mimeType={file.mime_type} size={24} className="text-slate-400" />
                         </div>
                       )}
@@ -301,10 +304,19 @@ export default function Trash() {
                           {formatBytes(file.size)}
                         </span>
                         {file.trashed_at && (
-                          <span className="flex items-center gap-1 text-xs text-slate-400">
-                            <Clock size={12} />
-                            Trashed {timeAgo(file.trashed_at)}
-                          </span>
+                          <>
+                            <span className="flex items-center gap-1 text-xs text-slate-400">
+                              <Clock size={12} />
+                              Trashed {timeAgo(file.trashed_at)}
+                            </span>
+                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                              daysRemaining(file.trashed_at) <= 5
+                                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                            }`}>
+                              {daysRemaining(file.trashed_at)} days left
+                            </span>
+                          </>
                         )}
                         <span className="text-xs text-slate-300 dark:text-slate-600 hidden sm:block">
                           {file.mime_type}
@@ -318,7 +330,7 @@ export default function Trash() {
                         <button
                           onClick={() => handlePreview(file)}
                           title="Preview"
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-600 bg-violet-50 dark:bg-violet-900/30 hover:bg-violet-100 dark:hover:bg-violet-900/50 rounded-lg transition-colors"
                         >
                           <Eye size={14} />
                           Preview
@@ -354,7 +366,7 @@ export default function Trash() {
       {/* Confirm empty trash dialog */}
       {confirmEmptyTrash && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center shrink-0">
@@ -370,7 +382,7 @@ export default function Trash() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setConfirmEmptyTrash(false)}
-                  className="flex-1 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="flex-1 py-2.5 border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors"
                 >
                   Cancel
                 </button>
@@ -389,7 +401,7 @@ export default function Trash() {
       {/* Confirm delete dialog */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
+          <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-xl w-full max-w-sm mx-4 animate-fade-in">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center shrink-0">
@@ -400,13 +412,13 @@ export default function Trash() {
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">This cannot be undone.</p>
                 </div>
               </div>
-              <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-700 px-3 py-2 rounded-lg mb-5 truncate">
+              <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-[#1E293B] px-3 py-2 rounded-lg mb-5 truncate">
                 "{confirmDelete.name}"
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setConfirmDelete(null)}
-                  className="flex-1 py-2.5 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="flex-1 py-2.5 border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors"
                 >
                   Cancel
                 </button>
@@ -440,15 +452,15 @@ export default function Trash() {
           >
             <button
               onClick={() => setPreviewFile(null)}
-              className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white dark:bg-slate-700 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
+              className="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white dark:bg-[#1E293B] rounded-full shadow-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-white/[0.1] transition-colors"
             >
               <X size={16} className="text-slate-600 dark:text-slate-300" />
             </button>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+            <div className="bg-white dark:bg-[#0F172A] rounded-2xl shadow-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-white/[0.05]">
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{previewFile.name}</p>
               </div>
-              <div className="p-2 flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+              <div className="p-2 flex items-center justify-center bg-slate-50 dark:bg-[#0B0F19]">
                 <img
                   src={previewFile.url}
                   alt={previewFile.name}

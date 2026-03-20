@@ -61,9 +61,9 @@ export function TwoFactorVerify({ tempToken, onSuccess, onCancel }: TwoFactorVer
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+      <div className="w-full max-w-sm bg-white dark:bg-[#0F172A] rounded-2xl shadow-xl border border-slate-100 dark:border-white/[0.05] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-white/[0.05]">
           <div className="flex items-center gap-2">
             <Shield size={18} className="text-blue-600" />
             <h3 className="font-semibold text-slate-800 dark:text-slate-200">
@@ -103,7 +103,7 @@ export function TwoFactorVerify({ tempToken, onSuccess, onCancel }: TwoFactorVer
                 value={code}
                 onChange={(e) => handleCodeChange(e.target.value)}
                 placeholder="000000"
-                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-600 rounded-xl text-lg text-center font-mono tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200"
+                className="w-full px-4 py-3 border border-slate-200 dark:border-white/[0.08] rounded-xl text-lg text-center font-mono tracking-[0.3em] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200"
                 maxLength={6}
                 disabled={loading}
               />

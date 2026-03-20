@@ -12,11 +12,7 @@ import {
   Volume2,
   VolumeX,
   Maximize,
-  SkipForward,
-  ChevronDown,
   Trash2,
-  ToggleLeft,
-  ToggleRight,
 } from 'lucide-react';
 import type { Post, PostComment } from '../api/explore';
 import {
@@ -290,12 +286,12 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
   const relativeTime = timeAgo;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-start justify-center overflow-y-auto">
-      <div className="w-full max-w-7xl mx-auto p-4 lg:p-6 mt-4 mb-8">
+    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-start justify-center overflow-y-auto">
+      <div className="w-full max-w-7xl mx-auto p-4 lg:p-6 mt-4 mb-8 modal-enter">
         {/* Close button */}
         <button
           onClick={onClose}
-          className="fixed top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+          className="fixed top-4 right-4 z-50 p-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-xl text-white rounded-full ring-1 ring-white/10 hover:ring-white/20 transition-all"
         >
           <X size={20} />
         </button>
@@ -328,68 +324,70 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
                   onClick={togglePlay}
                   className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center">
+                  <div className="w-16 h-16 bg-white/15 backdrop-blur-xl rounded-full flex items-center justify-center ring-1 ring-white/20 shadow-2xl">
                     <Play size={28} className="text-white ml-1" />
                   </div>
                 </button>
               )}
 
-              {/* Controls */}
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                {/* Progress bar */}
-                <div
-                  className="w-full h-1 bg-white/20 rounded-full mb-3 cursor-pointer group/progress"
-                  onClick={handleSeek}
-                >
+              {/* Controls overlay with glassmorphism */}
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pt-16 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="mx-4 mb-4 px-4 py-3 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10">
+                  {/* Gradient progress bar */}
                   <div
-                    className="h-full bg-blue-500 rounded-full relative"
-                    style={{ width: `${progress}%` }}
+                    className="w-full h-1.5 bg-white/10 rounded-full mb-3 cursor-pointer group/progress hover:h-2 transition-all"
+                    onClick={handleSeek}
                   >
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity" />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <button onClick={togglePlay} className="text-white hover:text-blue-400 transition-colors">
-                      {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-                    </button>
-                    <button onClick={toggleMute} className="text-white hover:text-blue-400 transition-colors">
-                      {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                    </button>
-                    <span className="text-xs text-white/80 font-mono">
-                      {timeFormat(currentTime)} / {timeFormat(duration)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                        className="text-xs text-white bg-white/20 hover:bg-white/30 px-2 py-1 rounded-md transition-colors font-medium"
-                      >
-                        {speed}x
-                      </button>
-                      {showSpeedMenu && (
-                        <div className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur-md rounded-lg overflow-hidden shadow-xl border border-white/10">
-                          {SPEEDS.map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => changeSpeed(s)}
-                              className={`block w-full px-4 py-2 text-xs text-left transition-colors ${
-                                speed === s
-                                  ? 'bg-blue-500 text-white'
-                                  : 'text-white/80 hover:bg-white/10'
-                              }`}
-                            >
-                              {s}x
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                    <div
+                      className="h-full gradient-progress rounded-full relative"
+                      style={{ width: `${progress}%` }}
+                    >
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg shadow-indigo-500/50 opacity-0 group-hover/progress:opacity-100 transition-opacity" />
                     </div>
-                    <button onClick={handleFullscreen} className="text-white hover:text-blue-400 transition-colors">
-                      <Maximize size={18} />
-                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button onClick={togglePlay} className="text-white hover:text-indigo-400 transition-colors">
+                        {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+                      </button>
+                      <button onClick={toggleMute} className="text-white hover:text-indigo-400 transition-colors">
+                        {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                      </button>
+                      <span className="text-xs text-white/80 font-mono">
+                        {timeFormat(currentTime)} / {timeFormat(duration)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+                          className="text-xs text-white bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-lg transition-colors font-medium"
+                        >
+                          {speed}x
+                        </button>
+                        {showSpeedMenu && (
+                          <div className="absolute bottom-full right-0 mb-2 bg-black/80 backdrop-blur-xl rounded-xl overflow-hidden shadow-xl border border-white/10">
+                            {SPEEDS.map((s) => (
+                              <button
+                                key={s}
+                                onClick={() => changeSpeed(s)}
+                                className={`block w-full px-4 py-2 text-xs text-left transition-colors ${
+                                  speed === s
+                                    ? 'bg-indigo-500 text-white'
+                                    : 'text-white/80 hover:bg-white/10'
+                                }`}
+                              >
+                                {s}x
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={handleFullscreen} className="text-white hover:text-indigo-400 transition-colors">
+                        <Maximize size={18} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -403,7 +401,7 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
                   {currentPost.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-blue-400 hover:text-blue-300 text-sm cursor-pointer transition-colors"
+                      className="text-indigo-400 hover:text-indigo-300 text-sm cursor-pointer transition-colors"
                     >
                       #{tag}
                     </span>
@@ -415,8 +413,18 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
             {/* Creator info */}
             <div className="flex items-center justify-between mt-4 py-4 border-t border-white/10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
-                  {currentPost.creator_name?.[0]?.toUpperCase() ?? '?'}
+                <div className="p-0.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full ring-2 ring-indigo-500/30 shrink-0">
+                  {currentPost.creator_avatar ? (
+                    <img
+                      src={currentPost.creator_avatar}
+                      alt={currentPost.creator_name}
+                      className="w-9 h-9 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 bg-black rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {currentPost.creator_name?.[0]?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-white font-medium text-sm">@{currentPost.creator_name}</p>
@@ -429,8 +437,8 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
                 onClick={handleSubscribe}
                 className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
                   isSubscribed
-                    ? 'border border-white/30 text-white/80 hover:border-white/50'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/25'
+                    ? 'border border-white/20 text-white/70 hover:border-white/40'
+                    : 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5'
                 }`}
               >
                 {isSubscribed ? 'Subscribed' : 'Subscribe'}
@@ -441,41 +449,41 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
             <div className="flex items-center gap-1 py-3 border-t border-white/10">
               <button
                 onClick={handleLike}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-medium transition-all ${
                   isLiked
-                    ? 'bg-red-500/20 text-red-400'
+                    ? 'bg-red-500/15 text-red-400 shadow-lg shadow-red-500/10'
                     : 'bg-white/5 text-white/70 hover:bg-white/10'
                 }`}
               >
                 <Heart
                   size={18}
-                  className={`transition-transform ${likeAnimating ? 'animate-like-bounce' : ''} ${
+                  className={`transition-transform ${likeAnimating ? 'animate-heart-burst' : ''} ${
                     isLiked ? 'fill-current' : ''
                   }`}
                 />
                 {formatCount(likeCount)}
               </button>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 text-white/70 text-sm">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 text-white/70 text-sm">
                 <Eye size={18} />
                 {formatCount(currentPost.view_count)}
               </div>
               <button
                 onClick={() => document.getElementById('comment-input')?.focus()}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors"
               >
                 <MessageCircle size={18} />
                 {formatCount(currentPost.comment_count)}
               </button>
               <button
                 onClick={handleShare}
-                className="relative flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors"
+                className="relative flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors"
               >
                 <Share2 size={18} />
                 {shareToast ? 'Link copied!' : 'Share'}
               </button>
               <button
                 onClick={() => setShowReport(!showReport)}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 text-white/70 hover:bg-white/10 text-sm transition-colors ml-auto"
+                className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/5 text-white/70 hover:bg-red-500/10 hover:text-red-400 text-sm transition-colors ml-auto"
               >
                 <Flag size={16} />
               </button>
@@ -489,7 +497,7 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
                   placeholder="Reason for reporting..."
-                  className="w-full px-3 py-2 bg-white/10 rounded-lg text-sm text-white placeholder:text-white/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-white/10 rounded-lg text-sm text-white placeholder:text-white/40 border border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
                 />
                 <div className="flex gap-2 mt-2">
                   <button
@@ -510,14 +518,19 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
 
             {/* Comments */}
             <div className="mt-4 border-t border-white/10 pt-4">
-              <h3 className="text-white font-semibold mb-4">
-                Comments ({comments.length})
+              <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                Comments
+                <span className="bg-white/10 text-white/60 px-2 py-0.5 rounded-full text-xs font-normal">
+                  {comments.length}
+                </span>
               </h3>
 
               {/* Comment input */}
               <div className="flex gap-3 mb-6">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
-                  Y
+                <div className="p-0.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full shrink-0">
+                  <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    Y
+                  </div>
                 </div>
                 <div className="flex-1 flex gap-2">
                   <input
@@ -526,12 +539,12 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
                     placeholder="Add a comment..."
-                    className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-transparent transition-all"
                   />
                   <button
                     onClick={handleAddComment}
                     disabled={!commentText.trim()}
-                    className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full disabled:opacity-30 transition-colors"
+                    className="p-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full disabled:opacity-30 transition-colors"
                   >
                     <Send size={16} />
                   </button>
@@ -540,16 +553,18 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
 
               {loadingComments ? (
                 <div className="flex justify-center py-8">
-                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : comments.length === 0 ? (
                 <p className="text-center text-white/40 text-sm py-8">No comments yet. Be the first!</p>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-1">
                   {comments.map((c) => (
-                    <div key={c.id} className="flex gap-3 group">
-                      <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
-                        {c.user_name?.[0]?.toUpperCase() ?? '?'}
+                    <div key={c.id} className="flex gap-3 group hover:bg-white/[0.03] rounded-xl p-2 transition-colors">
+                      <div className="p-0.5 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full shrink-0 h-fit">
+                        <div className="w-7 h-7 bg-black rounded-full flex items-center justify-center text-white text-xs font-bold">
+                          {c.user_name?.[0]?.toUpperCase() ?? '?'}
+                        </div>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -580,30 +595,41 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
                 className="flex items-center gap-2 text-xs text-white/60"
               >
                 Autoplay
-                {autoplay ? (
-                  <ToggleRight size={20} className="text-blue-500" />
-                ) : (
-                  <ToggleLeft size={20} className="text-white/30" />
-                )}
+                <div
+                  className={`relative w-8 h-4 rounded-full transition-colors ${
+                    autoplay ? 'bg-indigo-500' : 'bg-white/20'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform ${
+                      autoplay ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                  />
+                </div>
               </button>
             </div>
-            <div className="space-y-3">
-              {relatedPosts.map((rp) => (
+            <div className="space-y-2">
+              {relatedPosts.map((rp, idx) => (
                 <button
                   key={rp.id}
                   onClick={() => navigateToPost(rp)}
-                  className="flex gap-3 w-full text-left group/card hover:bg-white/5 rounded-xl p-2 transition-colors"
+                  className="flex gap-3 w-full text-left group/card hover:bg-white/5 rounded-2xl p-2 transition-colors"
                 >
-                  <div className="w-40 aspect-video bg-slate-800 rounded-lg overflow-hidden relative shrink-0">
+                  <div className="w-40 aspect-video bg-slate-800 rounded-xl overflow-hidden relative shrink-0 hover:ring-1 ring-indigo-500/30 transition-all">
                     <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
                       <Play size={16} className="text-white/40" />
                     </div>
                     <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/80 text-white text-[10px] font-medium rounded">
                       {formatDuration(rp.duration_seconds)}
                     </div>
+                    {idx === 0 && autoplay && (
+                      <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-indigo-500/80 backdrop-blur-sm text-white text-[9px] font-semibold uppercase rounded tracking-wide">
+                        Next
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0 py-0.5">
-                    <p className="text-white text-sm font-medium line-clamp-2 leading-snug group-hover/card:text-blue-400 transition-colors">
+                    <p className="text-white text-sm font-medium line-clamp-2 leading-snug group-hover/card:text-indigo-400 transition-colors">
                       {rp.caption}
                     </p>
                     <p className="text-white/50 text-xs mt-1">@{rp.creator_name}</p>
@@ -620,20 +646,6 @@ export function VideoWatchModal({ post, onClose, onPostUpdate, onNavigate }: Vid
           </div>
         </div>
       </div>
-
-      {/* Like bounce animation */}
-      <style>{`
-        @keyframes like-bounce {
-          0% { transform: scale(1); }
-          25% { transform: scale(1.3); }
-          50% { transform: scale(0.9); }
-          75% { transform: scale(1.1); }
-          100% { transform: scale(1); }
-        }
-        .animate-like-bounce {
-          animation: like-bounce 0.5s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 }

@@ -4,6 +4,8 @@ import type { FileItem } from '../api/files';
 import { getDownloadUrl, formatBytes } from '../api/files';
 import client from '../api/client';
 import { FileIcon } from './FileIcon';
+import { useAuth } from '../store/auth';
+import { AdBanner } from './AdBanner';
 
 interface FilePreviewProps {
   file: FileItem;
@@ -30,6 +32,8 @@ function getFileCategory(mimeType: string): 'image' | 'video' | 'audio' | 'pdf' 
 }
 
 export function FilePreview({ file, files, onClose, onNavigate }: FilePreviewProps) {
+  const { user } = useAuth();
+  const isFreeTier = !user?.plan || user.plan === 'free';
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -163,14 +167,25 @@ export function FilePreview({ file, files, onClose, onNavigate }: FilePreviewPro
       case 'video':
         return (
           <div className="flex flex-col items-center justify-center h-full p-4">
-            <video
-              src={url}
-              controls
-              className="max-w-full max-h-[75vh] rounded-lg"
-              ref={(el) => { if (el) el.playbackRate = videoSpeed; }}
-            >
-              Your browser does not support video playback.
-            </video>
+            <div className="relative max-w-full">
+              <video
+                src={url}
+                controls
+                className="max-w-full max-h-[75vh] rounded-lg"
+                ref={(el) => { if (el) el.playbackRate = videoSpeed; }}
+              >
+                Your browser does not support video playback.
+              </video>
+              {/* Ad overlay for free-tier users */}
+              {isFreeTier && (
+                <div className="absolute bottom-12 left-0 right-0 bg-black/60 backdrop-blur-sm px-3 py-2 flex items-center justify-center gap-2 pointer-events-none">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wide">Advertisement</span>
+                  <div className="pointer-events-auto">
+                    <AdBanner slot="VIDEO_OVERLAY_SLOT_ID" format="horizontal" style={{ minHeight: 50, maxHeight: 60 }} />
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-2 mt-3">
               <span className="text-xs text-slate-300">Speed:</span>
               {[0.5, 1, 1.5, 2].map((speed) => (

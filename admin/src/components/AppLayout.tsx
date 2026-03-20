@@ -2,7 +2,7 @@ import { Layout, Menu, Typography, Button, Space } from 'antd';
 import {
   DashboardOutlined, TeamOutlined, CloudOutlined, LogoutOutlined,
   CloudServerOutlined, AuditOutlined, CheckCircleOutlined,
-  SettingOutlined, FolderOutlined, CommentOutlined, DollarOutlined,
+  SettingOutlined, FolderOutlined, CommentOutlined, MoneyCollectOutlined,
   BarChartOutlined, PlayCircleOutlined, BellOutlined, HeartOutlined,
   DownloadOutlined, EyeOutlined, DatabaseOutlined, PieChartOutlined,
 } from '@ant-design/icons';
@@ -26,9 +26,9 @@ const menuItems = [
 
   { type: 'group' as const, label: 'Analytics', children: [
     { key: '/ad-analytics', icon: <BarChartOutlined />, label: 'Ad Analytics' },
-    { key: '/ad-settings', icon: <DollarOutlined />, label: 'Ad Settings' },
+    { key: '/ad-settings', icon: <MoneyCollectOutlined />, label: 'Ad Settings' },
     { key: '/user-storage', icon: <DatabaseOutlined />, label: 'User Storage' },
-    { key: '/revenue', icon: <DollarOutlined />, label: 'Revenue' },
+    { key: '/revenue', icon: <MoneyCollectOutlined />, label: 'Revenue' },
     { key: '/billing', icon: <PieChartOutlined />, label: 'Billing' },
     { key: '/reports', icon: <DownloadOutlined />, label: 'Reports' },
   ]},

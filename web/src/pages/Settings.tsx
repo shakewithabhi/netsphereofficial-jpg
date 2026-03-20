@@ -1,22 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import type { FormEvent, ChangeEvent } from 'react';
-import { User, Check, X, HardDrive, FileText, Shield, Camera, Lock, Eye, EyeOff } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { User, Check, X, HardDrive, FileText, Shield, Camera, Lock, Eye, EyeOff, Trash2, AlertTriangle } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../store/auth';
 import { formatBytes } from '../api/files';
 import client from '../api/client';
-import { uploadAvatar, changePassword } from '../api/auth';
+import { uploadAvatar, changePassword, deleteAccount } from '../api/auth';
 import { Layout, Breadcrumb } from '../components/Layout';
 import { RewardedAdButton } from '../components/RewardedAd';
 import { TwoFactorSetup } from '../components/TwoFactorSetup';
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
+  const location = useLocation();
   const [displayName, setDisplayName] = useState(user?.display_name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+
+  // Delete account state
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const deleteRef = useRef<HTMLDivElement>(null);
 
   // Avatar state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,13 +48,20 @@ export default function Settings() {
     setAvatarUrl(user?.avatar_url ?? storedAvatar ?? null);
   }, [user]);
 
+  // Scroll to #delete section if hash is present
+  useEffect(() => {
+    if (location.hash === '#delete' && deleteRef.current) {
+      setTimeout(() => deleteRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  }, [location.hash]);
+
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setSuccess('');
     setError('');
     try {
-      await client.put('/auth/profile', {
+      await client.put('/auth/me', {
         display_name: displayName,
         email,
       });
@@ -160,6 +173,19 @@ export default function Settings() {
     }
   }
 
+  async function handleDeleteAccount() {
+    if (deleteConfirm !== 'DELETE') return;
+    setDeleteLoading(true);
+    try {
+      await deleteAccount();
+      logout();
+    } catch {
+      alert('Contact support to delete your account.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
 
   useEffect(() => {
@@ -180,19 +206,19 @@ export default function Settings() {
   const storagePercent = Math.min(100, Math.round((storageUsed / storageLimit) * 100));
 
   const inputClass =
-    'w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200';
+    'w-full px-4 py-2.5 border border-slate-200 dark:border-white/[0.08] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200';
 
   return (
     <Layout>
-      <div className="p-6 max-w-2xl dark:bg-slate-900 min-h-full">
+      <div className="p-6 max-w-2xl dark:bg-[#0B0F19] min-h-full">
         <div className="mb-6">
           <Breadcrumb crumbs={[{ label: 'Settings' }]} />
         </div>
 
         <div className="space-y-6">
           {/* Profile section */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/[0.05] flex items-center gap-2">
               <User size={16} className="text-slate-500 dark:text-slate-400" />
               <h2 className="font-semibold text-slate-800 dark:text-slate-200">Profile</h2>
             </div>
@@ -308,8 +334,8 @@ export default function Settings() {
           </div>
 
           {/* Change Password section */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/[0.05] flex items-center gap-2">
               <Lock size={16} className="text-slate-500 dark:text-slate-400" />
               <h2 className="font-semibold text-slate-800 dark:text-slate-200">Change Password</h2>
             </div>
@@ -409,8 +435,8 @@ export default function Settings() {
           </div>
 
           {/* Storage section */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/[0.05] flex items-center gap-2">
               <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
               <h2 className="font-semibold text-slate-800 dark:text-slate-200">Storage</h2>
             </div>
@@ -433,7 +459,7 @@ export default function Settings() {
                 </span>
               </div>
 
-              <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-slate-100 dark:bg-[#1E293B] rounded-full h-3 overflow-hidden">
                 <div
                   className={`h-3 rounded-full transition-all ${
                     storagePercent > 90 ? 'bg-red-500' : 'bg-blue-600'
@@ -450,7 +476,7 @@ export default function Settings() {
 
               {/* Rewarded ad for free-tier users */}
               {(!user?.plan || user.plan === 'free') && (
-                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-white/[0.05]">
                   <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
                     Need more space? Watch a short ad to earn extra storage.
                   </p>
@@ -461,8 +487,8 @@ export default function Settings() {
           </div>
 
           {/* Two-Factor Authentication section */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/[0.05] flex items-center gap-2">
               <Shield size={16} className="text-slate-500 dark:text-slate-400" />
               <h2 className="font-semibold text-slate-800 dark:text-slate-200">Two-Factor Authentication</h2>
             </div>
@@ -482,26 +508,68 @@ export default function Settings() {
           </div>
 
           {/* Legal section */}
-          <div className="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-white/[0.05] rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-white/[0.05] flex items-center gap-2">
               <FileText size={16} className="text-slate-500 dark:text-slate-400" />
               <h2 className="font-semibold text-slate-800 dark:text-slate-200">Legal</h2>
             </div>
             <div className="p-6 space-y-3">
               <Link
                 to="/privacy"
-                className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors group"
+                className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-[#1E293B] rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.1] transition-colors group"
               >
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Privacy Policy</span>
                 <span className="text-xs text-slate-400 group-hover:text-blue-600 transition-colors">View</span>
               </Link>
               <Link
                 to="/terms"
-                className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors group"
+                className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-[#1E293B] rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.1] transition-colors group"
               >
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Terms of Service</span>
                 <span className="text-xs text-slate-400 group-hover:text-blue-600 transition-colors">View</span>
               </Link>
+            </div>
+          </div>
+
+          {/* Delete Account section */}
+          <div ref={deleteRef} id="delete" className="bg-white dark:bg-[#0F172A] border border-red-200 dark:border-red-900/50 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-red-100 dark:border-red-900/50 flex items-center gap-2">
+              <Trash2 size={16} className="text-red-500" />
+              <h2 className="font-semibold text-red-600 dark:text-red-400">Delete Account</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl">
+                <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  This action is permanent and cannot be undone. All your files, shares, and account data will be permanently deleted.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                    Type <span className="font-bold text-red-500">DELETE</span> to confirm
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder="DELETE"
+                    className="w-full px-4 py-2.5 border border-red-200 dark:border-red-900/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200"
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleDeleteAccount}
+                    disabled={deleteConfirm !== 'DELETE' || deleteLoading}
+                    className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deleteLoading ? 'Deleting...' : 'Delete my account'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

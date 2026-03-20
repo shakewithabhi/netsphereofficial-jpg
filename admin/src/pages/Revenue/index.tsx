@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, Col, Row, Statistic, Table, Typography, Spin, Tag } from 'antd';
-import { DollarOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
+import { MoneyCollectOutlined, TeamOutlined, RiseOutlined } from '@ant-design/icons';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
@@ -35,8 +35,8 @@ export default function RevenuePage() {
   const planColumns = [
     { title: 'Plan', dataIndex: 'plan', render: (v: string) => <Tag color={v === 'free' ? 'default' : v === 'pro' ? 'blue' : 'gold'}>{planLabel(v)}</Tag> },
     { title: 'User Count', dataIndex: 'user_count' },
-    { title: 'Price/Month', dataIndex: 'price_per_month', render: (v: number) => `$${(v ?? 0).toFixed(2)}` },
-    { title: 'Monthly Revenue', dataIndex: 'monthly_revenue', render: (v: number) => `$${(v ?? 0).toFixed(2)}` },
+    { title: 'Price/Month', dataIndex: 'price_per_month', render: (v: number) => `₹${(v ?? 0).toFixed(2)}` },
+    { title: 'Monthly Revenue', dataIndex: 'monthly_revenue', render: (v: number) => `₹${(v ?? 0).toFixed(2)}` },
   ];
 
   const changeColumns = [
@@ -62,7 +62,7 @@ export default function RevenuePage() {
 
   return (
     <div>
-      <Title level={4}><DollarOutlined /> Revenue Dashboard</Title>
+      <Title level={4}><MoneyCollectOutlined /> Revenue Dashboard</Title>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8}>
@@ -79,7 +79,7 @@ export default function RevenuePage() {
             <Statistic
               title="Monthly Revenue"
               value={s.monthly_revenue ?? 0}
-              prefix={<span style={{ color: '#52c41a' }}>$</span>}
+              prefix={<span style={{ color: '#52c41a' }}>₹</span>}
               precision={2}
             />
           </Card>
@@ -89,7 +89,7 @@ export default function RevenuePage() {
             <Statistic
               title="Avg Revenue Per User"
               value={s.avg_revenue_per_user ?? 0}
-              prefix={<span style={{ color: '#faad14' }}>$</span>}
+              prefix={<span style={{ color: '#faad14' }}>₹</span>}
               precision={2}
             />
           </Card>
@@ -127,8 +127,8 @@ export default function RevenuePage() {
             <LineChart data={projectionData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
-              <YAxis tickFormatter={(v) => `$${v}`} />
-              <Tooltip formatter={(v: number) => [`$${v.toFixed(2)}`, 'Projected Revenue']} />
+              <YAxis tickFormatter={(v) => `₹${v}`} />
+              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)}`, 'Projected Revenue']} />
               <Legend />
               <Line type="monotone" dataKey="revenue" stroke="#52c41a" name="Projected Revenue" strokeWidth={2} />
             </LineChart>

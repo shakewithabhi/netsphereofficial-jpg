@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Card, Col, Row, Statistic, Spin, Typography, Table, Progress } from 'antd';
 import {
-  UserOutlined, DollarOutlined, EyeOutlined, TeamOutlined,
+  UserOutlined, MoneyCollectOutlined, EyeOutlined, TeamOutlined,
   PercentageOutlined, RiseOutlined,
 } from '@ant-design/icons';
 import {
@@ -45,7 +45,7 @@ export default function AdAnalyticsPage() {
     { title: 'Paid Users', value: totalPaid, icon: <TeamOutlined />, color: '#52c41a' },
     { title: 'Free User %', value: `${freePercent.toFixed(1)}%`, icon: <PercentageOutlined />, color: '#faad14' },
     { title: 'Est. Daily Impressions', value: impressions.toLocaleString(), icon: <EyeOutlined />, color: '#722ed1' },
-    { title: 'Est. Daily Revenue', value: `$${dailyRevenue.toFixed(2)}`, icon: <DollarOutlined />, color: '#eb2f96' },
+    { title: 'Est. Daily Revenue', value: `₹${dailyRevenue.toFixed(2)}`, icon: <MoneyCollectOutlined />, color: '#eb2f96' },
   ];
 
   const planData = (a.plan_distribution ?? []).map((p: any) => ({
@@ -72,7 +72,7 @@ export default function AdAnalyticsPage() {
       title: 'Est. Revenue',
       dataIndex: 'revenue',
       key: 'revenue',
-      render: (v: number) => `$${v.toFixed(2)}`,
+      render: (v: number) => `₹${v.toFixed(2)}`,
     },
   ];
 
@@ -155,13 +155,13 @@ export default function AdAnalyticsPage() {
               <Col xs={24} sm={12}>
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ marginBottom: 8 }}>
-                    <strong>At 5% conversion:</strong> {conversionRate5} users = ${(conversionRate5 * potentialRevenuePerUser).toFixed(2)}/mo
+                    <strong>At 5% conversion:</strong> {conversionRate5} users = ₹{(conversionRate5 * potentialRevenuePerUser).toFixed(2)}/mo
                   </div>
                   <Progress percent={5} strokeColor="#52c41a" />
                 </div>
                 <div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong>At 10% conversion:</strong> {conversionRate10} users = ${(conversionRate10 * potentialRevenuePerUser).toFixed(2)}/mo
+                    <strong>At 10% conversion:</strong> {conversionRate10} users = ₹{(conversionRate10 * potentialRevenuePerUser).toFixed(2)}/mo
                   </div>
                   <Progress percent={10} strokeColor="#1677ff" />
                 </div>

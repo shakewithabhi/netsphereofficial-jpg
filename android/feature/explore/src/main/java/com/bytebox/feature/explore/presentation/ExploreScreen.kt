@@ -430,6 +430,11 @@ private fun ExploreFeedContent(
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
+                // Native ad after every 6th row (every 12 items)
+                // TODO: Wire up native ad rendering here
+                // if (AdManager.shouldShowNativeAd(rowIndex)) { BannerAd() }
+                // Requires: import com.bytebox.core.ui.components.BannerAd
+                //           import com.bytebox.core.common.AdManager
             }
         } else if (!uiState.isLoading) {
             item(key = "empty") {

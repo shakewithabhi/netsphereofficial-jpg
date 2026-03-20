@@ -55,27 +55,28 @@ export async function getFeed(
   sort = 'latest',
   category?: string,
   tag?: string,
-  limit = 20
+  limit = 20,
+  offset = 0
 ): Promise<Post[]> {
-  const params: Record<string, string | number> = { sort, limit };
+  const params: Record<string, string | number> = { sort, limit, offset };
   if (category) params.category = category;
   if (tag) params.tag = tag;
   const res = await client.get('/explore/feed', { params });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
-export async function getTrendingFeed(limit = 10): Promise<Post[]> {
-  const res = await client.get('/explore/feed/trending', { params: { limit } });
+export async function getTrendingFeed(limit = 10, offset = 0): Promise<Post[]> {
+  const res = await client.get('/explore/feed/trending', { params: { limit, offset } });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
-export async function getForYouFeed(limit = 20): Promise<Post[]> {
-  const res = await client.get('/explore/feed/foryou', { params: { limit } });
+export async function getForYouFeed(limit = 20, offset = 0): Promise<Post[]> {
+  const res = await client.get('/explore/feed/foryou', { params: { limit, offset } });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
-export async function getSubscriptionFeed(limit = 20): Promise<Post[]> {
-  const res = await client.get('/explore/feed/subscriptions', { params: { limit } });
+export async function getSubscriptionFeed(limit = 20, offset = 0): Promise<Post[]> {
+  const res = await client.get('/explore/feed/subscriptions', { params: { limit, offset } });
   return res.data.data?.posts ?? res.data.data ?? [];
 }
 
@@ -98,6 +99,14 @@ export async function createPost(
 
 export async function getPost(id: string): Promise<Post> {
   const res = await client.get(`/explore/posts/${id}`);
+  return res.data.data;
+}
+
+export async function updatePost(
+  id: string,
+  data: { caption?: string; category?: string; tags?: string[] }
+): Promise<Post> {
+  const res = await client.put(`/explore/posts/${id}`, data);
   return res.data.data;
 }
 
@@ -187,6 +196,12 @@ export function formatCount(n: number): string {
 }
 
 export function formatDuration(seconds: number): string {
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;

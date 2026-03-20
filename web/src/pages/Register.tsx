@@ -77,7 +77,7 @@ export default function Register() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Your name"
                 autoComplete="name"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 dark:text-white bg-white dark:bg-[#1E293B] dark:border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
             </div>
 
@@ -91,7 +91,7 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 autoComplete="email"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 dark:text-white bg-white dark:bg-[#1E293B] dark:border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
             </div>
 
@@ -106,7 +106,7 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Min. 8 characters"
                   autoComplete="new-password"
-                  className="w-full px-4 py-2.5 pr-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  className="w-full px-4 py-2.5 pr-10 border border-slate-200 rounded-xl text-sm text-slate-900 dark:text-white bg-white dark:bg-[#1E293B] dark:border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
                 />
                 <button
                   type="button"
@@ -128,7 +128,7 @@ export default function Register() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat your password"
                 autoComplete="new-password"
-                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 dark:text-white bg-white dark:bg-[#1E293B] dark:border-white/[0.08] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
               />
             </div>
 

@@ -36,12 +36,14 @@ type Post struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 
 	// Joined fields
-	UserName         string `json:"user_name"`
+	UserName          string `json:"user_name"`
 	UserAvatarInitial string `json:"user_avatar_initial"`
-	FileName         string `json:"file_name"`
-	FileMimeType     string `json:"file_mime_type"`
-	FileSize         int64  `json:"file_size"`
-	FileStorageKey   string `json:"-"`
+	UserAvatarKey     string `json:"-"`
+	FileName          string `json:"file_name"`
+	FileMimeType      string `json:"file_mime_type"`
+	FileSize          int64  `json:"file_size"`
+	FileStorageKey    string `json:"-"`
+	FileThumbnailKey  string `json:"-"`
 
 	// Viewer-specific fields
 	IsLiked          bool  `json:"is_liked"`
@@ -59,10 +61,13 @@ type PostResponse struct {
 	ViewCount        int64     `json:"view_count"`
 	LikeCount        int64     `json:"like_count"`
 	CommentCount     int64     `json:"comment_count"`
-	DurationSeconds  int       `json:"duration_seconds"`
-	VideoURL         string    `json:"video_url"`
-	UserName         string    `json:"user_name"`
-	UserAvatarInitial string  `json:"user_avatar_initial"`
+	DurationSeconds   int       `json:"duration_seconds"`
+	VideoURL          string    `json:"video_url"`
+	ThumbnailURL      string    `json:"thumbnail_url"`
+	CreatorName       string    `json:"creator_name"`
+	CreatorAvatar     string    `json:"creator_avatar"`
+	UserName          string    `json:"user_name"`
+	UserAvatarInitial string    `json:"user_avatar_initial"`
 	FileName         string    `json:"file_name"`
 	FileMimeType     string    `json:"file_mime_type"`
 	FileSize         int64     `json:"file_size"`
