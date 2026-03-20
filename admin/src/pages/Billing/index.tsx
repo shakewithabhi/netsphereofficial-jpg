@@ -148,7 +148,7 @@ export default function BillingPage() {
             <Statistic
               title="Total Revenue"
               value={b.total_revenue ?? 0}
-              prefix={<MoneyCollectOutlined style={{ color: '#1677ff' }} />}
+              prefix={<span style={{ color: '#52c41a' }}>₹</span>}
               precision={2}
             />
           </Card>
